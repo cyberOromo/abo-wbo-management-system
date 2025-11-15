@@ -1,7 +1,7 @@
 <?php
 namespace App\Controllers;
 
-use App\Core\BaseController;
+use App\Core\Controller;
 use App\Models\Responsibility;
 use App\Models\ResponsibilityAssignment;
 use App\Models\Position;
@@ -14,7 +14,7 @@ use Exception;
  * Handles responsibility and assignment management
  * ABO-WBO Management System - Shared Responsibilities & Tasks Management
  */
-class ResponsibilityController extends BaseController
+class ResponsibilityController extends Controller
 {
     protected $responsibilityModel;
     protected $assignmentModel;
@@ -24,7 +24,11 @@ class ResponsibilityController extends BaseController
     
     public function __construct()
     {
-        parent::__construct();
+        $this->responsibilityModel = new Responsibility();
+        $this->assignmentModel = new ResponsibilityAssignment();
+        $this->positionModel = new Position();
+        $this->userAssignmentModel = new UserAssignment();
+        $this->userModel = new User();
     }
     
     /**
@@ -60,15 +64,10 @@ class ResponsibilityController extends BaseController
             // Get overdue assignments
             $overdueAssignments = $this->assignmentModel->getOverdueAssignments(['limit' => 5]);
             
-            $this->render('responsibilities/index_modern', [
+            $this->render('responsibilities/index', [
                 'title' => 'Shared Responsibilities & Tasks Management',
                 'section' => 'responsibilities',
-                'responsibilities' => $sharedResponsibilities,
                 'stats' => $stats,
-                'can_create' => true,
-                'responsibility_stats' => $stats,
-                'recent_delegations' => $this->getRecentDelegations(),
-                'responsibility_metrics' => $this->getResponsibilityMetrics(),
                 'shared_responsibilities' => $sharedResponsibilities,
                 'position_responsibilities' => $positionResponsibilities,
                 'recent_assignments' => $recentAssignments,
@@ -504,11 +503,7 @@ class ResponsibilityController extends BaseController
             $modelClass = "\\App\\Models\\" . ucfirst($type);
             if (class_exists($modelClass)) {
                 $model = new $modelClass();
-                if (method_exists($model, 'getActive')) {
-                    return $model->getActive();
-                } else {
-                    return $modelClass::all();
-                }
+                return $model->getAll();
             }
         } catch (Exception $e) {
             error_log("Failed to get {$type} units: " . $e->getMessage());
@@ -544,29 +539,6 @@ class ResponsibilityController extends BaseController
         // This would fetch from activity_logs table
         // For now, return empty array
         return [];
-    }
-    
-    
-    /**
-     * Get recent delegations for dashboard
-     */
-    private function getRecentDelegations(): array
-    {
-        // This would fetch from delegations table
-        // For now, return empty array
-        return [];
-    }
-    
-    /**
-     * Get responsibility metrics for dashboard
-     */
-    private function getResponsibilityMetrics(): array
-    {
-        return [
-            'assignment_rate' => 75,
-            'active_delegations' => 12,
-            'pending_reviews' => 3
-        ];
     }
     
     /**

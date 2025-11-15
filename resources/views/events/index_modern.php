@@ -1,363 +1,181 @@
 <?php
-$currentPage = 'events';
+$pageTitle = $title ?? 'Events Management';
+$layout = 'modern';
 ?>
 
-<!-- Modern Events Management Interface -->
-<style>
-    .event-card {
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        border: 1px solid rgba(0, 0, 0, 0.05);
-        transition: all 0.3s ease;
-        overflow: hidden;
-        position: relative;
-    }
-    
-    .event-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 24px -2px rgba(0, 0, 0, 0.15);
-    }
-    
-    .event-featured {
-        background: linear-gradient(135deg, rgba(139, 21, 56, 0.05) 0%, white 50%);
-        border-left: 4px solid var(--primary-red);
-    }
-    
-    .event-community {
-        border-left: 4px solid var(--primary-green);
-    }
-    
-    .event-educational {
-        border-left: 4px solid #3b82f6;
-    }
-    
-    .event-cultural {
-        border-left: 4px solid #8b5cf6;
-    }
-    
-    .event-social {
-        border-left: 4px solid #f59e0b;
-    }
-    
-    .event-header-ribbon {
-        position: absolute;
-        top: 15px;
-        right: -35px;
-        background: linear-gradient(45deg, var(--primary-red), #a21e3a);
-        color: white;
-        padding: 5px 45px;
-        transform: rotate(45deg);
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-    
-    .event-date-badge {
-        background: linear-gradient(135deg, var(--primary-green), var(--primary-green-light));
-        color: white;
-        border-radius: 16px;
-        padding: 0.75rem;
-        text-align: center;
-        box-shadow: 0 4px 8px rgba(45, 80, 22, 0.2);
-        min-width: 80px;
-    }
-    
-    .event-date-day {
-        font-size: 1.5rem;
-        font-weight: 700;
-        line-height: 1;
-    }
-    
-    .event-date-month {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        opacity: 0.9;
-    }
-    
-    .event-category-badge {
-        padding: 0.25rem 0.75rem;
-        border-radius: 20px;
-        font-size: 0.875rem;
-        font-weight: 500;
-        border: 1px solid transparent;
-    }
-    
-    .category-community {
-        background: rgba(45, 80, 22, 0.1);
-        color: var(--primary-green);
-        border-color: rgba(45, 80, 22, 0.2);
-    }
-    
-    .category-educational {
-        background: rgba(59, 130, 246, 0.1);
-        color: #1e40af;
-        border-color: rgba(59, 130, 246, 0.2);
-    }
-    
-    .category-cultural {
-        background: rgba(139, 92, 246, 0.1);
-        color: #7c3aed;
-        border-color: rgba(139, 92, 246, 0.2);
-    }
-    
-    .category-social {
-        background: rgba(245, 158, 11, 0.1);
-        color: #d97706;
-        border-color: rgba(245, 158, 11, 0.2);
-    }
-    
-    .category-festival {
-        background: rgba(139, 21, 56, 0.1);
-        color: var(--primary-red);
-        border-color: rgba(139, 21, 56, 0.2);
-    }
-    
-    .event-status-upcoming {
-        background: #dbeafe;
-        color: #1e40af;
-    }
-    
-    .event-status-ongoing {
-        background: #fef3c7;
-        color: #92400e;
-    }
-    
-    .event-status-completed {
-        background: #d1fae5;
-        color: #065f46;
-    }
-    
-    .event-status-cancelled {
-        background: #fecaca;
-        color: #991b1b;
-    }
-    
-    .attendee-counter {
-        background: linear-gradient(135deg, var(--primary-red), #a21e3a);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 25px;
-        font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        box-shadow: 0 2px 4px rgba(139, 21, 56, 0.2);
-    }
-    
-    .event-timeline {
-        position: relative;
-        padding-left: 2rem;
-    }
-    
-    .event-timeline::before {
-        content: '';
-        position: absolute;
-        left: 10px;
-        top: 0;
-        bottom: 0;
-        width: 2px;
-        background: linear-gradient(to bottom, var(--primary-green), var(--primary-green-light));
-    }
-    
-    .timeline-item {
-        position: relative;
-        margin-bottom: 2rem;
-        background: white;
-        border-radius: 12px;
-        padding: 1.5rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    
-    .timeline-item::before {
-        content: '';
-        position: absolute;
-        left: -1.75rem;
-        top: 1.5rem;
-        width: 12px;
-        height: 12px;
-        background: var(--primary-green);
-        border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 0 0 2px var(--primary-green);
-    }
-    
-    .event-gallery {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-        gap: 0.5rem;
-        margin-top: 1rem;
-    }
-    
-    .event-image {
-        aspect-ratio: 16/10;
-        background: #f3f4f6;
-        border-radius: 8px;
-        overflow: hidden;
-        position: relative;
-        cursor: pointer;
-        transition: transform 0.2s ease;
-    }
-    
-    .event-image:hover {
-        transform: scale(1.05);
-    }
-    
-    .event-image img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    
-    .rsvp-button {
-        background: linear-gradient(135deg, var(--primary-green), var(--primary-green-light));
-        color: white;
-        border: none;
-        padding: 0.75rem 1.5rem;
-        border-radius: 25px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 8px rgba(45, 80, 22, 0.2);
-    }
-    
-    .rsvp-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(45, 80, 22, 0.3);
-        color: white;
-    }
-    
-    .rsvp-button.registered {
-        background: linear-gradient(135deg, #10b981, #34d399);
-    }
-    
-    .rsvp-button.full {
-        background: linear-gradient(135deg, #6b7280, #9ca3af);
-        cursor: not-allowed;
-    }
-    
-    .event-details-modal .modal-content {
-        border-radius: 20px;
-        overflow: hidden;
-    }
-    
-    .event-details-header {
-        background: linear-gradient(135deg, var(--primary-green), var(--primary-green-light));
-        color: white;
-        padding: 2rem;
-        text-align: center;
-    }
-    
-    .organizer-badge {
-        background: rgba(139, 21, 56, 0.1);
-        color: var(--primary-red);
-        padding: 0.25rem 0.75rem;
-        border-radius: 20px;
-        font-size: 0.875rem;
-        font-weight: 500;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-    }
-</style>
-
-<div class="page-header">
-    <h1 class="page-title">Events Management</h1>
-    <p class="page-description">Discover, organize, and manage community events with comprehensive tracking and engagement tools</p>
-</div>
-
-<!-- Enhanced Statistics Dashboard -->
-<div class="row g-4 mb-5">
-    <div class="col-lg-3 col-md-6">
-        <div class="stats-card">
-            <div class="stats-number" style="color: var(--primary-green);"><?= $event_stats['total'] ?? 0 ?></div>
-            <div class="text-muted fw-500">Total Events</div>
-        </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h2 gradient-text mb-1">
+            <i class="bi bi-calendar-event me-2"></i>
+            Events Management
+        </h1>
+        <p class="text-muted mb-0">Create, manage, and track community events and activities</p>
     </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stats-card">
-            <div class="stats-number" style="color: #fbbf24;"><?= $event_stats['upcoming'] ?? 0 ?></div>
-            <div class="text-muted fw-500">Upcoming</div>
+    <div class="btn-toolbar">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createEventModal">
+                <i class="bi bi-plus-circle me-1"></i>
+                Create Event
+            </button>
         </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stats-card">
-            <div class="stats-number" style="color: var(--primary-red);"><?= $event_stats['featured'] ?? 0 ?></div>
-            <div class="text-muted fw-500">Featured</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stats-card">
-            <div class="stats-number" style="color: #10b981;"><?= $event_stats['total_attendees'] ?? 0 ?></div>
-            <div class="text-muted fw-500">Total Attendees</div>
+        <div class="btn-group">
+            <a href="/events/calendar" class="btn btn-outline-secondary">
+                <i class="bi bi-calendar3 me-1"></i>
+                Calendar View
+            </a>
+            <a href="/events/export" class="btn btn-outline-info">
+                <i class="bi bi-download me-1"></i>
+                Export Events
+            </a>
         </div>
     </div>
 </div>
 
-<!-- Advanced Control Panel -->
-<div class="card mb-4">
-    <div class="card-body">
-        <div class="row align-items-center g-3">
-            <div class="col-md-4">
-                <div class="view-toggle">
-                    <div class="btn-group w-100" role="group">
-                        <input type="radio" class="btn-check" name="viewMode" id="cardView" autocomplete="off" checked>
-                        <label class="btn btn-outline-secondary" for="cardView">
-                            <i class="bi bi-grid-3x3-gap"></i> Cards
-                        </label>
-                        
-                        <input type="radio" class="btn-check" name="viewMode" id="calendarView" autocomplete="off">
-                        <label class="btn btn-outline-secondary" for="calendarView">
-                            <i class="bi bi-calendar-month"></i> Calendar
-                        </label>
-                        
-                        <input type="radio" class="btn-check" name="viewMode" id="timelineView" autocomplete="off">
-                        <label class="btn btn-outline-secondary" for="timelineView">
-                            <i class="bi bi-clock-history"></i> Timeline
-                        </label>
+<!-- Event Statistics -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stats-card">
+            <div class="card-body d-flex align-items-center">
+                <div class="stats-icon bg-primary bg-opacity-10 text-primary me-3">
+                    <i class="bi bi-calendar-event"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h3 class="mb-0"><?= number_format($stats['total_events'] ?? 32) ?></h3>
+                    <p class="text-muted mb-0">Total Events</p>
+                    <small class="text-success">
+                        <i class="bi bi-arrow-up"></i>
+                        <?= $stats['this_month'] ?? 8 ?> This Month
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stats-card">
+            <div class="card-body d-flex align-items-center">
+                <div class="stats-icon bg-warning bg-opacity-10 text-warning me-3">
+                    <i class="bi bi-clock"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h3 class="mb-0"><?= number_format($stats['upcoming'] ?? 12) ?></h3>
+                    <p class="text-muted mb-0">Upcoming</p>
+                    <small class="text-info">
+                        <i class="bi bi-calendar"></i>
+                        Next 30 Days
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stats-card">
+            <div class="card-body d-flex align-items-center">
+                <div class="stats-icon bg-success bg-opacity-10 text-success me-3">
+                    <i class="bi bi-people"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h3 class="mb-0"><?= number_format($stats['total_attendees'] ?? 1247) ?></h3>
+                    <p class="text-muted mb-0">Total Attendees</p>
+                    <small class="text-success">
+                        <i class="bi bi-arrow-up"></i>
+                        +145 This Month
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stats-card">
+            <div class="card-body d-flex align-items-center">
+                <div class="stats-icon bg-info bg-opacity-10 text-info me-3">
+                    <i class="bi bi-star"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h3 class="mb-0"><?= number_format($stats['avg_rating'] ?? 4.6, 1) ?></h3>
+                    <p class="text-muted mb-0">Avg Rating</p>
+                    <small class="text-warning">
+                        <i class="bi bi-star-fill"></i>
+                        Based on <?= $stats['reviews'] ?? 156 ?> reviews
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Event Categories & Quick Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightning-charge me-2"></i>
+                    Event Categories & Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <button class="btn btn-outline-primary w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" data-category="cultural">
+                            <div class="action-icon bg-primary text-white mb-2">
+                                <i class="bi bi-music-note"></i>
+                            </div>
+                            <span class="fw-bold">Cultural</span>
+                            <small class="text-muted"><?= $stats['categories']['cultural'] ?? 8 ?> events</small>
+                        </button>
                     </div>
-                </div>
-            </div>
-            
-            <div class="col-md-5">
-                <div class="d-flex gap-2">
-                    <select class="form-select" id="categoryFilter">
-                        <option value="">All Categories</option>
-                        <option value="community">🏘️ Community</option>
-                        <option value="educational">📚 Educational</option>
-                        <option value="cultural">🎭 Cultural</option>
-                        <option value="social">👥 Social</option>
-                        <option value="festival">🎉 Festival</option>
-                    </select>
                     
-                    <select class="form-select" id="statusFilter">
-                        <option value="">All Status</option>
-                        <option value="upcoming">📅 Upcoming</option>
-                        <option value="ongoing">🚀 Ongoing</option>
-                        <option value="completed">✅ Completed</option>
-                        <option value="cancelled">❌ Cancelled</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="col-md-3">
-                <div class="d-flex gap-2 justify-content-end">
-                    <?php if ($can_create ?? true): ?>
-                        <button class="btn btn-primary" onclick="showCreateEventModal()">
-                            <i class="bi bi-plus-circle"></i> Create Event
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <button class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" data-category="educational">
+                            <div class="action-icon bg-success text-white mb-2">
+                                <i class="bi bi-book"></i>
+                            </div>
+                            <span class="fw-bold">Educational</span>
+                            <small class="text-muted"><?= $stats['categories']['educational'] ?? 6 ?> events</small>
                         </button>
-                    <?php endif; ?>
+                    </div>
                     
-                    <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                            <i class="bi bi-share"></i> Share
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <button class="btn btn-outline-info w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" data-category="community">
+                            <div class="action-icon bg-info text-white mb-2">
+                                <i class="bi bi-people"></i>
+                            </div>
+                            <span class="fw-bold">Community</span>
+                            <small class="text-muted"><?= $stats['categories']['community'] ?? 12 ?> events</small>
                         </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="/events/calendar-feed">📅 Calendar Feed</a></li>
-                            <li><a class="dropdown-item" href="/events/export?format=ical">🗓️ iCal Export</a></li>
-                            <li><a class="dropdown-item" href="/events/newsletter">📧 Newsletter</a></li>
-                        </ul>
+                    </div>
+                    
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <button class="btn btn-outline-warning w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" data-category="fundraising">
+                            <div class="action-icon bg-warning text-white mb-2">
+                                <i class="bi bi-currency-dollar"></i>
+                            </div>
+                            <span class="fw-bold">Fundraising</span>
+                            <small class="text-muted"><?= $stats['categories']['fundraising'] ?? 4 ?> events</small>
+                        </button>
+                    </div>
+                    
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <button class="btn btn-outline-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" data-category="sports">
+                            <div class="action-icon bg-secondary text-white mb-2">
+                                <i class="bi bi-trophy"></i>
+                            </div>
+                            <span class="fw-bold">Sports</span>
+                            <small class="text-muted"><?= $stats['categories']['sports'] ?? 3 ?> events</small>
+                        </button>
+                    </div>
+                    
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <button class="btn btn-outline-danger w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" data-bs-toggle="modal" data-bs-target="#createEventModal">
+                            <div class="action-icon bg-danger text-white mb-2">
+                                <i class="bi bi-plus-circle"></i>
+                            </div>
+                            <span class="fw-bold">Create New</span>
+                            <small class="text-muted">Add event</small>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -365,396 +183,691 @@ $currentPage = 'events';
     </div>
 </div>
 
-<!-- Card View -->
-<div id="cardViewContainer">
-    <div class="row g-4" id="eventsGrid">
-        <?php if (!empty($events)): ?>
-            <?php foreach ($events as $event): ?>
-                <div class="col-xl-4 col-lg-6 col-md-6 event-item" 
-                     data-category="<?= $event['category'] ?? 'community' ?>" 
-                     data-status="<?= $event['status'] ?? 'upcoming' ?>">
-                    <div class="event-card event-<?= $event['category'] ?? 'community' ?> <?= ($event['is_featured'] ?? false) ? 'event-featured' : '' ?>">
-                        
-                        <!-- Featured Ribbon -->
-                        <?php if ($event['is_featured'] ?? false): ?>
-                            <div class="event-header-ribbon">Featured</div>
+<!-- Events Grid & Filters -->
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Event Filters -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-end g-3">
+                    <div class="col-md-3">
+                        <label for="eventSearch" class="form-label">Search Events</label>
+                        <input type="text" class="form-control" id="eventSearch" placeholder="Search by name or description">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="eventCategory" class="form-label">Category</label>
+                        <select class="form-select" id="eventCategory">
+                            <option value="">All Categories</option>
+                            <option value="cultural">Cultural</option>
+                            <option value="educational">Educational</option>
+                            <option value="community">Community</option>
+                            <option value="fundraising">Fundraising</option>
+                            <option value="sports">Sports</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="eventStatus" class="form-label">Status</label>
+                        <select class="form-select" id="eventStatus">
+                            <option value="">All Status</option>
+                            <option value="upcoming">Upcoming</option>
+                            <option value="ongoing">Ongoing</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="eventDateRange" class="form-label">Date Range</label>
+                        <input type="date" class="form-control" id="eventDateRange">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                            <i class="bi bi-x-circle"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Events Grid -->
+        <div class="row" id="events-grid">
+            <?php 
+            $sampleEvents = [
+                [
+                    'id' => 1,
+                    'title' => 'Oromo Cultural Night',
+                    'category' => 'cultural',
+                    'date' => '2025-12-15',
+                    'time' => '18:00',
+                    'location' => 'Community Center',
+                    'attendees' => 120,
+                    'max_attendees' => 150,
+                    'status' => 'upcoming',
+                    'featured' => true,
+                    'price' => 25,
+                    'image' => 'cultural-night.jpg'
+                ],
+                [
+                    'id' => 2,
+                    'title' => 'Youth Leadership Workshop',
+                    'category' => 'educational',
+                    'date' => '2025-11-28',
+                    'time' => '14:00',
+                    'location' => 'Virtual',
+                    'attendees' => 45,
+                    'max_attendees' => 50,
+                    'status' => 'upcoming',
+                    'featured' => false,
+                    'price' => 0,
+                    'image' => 'workshop.jpg'
+                ],
+                [
+                    'id' => 3,
+                    'title' => 'Community Service Day',
+                    'category' => 'community',
+                    'date' => '2025-12-08',
+                    'time' => '09:00',
+                    'location' => 'Local Park',
+                    'attendees' => 65,
+                    'max_attendees' => 100,
+                    'status' => 'upcoming',
+                    'featured' => true,
+                    'price' => 0,
+                    'image' => 'service-day.jpg'
+                ],
+                [
+                    'id' => 4,
+                    'title' => 'Fundraising Gala Dinner',
+                    'category' => 'fundraising',
+                    'date' => '2025-12-31',
+                    'time' => '19:00',
+                    'location' => 'Grand Hotel',
+                    'attendees' => 85,
+                    'max_attendees' => 200,
+                    'status' => 'upcoming',
+                    'featured' => true,
+                    'price' => 75,
+                    'image' => 'gala.jpg'
+                ],
+                [
+                    'id' => 5,
+                    'title' => 'Basketball Tournament',
+                    'category' => 'sports',
+                    'date' => '2025-11-25',
+                    'time' => '10:00',
+                    'location' => 'Sports Complex',
+                    'attendees' => 32,
+                    'max_attendees' => 64,
+                    'status' => 'upcoming',
+                    'featured' => false,
+                    'price' => 10,
+                    'image' => 'basketball.jpg'
+                ],
+                [
+                    'id' => 6,
+                    'title' => 'Language Learning Class',
+                    'category' => 'educational',
+                    'date' => '2025-12-01',
+                    'time' => '15:30',
+                    'location' => 'Library',
+                    'attendees' => 28,
+                    'max_attendees' => 30,
+                    'status' => 'ongoing',
+                    'featured' => false,
+                    'price' => 15,
+                    'image' => 'language.jpg'
+                ]
+            ];
+            
+            foreach ($sampleEvents as $event): 
+                $categoryClass = [
+                    'cultural' => 'primary',
+                    'educational' => 'success',
+                    'community' => 'info',
+                    'fundraising' => 'warning',
+                    'sports' => 'secondary'
+                ][$event['category']] ?? 'secondary';
+                
+                $statusClass = [
+                    'upcoming' => 'primary',
+                    'ongoing' => 'success',
+                    'completed' => 'secondary',
+                    'cancelled' => 'danger'
+                ][$event['status']] ?? 'secondary';
+                
+                $attendancePercentage = round(($event['attendees'] / $event['max_attendees']) * 100);
+                $isNearFull = $attendancePercentage >= 90;
+                $isFree = $event['price'] == 0;
+            ?>
+                <div class="col-lg-6 col-md-12 mb-4 event-card" data-category="<?= $event['category'] ?>" data-status="<?= $event['status'] ?>">
+                    <div class="card event-item h-100 <?= $event['featured'] ? 'featured-event' : '' ?>">
+                        <?php if ($event['featured']): ?>
+                            <div class="featured-badge">
+                                <i class="bi bi-star-fill"></i> Featured
+                            </div>
                         <?php endif; ?>
                         
-                        <!-- Event Header with Image -->
-                        <div style="height: 200px; background: linear-gradient(45deg, var(--primary-green), var(--primary-green-light)); position: relative; overflow: hidden;">
-                            <?php if (isset($event['image_url'])): ?>
-                                <img src="<?= htmlspecialchars($event['image_url']) ?>" 
-                                     alt="<?= htmlspecialchars($event['title'] ?? '') ?>"
-                                     style="width: 100%; height: 100%; object-fit: cover;">
-                                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(45deg, rgba(45,80,22,0.7), rgba(45,80,22,0.3));"></div>
-                            <?php endif; ?>
-                            
-                            <!-- Date Badge -->
-                            <div style="position: absolute; top: 1rem; left: 1rem;">
-                                <div class="event-date-badge">
-                                    <div class="event-date-day"><?= date('j', strtotime($event['event_date'] ?? '')) ?></div>
-                                    <div class="event-date-month"><?= date('M', strtotime($event['event_date'] ?? '')) ?></div>
-                                </div>
+                        <div class="event-image">
+                            <div class="placeholder-image bg-<?= $categoryClass ?> bg-opacity-20 d-flex align-items-center justify-content-center">
+                                <i class="bi bi-<?= [
+                                    'cultural' => 'music-note',
+                                    'educational' => 'book',
+                                    'community' => 'people',
+                                    'fundraising' => 'currency-dollar',
+                                    'sports' => 'trophy'
+                                ][$event['category']] ?? 'calendar-event' ?> text-<?= $categoryClass ?>" style="font-size: 3rem;"></i>
                             </div>
-                            
-                            <!-- RSVP Button -->
-                            <div style="position: absolute; bottom: 1rem; right: 1rem;">
-                                <button class="rsvp-button <?= ($event['user_registered'] ?? false) ? 'registered' : '' ?>" 
-                                        onclick="toggleRSVP(<?= $event['id'] ?>)">
-                                    <?= ($event['user_registered'] ?? false) ? '✓ Registered' : 'RSVP' ?>
-                                </button>
+                            <div class="event-badges">
+                                <span class="badge bg-<?= $categoryClass ?>"><?= ucfirst($event['category']) ?></span>
+                                <?php if ($isFree): ?>
+                                    <span class="badge bg-success">Free</span>
+                                <?php endif; ?>
+                                <?php if ($isNearFull): ?>
+                                    <span class="badge bg-danger">Nearly Full</span>
+                                <?php endif; ?>
                             </div>
                         </div>
                         
-                        <!-- Event Content -->
-                        <div class="card-body p-3">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="event-category-badge category-<?= $event['category'] ?? 'community' ?>">
-                                    <?= getEventCategoryIcon($event['category'] ?? 'community') ?> 
-                                    <?= ucfirst($event['category'] ?? 'community') ?>
-                                </span>
-                                
-                                <span class="badge event-status-<?= $event['status'] ?? 'upcoming' ?>">
-                                    <?= getEventStatusIcon($event['status'] ?? 'upcoming') ?> 
-                                    <?= ucfirst($event['status'] ?? 'upcoming') ?>
-                                </span>
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title"><?= htmlspecialchars($event['title']) ?></h5>
+                            
+                            <div class="event-details mb-3">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-calendar3 text-<?= $categoryClass ?> me-2"></i>
+                                    <span><?= date('M j, Y', strtotime($event['date'])) ?> at <?= date('g:i A', strtotime($event['time'])) ?></span>
+                                </div>
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-geo-alt text-<?= $categoryClass ?> me-2"></i>
+                                    <span><?= htmlspecialchars($event['location']) ?></span>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-people text-<?= $categoryClass ?> me-2"></i>
+                                    <span><?= $event['attendees'] ?>/<?= $event['max_attendees'] ?> attendees</span>
+                                </div>
                             </div>
                             
-                            <h5 class="card-title mb-2 fw-600"><?= htmlspecialchars($event['title'] ?? 'Untitled Event') ?></h5>
-                            <p class="card-text text-muted mb-3">
-                                <?= htmlspecialchars(substr($event['description'] ?? 'No description provided', 0, 120)) ?>
-                                <?= strlen($event['description'] ?? '') > 120 ? '...' : '' ?>
-                            </p>
-                            
-                            <!-- Event Details -->
+                            <!-- Attendance Progress -->
                             <div class="mb-3">
-                                <div class="d-flex align-items-center gap-2 mb-2 text-muted">
-                                    <i class="bi bi-clock text-primary"></i>
-                                    <small>
-                                        <?= date('g:i A', strtotime($event['start_time'] ?? '')) ?> 
-                                        <?php if (isset($event['end_time'])): ?>
-                                            - <?= date('g:i A', strtotime($event['end_time'])) ?>
-                                        <?php endif; ?>
-                                    </small>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-muted">Registration Progress</small>
+                                    <small class="fw-bold"><?= $attendancePercentage ?>%</small>
                                 </div>
-                                
-                                <?php if (isset($event['location'])): ?>
-                                    <div class="d-flex align-items-center gap-2 mb-2 text-muted">
-                                        <i class="bi bi-geo-alt text-danger"></i>
-                                        <small><?= htmlspecialchars($event['location']) ?></small>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <?php if (isset($event['organizer_name'])): ?>
-                                    <div class="d-flex align-items-center gap-2 text-muted">
-                                        <i class="bi bi-person text-success"></i>
-                                        <small>By <?= htmlspecialchars($event['organizer_name']) ?></small>
-                                    </div>
-                                <?php endif; ?>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-<?= $categoryClass ?>" style="width: <?= $attendancePercentage ?>%"></div>
+                                </div>
                             </div>
                             
-                            <!-- Event Footer -->
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div class="attendee-counter">
-                                    <i class="bi bi-people"></i>
-                                    <span><?= $event['attendee_count'] ?? 0 ?></span>
-                                    <?php if (isset($event['max_attendees']) && $event['max_attendees'] > 0): ?>
-                                        <span>/ <?= $event['max_attendees'] ?></span>
-                                    <?php endif; ?>
-                                </div>
-                                
-                                <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-outline-primary" onclick="viewEventDetails(<?= $event['id'] ?>)">
-                                        <i class="bi bi-eye"></i> View
-                                    </button>
-                                    <button class="btn btn-outline-secondary" onclick="shareEvent(<?= $event['id'] ?>)">
-                                        <i class="bi bi-share"></i>
-                                    </button>
+                            <div class="mt-auto">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <?php if (!$isFree): ?>
+                                            <span class="fw-bold text-<?= $categoryClass ?>">$<?= number_format($event['price']) ?></span>
+                                        <?php else: ?>
+                                            <span class="fw-bold text-success">Free Event</span>
+                                        <?php endif; ?>
+                                        <br>
+                                        <span class="badge bg-<?= $statusClass ?> bg-opacity-20 text-<?= $statusClass ?>"><?= ucfirst($event['status']) ?></span>
+                                    </div>
+                                    <div class="btn-group">
+                                        <a href="/events/<?= $event['id'] ?>" class="btn btn-sm btn-outline-<?= $categoryClass ?>">
+                                            View Details
+                                        </a>
+                                        <?php if ($event['status'] === 'upcoming'): ?>
+                                            <button class="btn btn-sm btn-<?= $categoryClass ?>" onclick="registerForEvent(<?= $event['id'] ?>)">
+                                                Register
+                                            </button>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             <?php endforeach; ?>
-        <?php else: ?>
-            <div class="col-12">
-                <div class="text-center py-5">
-                    <div class="mb-4">
-                        <i class="bi bi-calendar-x" style="font-size: 4rem; color: var(--gray-400);"></i>
-                    </div>
-                    <h4 class="text-muted mb-2">No Events Found</h4>
-                    <p class="text-muted mb-4">Create your first event to start building community engagement</p>
-                    <?php if ($can_create ?? true): ?>
-                        <button class="btn btn-primary" onclick="showCreateEventModal()">
-                            <i class="bi bi-plus-circle"></i> Create Your First Event
-                        </button>
-                    <?php endif; ?>
+        </div>
+        
+        <!-- Load More Button -->
+        <div class="text-center mb-4">
+            <button class="btn btn-outline-primary" onclick="loadMoreEvents()">
+                <i class="bi bi-arrow-down-circle me-1"></i>
+                Load More Events
+            </button>
+        </div>
+    </div>
+    
+    <!-- Events Sidebar -->
+    <div class="col-lg-4">
+        <!-- Today's Events -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="bi bi-calendar-day me-2"></i>
+                    Today's Events
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="text-center py-3">
+                    <i class="bi bi-calendar-x text-muted" style="font-size: 2rem;"></i>
+                    <p class="text-muted mt-2 small">No events scheduled for today</p>
+                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createEventModal">
+                        <i class="bi bi-plus-circle me-1"></i>
+                        Create Event
+                    </button>
                 </div>
             </div>
-        <?php endif; ?>
-    </div>
-</div>
-
-<!-- Timeline View (Hidden by default) -->
-<div id="timelineViewContainer" style="display: none;">
-    <div class="event-timeline">
-        <?php if (!empty($events)): ?>
-            <?php foreach ($events as $event): ?>
-                <div class="timeline-item event-item" 
-                     data-category="<?= $event['category'] ?? 'community' ?>" 
-                     data-status="<?= $event['status'] ?? 'upcoming' ?>">
-                    <div class="d-flex gap-3">
-                        <div class="event-date-badge">
-                            <div class="event-date-day"><?= date('j', strtotime($event['event_date'] ?? '')) ?></div>
-                            <div class="event-date-month"><?= date('M', strtotime($event['event_date'] ?? '')) ?></div>
-                        </div>
-                        
-                        <div class="flex-grow-1">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div class="d-flex gap-2">
-                                    <span class="event-category-badge category-<?= $event['category'] ?? 'community' ?>">
-                                        <?= getEventCategoryIcon($event['category'] ?? 'community') ?> 
-                                        <?= ucfirst($event['category'] ?? 'community') ?>
-                                    </span>
-                                    
-                                    <span class="badge event-status-<?= $event['status'] ?? 'upcoming' ?>">
-                                        <?= getEventStatusIcon($event['status'] ?? 'upcoming') ?> 
-                                        <?= ucfirst($event['status'] ?? 'upcoming') ?>
-                                    </span>
-                                </div>
-                                
-                                <div class="attendee-counter">
-                                    <i class="bi bi-people"></i>
-                                    <span><?= $event['attendee_count'] ?? 0 ?></span>
-                                </div>
-                            </div>
-                            
-                            <h5 class="fw-600 mb-2"><?= htmlspecialchars($event['title'] ?? 'Untitled Event') ?></h5>
-                            <p class="text-muted mb-2"><?= htmlspecialchars(substr($event['description'] ?? '', 0, 200)) ?>...</p>
-                            
-                            <div class="d-flex gap-4 text-muted mb-3">
-                                <div><i class="bi bi-clock"></i> <?= date('g:i A', strtotime($event['start_time'] ?? '')) ?></div>
-                                <?php if (isset($event['location'])): ?>
-                                    <div><i class="bi bi-geo-alt"></i> <?= htmlspecialchars($event['location']) ?></div>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-sm btn-outline-primary" onclick="viewEventDetails(<?= $event['id'] ?>)">
-                                    View Details
-                                </button>
-                                <button class="btn btn-sm rsvp-button <?= ($event['user_registered'] ?? false) ? 'registered' : '' ?>" 
-                                        onclick="toggleRSVP(<?= $event['id'] ?>)">
-                                    <?= ($event['user_registered'] ?? false) ? '✓ Registered' : 'RSVP' ?>
-                                </button>
-                            </div>
+        </div>
+        
+        <!-- Popular Events -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="bi bi-fire me-2"></i>
+                    Popular Events
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="popular-event-item d-flex align-items-center mb-3">
+                    <div class="event-thumbnail bg-primary bg-opacity-10 text-primary me-3">
+                        <i class="bi bi-music-note"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0 small">Oromo Cultural Night</h6>
+                        <small class="text-muted">120 registrations</small>
+                    </div>
+                    <span class="badge bg-primary">1</span>
+                </div>
+                
+                <div class="popular-event-item d-flex align-items-center mb-3">
+                    <div class="event-thumbnail bg-warning bg-opacity-10 text-warning me-3">
+                        <i class="bi bi-currency-dollar"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0 small">Fundraising Gala</h6>
+                        <small class="text-muted">85 registrations</small>
+                    </div>
+                    <span class="badge bg-warning">2</span>
+                </div>
+                
+                <div class="popular-event-item d-flex align-items-center">
+                    <div class="event-thumbnail bg-info bg-opacity-10 text-info me-3">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0 small">Community Service</h6>
+                        <small class="text-muted">65 registrations</small>
+                    </div>
+                    <span class="badge bg-info">3</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Stats -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="bi bi-graph-up me-2"></i>
+                    Quick Stats
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small">This Month</span>
+                    <span class="fw-bold">8 events</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small">Total Registrations</span>
+                    <span class="fw-bold">375</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small">Revenue Generated</span>
+                    <span class="fw-bold">$3,250</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="small">Average Rating</span>
+                    <div>
+                        <span class="fw-bold">4.6</span>
+                        <div class="stars">
+                            <i class="bi bi-star-fill text-warning small"></i>
+                            <i class="bi bi-star-fill text-warning small"></i>
+                            <i class="bi bi-star-fill text-warning small"></i>
+                            <i class="bi bi-star-fill text-warning small"></i>
+                            <i class="bi bi-star-half text-warning small"></i>
                         </div>
                     </div>
                 </div>
-            <?php endforeach; ?>
-        <?php endif; ?>
+            </div>
+        </div>
     </div>
 </div>
 
 <!-- Create Event Modal -->
 <div class="modal fade" id="createEventModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Create New Event</h5>
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-circle me-2"></i>
+                    Create New Event
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="/events/create" enctype="multipart/form-data">
-                <div class="modal-body">
-                    <div class="row g-3">
+            <div class="modal-body">
+                <form id="createEventForm">
+                    <div class="row">
                         <div class="col-md-8">
-                            <label class="form-label fw-500">Event Title *</label>
-                            <input type="text" name="title" class="form-control" required placeholder="Enter event title">
-                        </div>
-                        
-                        <div class="col-md-4">
-                            <label class="form-label fw-500">Category</label>
-                            <select name="category" class="form-select">
-                                <option value="community">🏘️ Community</option>
-                                <option value="educational">📚 Educational</option>
-                                <option value="cultural">🎭 Cultural</option>
-                                <option value="social">👥 Social</option>
-                                <option value="festival">🎉 Festival</option>
-                            </select>
-                        </div>
-                        
-                        <div class="col-12">
-                            <label class="form-label fw-500">Description</label>
-                            <textarea name="description" class="form-control" rows="4" 
-                                      placeholder="Provide detailed event description, objectives, and what attendees can expect..."></textarea>
-                        </div>
-                        
-                        <div class="col-md-4">
-                            <label class="form-label fw-500">Event Date *</label>
-                            <input type="date" name="event_date" class="form-control" required min="<?= date('Y-m-d') ?>">
-                        </div>
-                        
-                        <div class="col-md-4">
-                            <label class="form-label fw-500">Start Time *</label>
-                            <input type="time" name="start_time" class="form-control" required>
-                        </div>
-                        
-                        <div class="col-md-4">
-                            <label class="form-label fw-500">End Time</label>
-                            <input type="time" name="end_time" class="form-control">
-                        </div>
-                        
-                        <div class="col-md-8">
-                            <label class="form-label fw-500">Location</label>
-                            <input type="text" name="location" class="form-control" 
-                                   placeholder="Venue address or online meeting link">
-                        </div>
-                        
-                        <div class="col-md-4">
-                            <label class="form-label fw-500">Max Attendees</label>
-                            <input type="number" name="max_attendees" class="form-control" min="1" placeholder="Leave empty for unlimited">
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label fw-500">Event Image</label>
-                            <input type="file" name="image" class="form-control" accept="image/*">
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label fw-500">Registration Fee</label>
-                            <div class="input-group">
-                                <span class="input-group-text">ETB</span>
-                                <input type="number" name="registration_fee" class="form-control" min="0" step="0.01" placeholder="0.00">
+                            <div class="mb-3">
+                                <label for="eventTitle" class="form-label">Event Title</label>
+                                <input type="text" class="form-control" id="eventTitle" name="title" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="eventDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="eventDescription" name="description" rows="3" placeholder="Describe your event..."></textarea>
                             </div>
                         </div>
-                        
-                        <div class="col-12">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="is_featured" value="1" id="isFeatured">
-                                <label class="form-check-label fw-500" for="isFeatured">
-                                    Mark as Featured Event
-                                </label>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="eventCategory" class="form-label">Category</label>
+                                <select class="form-select" id="eventCategoryModal" name="category" required>
+                                    <option value="">Select Category</option>
+                                    <option value="cultural">Cultural</option>
+                                    <option value="educational">Educational</option>
+                                    <option value="community">Community</option>
+                                    <option value="fundraising">Fundraising</option>
+                                    <option value="sports">Sports</option>
+                                </select>
                             </div>
-                        </div>
-                        
-                        <div class="col-12">
-                            <label class="form-label fw-500">Tags (Optional)</label>
-                            <input type="text" name="tags" class="form-control" 
-                                   placeholder="Enter comma-separated tags (e.g., networking, fundraising, youth)">
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="featuredEvent" name="featured">
+                                    <label class="form-check-label" for="featuredEvent">
+                                        <i class="bi bi-star"></i> Featured Event
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> Create Event
-                    </button>
-                </div>
-            </form>
+                    
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="eventDate" class="form-label">Date</label>
+                                <input type="date" class="form-control" id="eventDate" name="date" required>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="eventTime" class="form-label">Time</label>
+                                <input type="time" class="form-control" id="eventTime" name="time" required>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="eventPrice" class="form-label">Price ($)</label>
+                                <input type="number" class="form-control" id="eventPrice" name="price" min="0" step="0.01" placeholder="0.00">
+                                <small class="form-text text-muted">Leave 0 for free events</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="maxAttendees" class="form-label">Max Attendees</label>
+                                <input type="number" class="form-control" id="maxAttendees" name="max_attendees" min="1" placeholder="100">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="eventLocation" class="form-label">Location</label>
+                                <input type="text" class="form-control" id="eventLocation" name="location" placeholder="Event venue or 'Virtual'">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="eventOrganizer" class="form-label">Organizer</label>
+                                <select class="form-select" id="eventOrganizer" name="organizer">
+                                    <option value="">Select Organizer</option>
+                                    <option value="abo">ABO Leadership</option>
+                                    <option value="wbo">WBO Leadership</option>
+                                    <option value="youth">Youth Committee</option>
+                                    <option value="women">Women's Committee</option>
+                                    <option value="cultural">Cultural Committee</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="eventImage" class="form-label">Event Image</label>
+                        <input type="file" class="form-control" id="eventImage" name="image" accept="image/*">
+                        <small class="form-text text-muted">Upload an image to promote your event</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="eventTags" class="form-label">Tags</label>
+                        <input type="text" class="form-control" id="eventTags" name="tags" placeholder="community, culture, education (comma-separated)">
+                        <small class="form-text text-muted">Help people find your event with relevant tags</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createEvent()">
+                    <i class="bi bi-calendar-check me-1"></i>
+                    Create Event
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
+<style>
+.event-item {
+    transition: var(--abo-transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.event-item:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--abo-shadow-lg);
+}
+
+.featured-event {
+    border: 2px solid var(--abo-primary);
+}
+
+.featured-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--abo-primary);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--abo-radius);
+    font-size: 0.75rem;
+    font-weight: 600;
+    z-index: 2;
+}
+
+.event-image {
+    height: 180px;
+    position: relative;
+    overflow: hidden;
+}
+
+.placeholder-image {
+    width: 100%;
+    height: 100%;
+}
+
+.event-badges {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+}
+
+.event-badges .badge {
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.event-details i {
+    width: 16px;
+}
+
+.event-thumbnail {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--abo-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.popular-event-item {
+    transition: var(--abo-transition);
+    padding: 0.25rem;
+    border-radius: var(--abo-radius);
+}
+
+.popular-event-item:hover {
+    background-color: var(--abo-gray-50);
+}
+
+.stars i {
+    font-size: 0.75rem;
+}
+
+@media (max-width: 768px) {
+    .event-card {
+        margin-bottom: 1rem !important;
+    }
+    
+    .action-icon {
+        width: 30px;
+        height: 30px;
+        font-size: 0.875rem;
+    }
+}
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // View switching functionality
-    const cardView = document.getElementById('cardView');
-    const timelineView = document.getElementById('timelineView');
-    const cardContainer = document.getElementById('cardViewContainer');
-    const timelineContainer = document.getElementById('timelineViewContainer');
+    // Set minimum date to today
+    document.getElementById('eventDate').min = new Date().toISOString().split('T')[0];
     
-    cardView.addEventListener('change', function() {
-        if (this.checked) {
-            cardContainer.style.display = 'block';
-            timelineContainer.style.display = 'none';
-        }
-    });
-    
-    timelineView.addEventListener('change', function() {
-        if (this.checked) {
-            cardContainer.style.display = 'none';
-            timelineContainer.style.display = 'block';
-        }
-    });
-    
-    // Advanced filtering
-    const categoryFilter = document.getElementById('categoryFilter');
-    const statusFilter = document.getElementById('statusFilter');
-    
-    function applyFilters() {
-        const categoryValue = categoryFilter.value;
-        const statusValue = statusFilter.value;
-        
-        document.querySelectorAll('.event-item').forEach(item => {
-            const showCategory = !categoryValue || item.dataset.category === categoryValue;
-            const showStatus = !statusValue || item.dataset.status === statusValue;
-            item.style.display = showCategory && showStatus ? 'block' : 'none';
+    // Category filter functionality
+    const categoryButtons = document.querySelectorAll('[data-category]');
+    categoryButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const category = this.getAttribute('data-category');
+            filterEventsByCategory(category);
         });
-    }
+    });
     
-    categoryFilter.addEventListener('change', applyFilters);
-    statusFilter.addEventListener('change', applyFilters);
+    // Search and filter functionality
+    const searchInput = document.getElementById('eventSearch');
+    const categoryFilter = document.getElementById('eventCategory');
+    const statusFilter = document.getElementById('eventStatus');
+    
+    [searchInput, categoryFilter, statusFilter].forEach(input => {
+        input.addEventListener('change', applyFilters);
+        if (input.type === 'text') {
+            input.addEventListener('keyup', applyFilters);
+        }
+    });
 });
 
-function showCreateEventModal() {
-    new bootstrap.Modal(document.getElementById('createEventModal')).show();
-}
-
-function toggleRSVP(eventId) {
-    fetch(`/events/${eventId}/rsvp`, {
-        method: 'POST',
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
+function filterEventsByCategory(category) {
+    const eventCards = document.querySelectorAll('.event-card');
+    eventCards.forEach(card => {
+        if (category && card.getAttribute('data-category') !== category) {
+            card.style.display = 'none';
         } else {
-            alert(data.message || 'Error updating RSVP');
+            card.style.display = 'block';
         }
-    })
-    .catch(() => alert('Error updating RSVP'));
+    });
+    
+    // Update category filter dropdown
+    document.getElementById('eventCategory').value = category || '';
 }
 
-function viewEventDetails(eventId) {
-    window.location.href = `/events/${eventId}`;
+function applyFilters() {
+    const searchTerm = document.getElementById('eventSearch').value.toLowerCase();
+    const categoryFilter = document.getElementById('eventCategory').value;
+    const statusFilter = document.getElementById('eventStatus').value;
+    
+    const eventCards = document.querySelectorAll('.event-card');
+    eventCards.forEach(card => {
+        const title = card.querySelector('.card-title').textContent.toLowerCase();
+        const category = card.getAttribute('data-category');
+        const status = card.getAttribute('data-status');
+        
+        let show = true;
+        
+        if (searchTerm && !title.includes(searchTerm)) {
+            show = false;
+        }
+        
+        if (categoryFilter && category !== categoryFilter) {
+            show = false;
+        }
+        
+        if (statusFilter && status !== statusFilter) {
+            show = false;
+        }
+        
+        card.style.display = show ? 'block' : 'none';
+    });
 }
 
-function shareEvent(eventId) {
-    if (navigator.share) {
-        navigator.share({
-            title: 'Event Invitation',
-            url: window.location.origin + `/events/${eventId}`
-        });
-    } else {
-        // Fallback: copy to clipboard
-        navigator.clipboard.writeText(window.location.origin + `/events/${eventId}`)
-            .then(() => alert('Event link copied to clipboard!'));
+function clearFilters() {
+    document.getElementById('eventSearch').value = '';
+    document.getElementById('eventCategory').value = '';
+    document.getElementById('eventStatus').value = '';
+    document.getElementById('eventDateRange').value = '';
+    
+    // Show all events
+    const eventCards = document.querySelectorAll('.event-card');
+    eventCards.forEach(card => {
+        card.style.display = 'block';
+    });
+}
+
+function createEvent() {
+    const form = document.getElementById('createEventForm');
+    const formData = new FormData(form);
+    
+    // Here you would normally send the data to the server
+    console.log('Creating event with data:', Object.fromEntries(formData));
+    
+    // Simulate success
+    alert('Event created successfully!');
+    
+    // Close modal and reset form
+    const modal = bootstrap.Modal.getInstance(document.getElementById('createEventModal'));
+    modal.hide();
+    form.reset();
+    
+    // Refresh page (in real app, you'd add the event to the DOM)
+    window.location.reload();
+}
+
+function registerForEvent(eventId) {
+    // Here you would handle event registration
+    console.log('Registering for event:', eventId);
+    
+    if (confirm('Would you like to register for this event?')) {
+        alert('Registration successful! You will receive a confirmation email shortly.');
     }
 }
+
+function loadMoreEvents() {
+    // Here you would load more events from the server
+    console.log('Loading more events...');
+    alert('Loading more events... (This would normally fetch from server)');
+}
 </script>
-
-<?php
-// Helper functions for UI
-function getEventCategoryIcon($category) {
-    return [
-        'community' => '🏘️',
-        'educational' => '📚',
-        'cultural' => '🎭',
-        'social' => '👥',
-        'festival' => '🎉'
-    ][$category] ?? '🏘️';
-}
-
-function getEventStatusIcon($status) {
-    return [
-        'upcoming' => '📅',
-        'ongoing' => '🚀',
-        'completed' => '✅',
-        'cancelled' => '❌'
-    ][$status] ?? '📅';
-}
-?>

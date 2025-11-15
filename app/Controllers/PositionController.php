@@ -1,7 +1,7 @@
 <?php
 namespace App\Controllers;
 
-use App\Core\BaseController;
+use App\Core\Controller;
 use App\Models\Position;
 use App\Models\UserAssignment;
 use App\Models\User;
@@ -15,7 +15,7 @@ use Exception;
  * Manages organizational positions and executive assignments
  * ABO-WBO Management System - Executive Management
  */
-class PositionController extends BaseController
+class PositionController extends Controller
 {
     private Position $positionModel;
     private UserAssignment $assignmentModel;
@@ -26,7 +26,6 @@ class PositionController extends BaseController
     
     public function __construct()
     {
-        parent::__construct();
         $this->positionModel = new Position();
         $this->assignmentModel = new UserAssignment();
         $this->userModel = new User();
@@ -56,20 +55,12 @@ class PositionController extends BaseController
                 'title' => 'Position Management',
                 'positions' => $positions,
                 'stats' => $stats,
-                'position_stats' => $stats,
-                'recent_assignments' => $this->getRecentAssignments(),
-                'position_metrics' => $this->getPositionMetrics(),
-                'executive_positions' => $this->getPositionsByLevel('executive'),
-                'godina_positions' => $this->getPositionsByLevel('godina'),
-                'gamta_positions' => $this->getPositionsByLevel('gamta'),
-                'gurmu_positions' => $this->getPositionsByLevel('gurmu'),
-                'can_create' => true,
                 'assignmentStats' => $assignmentStats,
                 'pendingApprovals' => $pendingApprovals,
                 'expiringSoon' => $expiringSoon
             ];
             
-            $this->render('position-management/index_modern', $data);
+            $this->render('positions/index', $data);
             
         } catch (Exception $e) {
             error_log("Error in PositionController::index: " . $e->getMessage());
@@ -522,91 +513,6 @@ class PositionController extends BaseController
         } catch (Exception $e) {
             error_log("Error getting positions by level: " . $e->getMessage());
             $this->jsonResponse(['success' => false, 'message' => 'Failed to load positions'], 500);
-        }
-    }
-    
-    /**
-     * Get recent position assignments for dashboard
-     */
-    private function getRecentAssignments()
-    {
-        try {
-            $query = "SELECT 
-                        pa.id,
-                        pa.position_id,
-                        pa.member_id,
-                        pa.assigned_at,
-                        pa.assigned_by,
-                        pa.status,
-                        p.title as position_title,
-                        p.level as position_level,
-                        m.first_name,
-                        m.last_name,
-                        m.email,
-                        assigner.first_name as assigned_by_first_name,
-                        assigner.last_name as assigned_by_last_name
-                      FROM position_assignments pa
-                      LEFT JOIN positions p ON pa.position_id = p.id
-                      LEFT JOIN members m ON pa.member_id = m.id
-                      LEFT JOIN members assigner ON pa.assigned_by = assigner.id
-                      ORDER BY pa.assigned_at DESC
-                      LIMIT 10";
-                      
-            $stmt = $this->db->prepare($query);
-            $stmt->execute();
-            return $stmt->fetchAll();
-        } catch (PDOException $e) {
-            error_log("Error getting recent assignments: " . $e->getMessage());
-            return [];
-        }
-    }
-    
-    /**
-     * Get position metrics for dashboard
-     */
-    private function getPositionMetrics()
-    {
-        try {
-            $metrics = [];
-            
-            // Total positions
-            $stmt = $this->db->prepare("SELECT COUNT(*) as total FROM positions WHERE status = 'active'");
-            $stmt->execute();
-            $metrics['total_positions'] = $stmt->fetchColumn();
-            
-            // Filled positions
-            $stmt = $this->db->prepare("SELECT COUNT(DISTINCT position_id) as filled FROM position_assignments WHERE status = 'active'");
-            $stmt->execute();
-            $metrics['filled_positions'] = $stmt->fetchColumn();
-            
-            // Vacant positions
-            $metrics['vacant_positions'] = $metrics['total_positions'] - $metrics['filled_positions'];
-            
-            // Fill rate
-            $metrics['fill_rate'] = $metrics['total_positions'] > 0 ? 
-                round(($metrics['filled_positions'] / $metrics['total_positions']) * 100, 1) : 0;
-            
-            // Positions by level
-            $stmt = $this->db->prepare("SELECT level, COUNT(*) as count FROM positions WHERE status = 'active' GROUP BY level");
-            $stmt->execute();
-            $metrics['by_level'] = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-            
-            // Recent assignments count (last 30 days)
-            $stmt = $this->db->prepare("SELECT COUNT(*) FROM position_assignments WHERE assigned_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)");
-            $stmt->execute();
-            $metrics['recent_assignments'] = $stmt->fetchColumn();
-            
-            return $metrics;
-        } catch (PDOException $e) {
-            error_log("Error getting position metrics: " . $e->getMessage());
-            return [
-                'total_positions' => 0,
-                'filled_positions' => 0,
-                'vacant_positions' => 0,
-                'fill_rate' => 0,
-                'by_level' => [],
-                'recent_assignments' => 0
-            ];
         }
     }
 }
