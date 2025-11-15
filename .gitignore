@@ -1,0 +1,260 @@
+# ===============================================
+# ABO-WBO Management System - .gitignore
+# Professional Production Deployment Configuration
+# ===============================================
+
+# 🔥 SECURITY AND SECRETS (NEVER UPLOAD)
+# ===============================================
+.env
+.env.*
+.env.local
+.env.production
+.env.staging
+.env.development
+
+# Database configuration with passwords
+config/database.php
+database.config.php
+
+# Any files containing credentials
+*password*
+*secret*
+*key*
+*credential*
+*smtp*
+
+# Application secrets
+app_key.txt
+jwt_secret.txt
+
+# HostGator specific configs (will be created on server)
+hostgator.config.php
+production.config.php
+
+# 🗄 SYSTEM AND MACHINE-GENERATED FILES
+# ===============================================
+# Composer dependencies (let production server run composer install)
+/vendor/
+composer.lock
+
+# Node.js dependencies  
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Package manager files
+package-lock.json
+yarn.lock
+
+# System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# XAMPP specific files
+xampp_start.exe
+xampp_stop.exe
+*.pid
+
+# 💾 DEVELOPMENT AND IDE FILES
+# ===============================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# PhpStorm/IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim swap files
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# 🧪 TESTING AND BUILD ARTIFACTS
+# ===============================================
+# Test files (exclude from production)
+/tests/
+/coverage/
+phpunit.result.cache
+.phpunit.result.cache
+
+# Development artifacts
+/tmp/
+/temp/
+*.tmp
+*.log
+
+# Build artifacts
+/dist/
+/build/
+*.map
+
+# 💾 DATABASE AND STORAGE
+# ===============================================
+# Local database files
+*.sqlite
+*.sqlite3
+*.db
+database.sqlite
+
+# Database dumps (unless specifically needed for deployment)
+*.sql
+*.dump
+backup_*.sql
+dump_*.sql
+
+# Storage directories (content will be created on server)
+/storage/logs/*.log
+/storage/cache/*
+/storage/sessions/*
+/storage/temp/*
+/storage/uploads/*
+!/storage/logs/.gitkeep
+!/storage/cache/.gitkeep
+!/storage/sessions/.gitkeep
+!/storage/temp/.gitkeep
+!/storage/uploads/.gitkeep
+
+# Backup directories
+/backups/
+*.backup
+*.bak
+
+# 📊 MONITORING AND ANALYTICS
+# ===============================================
+# Log files
+*.log
+/logs/
+error.log
+access.log
+debug.log
+
+# Analytics and monitoring configs
+google-analytics.json
+monitoring.config.php
+
+# 🔧 DEVELOPMENT TOOLS
+# ===============================================
+# Development configuration
+webpack.config.js
+gulpfile.js
+gruntfile.js
+.babelrc
+.eslintrc*
+.prettierrc*
+
+# Development dependencies
+.sass-cache/
+.cache/
+
+# 📱 PLATFORM SPECIFIC
+# ===============================================
+# Windows
+[Tt]humbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# 🚀 DEPLOYMENT SPECIFIC
+# ===============================================
+# Deployment scripts (keep local)
+deploy.local.sh
+deploy.bat
+*.deploy
+
+# Local environment configs
+local.config.php
+xampp.config.php
+development.config.php
+
+# Documentation that shouldn't be on production
+DEVELOPMENT-NOTES.md
+LOCAL-SETUP.md
+DEBUGGING-NOTES.md
+CHANGES_LOG*.txt
+
+# 📦 DEPENDENCIES AND LIBRARIES
+# ===============================================
+# Composer (let server handle)
+composer.phar
+/vendor/
+
+# NPM/Yarn (if using frontend build tools)
+node_modules/
+
+# Bower
+bower_components/
+
+# ⚙️ SERVER CONFIGURATION (CREATE ON SERVER)
+# ===============================================
+# Apache/Nginx configs (server specific)
+.htaccess.local
+.htaccess.development
+nginx.local.conf
+
+# SSL certificates (server managed)
+*.pem
+*.key
+*.crt
+*.csr
+
+# 🎯 CUSTOM APPLICATION EXCLUDES
+# ===============================================
+# Custom application logs
+application.log
+system.log
+error_*.log
+
+# Upload directories content (structure will be preserved)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# Cache directories
+/cache/
+*.cache
+
+# ===============================================
+# KEEP THESE FILES FOR PRODUCTION:
+# ===============================================
+# ✅ /app/ (all controllers, models, etc.)
+# ✅ /config/app.php (template version without secrets)
+# ✅ /public/ (entry points and assets)
+# ✅ /resources/views/ (templates)
+# ✅ /routes/ (routing configuration)
+# ✅ /database/schema.sql (database structure)
+# ✅ composer.json (dependencies list)
+# ✅ README.md (documentation)
+# ✅ .htaccess (for Apache URL rewriting)
+# ===============================================

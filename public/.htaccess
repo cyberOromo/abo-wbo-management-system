@@ -1,0 +1,15 @@
+# ABO-WBO Management System - Public Directory
+# This should be the ONLY .htaccess file handling routing
+
+# No rewrite rules here - all handled by root .htaccess
+# This prevents double processing that causes URL issues
+
+# Security: Prevent execution of PHP files in uploads
+<FilesMatch "^uploads/.*\.php$">
+    Require all denied
+</FilesMatch>
+
+# Security: Block access to sensitive files
+<FilesMatch "\.(env|log|sql)$">
+    Require all denied
+</FilesMatch>

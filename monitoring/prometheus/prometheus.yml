@@ -1,0 +1,132 @@
+# Prometheus Configuration for ABO-WBO Monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'abo-wbo-production'
+    replica: '1'
+
+# Rules for alerting
+rule_files:
+  - "rules/*.yml"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node Exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 10s
+    metrics_path: /metrics
+
+  # ABO-WBO Application metrics
+  - job_name: 'abo-wbo-app'
+    static_configs:
+      - targets: ['app:9001']  # Custom metrics endpoint
+    scrape_interval: 15s
+    metrics_path: /metrics
+    basic_auth:
+      username: 'prometheus'
+      password: 'metrics_password'
+
+  # Nginx metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:9113']  # nginx-prometheus-exporter
+    scrape_interval: 10s
+
+  # MySQL metrics
+  - job_name: 'mysql'
+    static_configs:
+      - targets: ['mysql:9104']  # mysqld_exporter
+    scrape_interval: 15s
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:9121']  # redis_exporter
+    scrape_interval: 10s
+
+  # Elasticsearch metrics
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch:9114']  # elasticsearch_exporter
+    scrape_interval: 15s
+
+  # Custom application metrics
+  - job_name: 'abo-wbo-business-metrics'
+    static_configs:
+      - targets: ['app:9002']  # Custom business metrics endpoint
+    scrape_interval: 30s
+    metrics_path: /business-metrics
+    params:
+      format: ['prometheus']
+
+  # Queue worker metrics
+  - job_name: 'queue-worker'
+    static_configs:
+      - targets: ['queue-worker:9003']
+    scrape_interval: 20s
+
+  # Backup service metrics
+  - job_name: 'backup-service'
+    static_configs:
+      - targets: ['backup:9004']
+    scrape_interval: 60s
+
+# Recording rules for aggregated metrics
+recording_rules:
+  - name: abo-wbo-aggregation-rules
+    rules:
+      # HTTP request rate
+      - record: abo_wbo:http_requests:rate5m
+        expr: rate(nginx_http_requests_total[5m])
+
+      # Error rate
+      - record: abo_wbo:http_errors:rate5m
+        expr: rate(nginx_http_requests_total{status=~"4.."}[5m])
+
+      # Database connection pool usage
+      - record: abo_wbo:db_connections:usage
+        expr: mysql_global_status_threads_connected / mysql_global_variables_max_connections
+
+      # Redis memory usage
+      - record: abo_wbo:redis_memory:usage_ratio
+        expr: redis_memory_used_bytes / redis_memory_max_bytes
+
+      # Task completion rate
+      - record: abo_wbo:tasks:completion_rate_1h
+        expr: rate(abo_wbo_tasks_completed_total[1h])
+
+      # User activity
+      - record: abo_wbo:users:active_5m
+        expr: increase(abo_wbo_user_logins_total[5m])
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 10GB
+    path: /prometheus
+    wal-compression: true
+
+# Global limits
+global:
+  query_log_file: /prometheus/query.log
+  external_labels:
+    environment: 'production'
+    application: 'abo-wbo'
+    version: '1.0.0'

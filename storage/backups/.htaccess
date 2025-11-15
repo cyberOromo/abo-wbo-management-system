@@ -1,0 +1,11 @@
+# Security - Deny access to backup files
+deny from all
+
+# Prevent directory browsing
+Options -Indexes
+
+# Disable PHP execution
+<FilesMatch "\.php$">
+    Order deny,allow
+    Deny from all
+</FilesMatch>

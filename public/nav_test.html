@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ABO-WBO Navigation Test</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .test-link { display: block; margin: 10px 0; padding: 10px; background: #f0f0f0; text-decoration: none; color: #333; border-radius: 5px; }
+        .test-link:hover { background: #e0e0e0; }
+        .info { background: #e8f4fd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .error { background: #ffe8e8; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>ABO-WBO Navigation Test</h1>
+    
+    <div class="info">
+        <strong>Note:</strong> Most admin routes require authentication. If you see 500 errors, try logging in first.
+    </div>
+    
+    <h3>Authentication</h3>
+    <a href="/auth/login" class="test-link">🔐 Login Page</a>
+    
+    <h3>Test Routes (No Auth Required)</h3>
+    <a href="/test-hierarchy" class="test-link">🏢 Test Hierarchy (No Auth)</a>
+    <a href="/test-user" class="test-link">👥 Test User Management (No Auth)</a>
+    
+    <h3>Admin Routes (Auth Required)</h3>
+    <a href="/hierarchy" class="test-link">🏢 Hierarchy Management</a>
+    <a href="/user" class="test-link">👥 User Management</a>
+    <a href="/positions" class="test-link">📋 Position Management</a>
+    <a href="/settings" class="test-link">⚙️ Settings</a>
+    <a href="/responsibilities" class="test-link">📝 Responsibilities</a>
+    <a href="/member-registration" class="test-link">📋 Member Registration</a>
+    <a href="/report" class="test-link">📊 Reports</a>
+    
+    <h3>Activity Routes (Auth Required)</h3>
+    <a href="/tasks" class="test-link">✅ Tasks</a>
+    <a href="/meetings" class="test-link">🤝 Meetings</a>
+    <a href="/events" class="test-link">📅 Events</a>
+    <a href="/donations" class="test-link">💰 Donations</a>
+    
+    <h3>Debug Tools</h3>
+    <a href="/test_routing.php" class="test-link">🛠️ Routing Debug</a>
+    <a href="/test_controller.php" class="test-link">🛠️ Controller Test</a>
+    
+    <div class="info">
+        <strong>Debug Mode:</strong> Enabled - You should see detailed error messages instead of generic 500 errors.
+    </div>
+    
+    <script>
+        // Log any errors that occur
+        window.addEventListener('error', function(e) {
+            console.error('Error:', e.error);
+        });
+    </script>
+</body>
+</html>

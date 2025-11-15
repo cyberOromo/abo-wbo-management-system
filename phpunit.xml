@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.4/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         cacheDirectory="storage/cache/phpunit"
+         executionOrder="depends,defects"
+         shortenArrays="true"
+         failOnWarning="true"
+         failOnRisky="true"
+         failOnEmptyTestSuite="true"
+         beStrictAboutOutputDuringTests="true"
+         beStrictAboutTodoAnnotatedTests="true"
+         beStrictAboutChangesEverywhere="true">
+
+    <testsuites>
+        <testsuite name="Unit">
+            <directory suffix="Test.php">tests/Unit</directory>
+        </testsuite>
+        
+        <testsuite name="Integration">
+            <directory suffix="Test.php">tests/Integration</directory>
+        </testsuite>
+        
+        <testsuite name="Feature">
+            <directory suffix="Test.php">tests/Feature</directory>
+        </testsuite>
+        
+        <testsuite name="HybridRegistration">
+            <directory suffix="Test.php">tests/Unit/Services</directory>
+            <directory suffix="Test.php">tests/Unit/Controllers</directory>
+            <directory suffix="Test.php">tests/Integration/HybridRegistration</directory>
+        </testsuite>
+    </testsuites>
+
+    <source>
+        <include>
+            <directory suffix=".php">app</directory>
+        </include>
+        <exclude>
+            <directory>app/Views</directory>
+            <file>app/bootstrap.php</file>
+        </exclude>
+    </source>
+
+    <coverage cacheDirectory="storage/cache/phpunit-coverage"
+              processUncoveredFiles="true">
+        <report>
+            <html outputDirectory="storage/logs/coverage-report" lowUpperBound="50" highLowerBound="90"/>
+            <text outputFile="storage/logs/coverage.txt" showUncoveredFiles="false" showOnlySummary="true"/>
+            <xml outputDirectory="storage/logs/coverage-xml"/>
+        </report>
+    </coverage>
+
+    <logging>
+        <junit outputFile="storage/logs/junit.xml"/>
+        <teamcity outputFile="storage/logs/teamcity.txt"/>
+        <testdoxHtml outputFile="storage/logs/testdox.html"/>
+        <testdoxText outputFile="storage/logs/testdox.txt"/>
+    </logging>
+
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="CACHE_DRIVER" value="array"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="QUEUE_DRIVER" value="sync"/>
+        <env name="MAIL_DRIVER" value="array"/>
+        <env name="NOTIFICATION_DRIVER" value="array"/>
+        <env name="LOG_LEVEL" value="debug"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <ini name="memory_limit" value="512M"/>
+        <ini name="max_execution_time" value="120"/>
+    </php>
+
+    <groups>
+        <exclude>
+            <group>slow</group>
+            <group>external</group>
+        </exclude>
+    </groups>
+</phpunit>

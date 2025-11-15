@@ -1,0 +1,30 @@
+# ABO-WBO Management System - Root Directory
+RewriteEngine On
+
+# Handle requests properly - don't redirect, just rewrite internally
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*)$ public/index.php [QSA,L]
+
+# Security: Prevent direct access to sensitive directories
+<IfModule mod_alias.c>
+    RedirectMatch 403 ^/app/
+    RedirectMatch 403 ^/config/
+    RedirectMatch 403 ^/database/
+    RedirectMatch 403 ^/routes/
+    RedirectMatch 403 ^/storage/
+    RedirectMatch 403 ^/tests/
+    RedirectMatch 403 ^/vendor/
+</IfModule>
+
+# Security: Prevent access to sensitive files
+<FilesMatch "\.(env|md|json|lock)$">
+    Require all denied
+</FilesMatch>
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-Frame-Options DENY
+    Header always set X-XSS-Protection "1; mode=block"
+</IfModule>

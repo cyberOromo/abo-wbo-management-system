@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Login Button</title>
+</head>
+<body>
+    <h1>Test Login Button - Fixed AuthMiddleware</h1>
+    
+    <p>Original issue: Double slash URLs like //auth/login</p>
+    
+    <div>
+        <h2>Test Links:</h2>
+        <p><a href="/auth/login">Single slash: /auth/login</a></p>
+        <p><a href="//auth/login">Double slash: //auth/login (should redirect properly now)</a></p>
+        <p><a href="/dashboard">Dashboard (should redirect to login if not authenticated)</a></p>
+    </div>
+    
+    <script>
+        console.log('Test page loaded');
+        console.log('Current URL:', window.location.href);
+    </script>
+</body>
+</html>

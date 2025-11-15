@@ -1,0 +1,40 @@
+# Production Nginx Dockerfile
+
+FROM nginx:alpine
+
+# Install additional packages
+RUN apk add --no-cache \
+    bash \
+    curl \
+    openssl
+
+# Remove default nginx configuration
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Copy custom nginx configuration
+COPY deployment/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY deployment/nginx/sites-available/abo-wbo.conf /etc/nginx/sites-available/abo-wbo.conf
+
+# Create sites-enabled directory and enable site
+RUN mkdir -p /etc/nginx/sites-enabled \
+    && ln -s /etc/nginx/sites-available/abo-wbo.conf /etc/nginx/sites-enabled/
+
+# Create necessary directories
+RUN mkdir -p /var/www/html/public \
+    && mkdir -p /var/log/nginx \
+    && mkdir -p /etc/nginx/ssl
+
+# Copy SSL configuration (certificates should be mounted)
+COPY deployment/nginx/ssl/ssl.conf /etc/nginx/ssl/ssl.conf
+
+# Set permissions
+RUN chown -R nginx:nginx /var/www/html \
+    && chown -R nginx:nginx /var/log/nginx
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
+
+EXPOSE 80 443
+
+CMD ["nginx", "-g", "daemon off;"]

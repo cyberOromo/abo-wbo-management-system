@@ -1,0 +1,39 @@
+# Deny access to all files in storage directory
+# This .htaccess file should be placed in the storage root directory
+# to prevent direct access to sensitive files
+
+# Apache 2.4+
+<RequireAll>
+    Require all denied
+</RequireAll>
+
+# Apache 2.2
+<Files "*">
+    Order deny,allow
+    Deny from all
+</Files>
+
+# Prevent execution of PHP files
+<FilesMatch "\.php$">
+    Order deny,allow
+    Deny from all
+</FilesMatch>
+
+# Prevent viewing of .htaccess files
+<Files ".htaccess">
+    Order deny,allow
+    Deny from all
+</Files>
+
+# Disable directory browsing
+Options -Indexes
+
+# Remove server signature
+ServerSignature Off
+
+# Security headers
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-Frame-Options DENY
+    Header always set X-XSS-Protection "1; mode=block"
+</IfModule>

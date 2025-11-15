@@ -1,0 +1,219 @@
+# A30W30 Donation Web Application – Detailed Specification & UI Wireframes
+
+This document is intended as a comprehensive handoff artifact for development teams (or AI) to build the A30W30 Donation application without ambiguity. It includes pixel‑agnostic wireframe sketches, component breakdowns, page flows, API contracts, data models, validation rules, and error states.
+
+---
+
+## 1. User Stories & Acceptance Criteria
+
+### 1.1. Certified User (Treasurer)
+- **Story CU‑1**: As a Certified User, I want to log in so that I can access my donation dashboard.
+  - AC: Login form accepts email/phone + password, shows validation errors (e.g. "Invalid credentials").
+- **Story CU‑2**: As a Certified User, I want to create an individual or group donation record so that I can submit it for approval.
+  - AC: Form fields auto‑populate my assigned hierarchy; required fields marked; "Submit" disabled until valid.
+- **Story CU‑3**: As a Certified User, I want to view my donation history so that I can track statuses.
+  - AC: Table lists Date, Event, Amount, Currency, Status, Receipt link (if approved).
+
+### 1.2. Manager
+- **Story M‑1**: As a Manager, I want to review pending donations from my scope so that I can approve or reject.
+  - AC: Dashboard tab "Pending Approvals" shows list with Approve/Reject actions and comment modal.
+- **Story M‑2**: As a Manager, I want to create new donation records within my broader hierarchy.
+  - AC: Same form as CU‑2 but hierarchy dropdown enables full scoped range.
+
+### 1.3. Super Admin
+- **Story SA‑1**: As Super Admin, I want to manage Godina/Gamta/Gurmu hierarchies.
+  - AC: CRUD UI with inline edit, unique‑name checks; deletions disabled.
+- **Story SA‑2**: As Super Admin, I want global reports across all hierarchies.
+  - AC: Filter panel + export button generates CSV/PDF matching filters.
+
+---
+
+## 2. UI Wireframes (Sketches)
+
+> **Legend**:
+> - 🔲 = Placeholder box (e.g. chart, list)
+> - 📋 = Form field
+> - ▶ = Button
+
+### 2.1. Login Page
+```
+┌───────────────────────────────────────────┐
+│ [Logo]                                   │
+│                                          │
+│  Email or Phone 📋                       │
+│  Password 📋                             │
+│  [▶ Login]                               │
+│                                          │
+│  Forgot password?  |  Contact support    │
+└───────────────────────────────────────────┘
+```
+
+### 2.2. User Dashboard
+```
+┌──────────────────────────────────────────────┐
+│ Navbar: Home | Create | My History | Logout │
+├──────────────────────────────────────────────┤
+│  🔲 Quick Stats: Pending / Approved counts  │
+├──────────────────────────────────────────────┤
+│  ▶ Create Donation                         │
+├─────┬──────────────┬─────────┬─────────────┤
+│Date │ Event Name   │ Amount  │ Status      │
+│2025-04-21 | Charity Gala | $500  | Pending │
+│...                                         │
+└──────────────────────────────────────────────┘
+```
+
+### 2.3. Create Donation Form
+```
+┌─────────────────────────────────────────────────┐
+│ [Breadcrumbs] Home > Create Donation            │
+├─────────────────────────────────────────────────┤
+│ Donor Type: ( ) Individual  ( ) Group           │
+│ 📋 First Name                              ○    │
+│ 📋 Last Name / Group Name                 ○    │
+│ 📋 Email or Phone                         ○    │
+│ 📋 Event Name                             ○    │
+│ 📋 Event Date (YYYY-MM-DD)                ○    │
+│ 📋 Amount / Currency                      ○    │
+│ 📋 Notes (optional)                       ○    │
+│ 🔽 Hierarchy: Godina ➤ Gamta ➤ Gurmu        ○    │
+│                                               │
+│ 🔲 [▶ Submit for Approval] (disabled until valid) │
+└─────────────────────────────────────────────────┘
+```
+
+### 2.4. Manager "Pending Approvals"
+```
+┌────────────────────────────────────────────────┐
+│ Tabs: Create | 🔲 Pending Approvals | My Submissions │
+├────────────────────────────────────────────────┤
+│ 🔲 Filter Bar: Date, Event, Donor, Hierarchy   │
+├────┬──────────────┬─────────┬───────┬────────┤
+│Date│Event         │Donor    │Amount │ Actions│
+│... │...           │...      │...    │[Approve][Reject]│
+└────────────────────────────────────────────────┘
+```
+
+### 2.5. Super Admin Hierarchy Management
+```
+┌─────────────────────────────────────────────────────┐
+│ Sidebar: Dashboard | Hierarchy | Users | Reports   │
+├─────────────────────────────────────────────────────┤
+│ 🔲 Godina List (Add/Edit)                         │
+│  - Asia  [Edit] [Add Gamta]                        │
+│    └ Gamta A [Edit] [Add Gurmu]                    │
+│        └ Gurmu 1 [Edit]                            │
+│ 🔲 [▶ + Add Godina]                                │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Component Architecture
+
+### 3.1. Atomic Design Structure
+- **Atoms**: Button, InputField, Select, Modal, Table, Badge, Alert
+- **Molecules**: HeaderNav, Breadcrumbs, FilterBar, DonorFormSection, HierarchyDropdown
+- **Organisms**: LoginForm, DonationForm, ApprovalList, HierarchyTree, ReportBuilder
+- **Templates/Pages**: LoginPage, DashboardPage (User/Manager), HierarchyPage, ReportPage
+
+### 3.2. Props & Events
+- **DonationForm**:
+  - Props: `mode: 'create'|'edit'`, `userScope`, `initialData?`
+  - Events: `onSubmit(data)`, `onValidationFail(errors)`
+- **ApprovalList**:
+  - Props: `items: ApprovalItem[]`, `scope`;
+  - Events: `onAction(id, 'approve'|'reject', comment?)`
+
+---
+
+## 4. API Specification
+
+### 4.1. Authentication
+```
+POST /api/auth/login
+Request: { identifier: string, password: string }
+Response: { token: JWT, user: { id, role, assignedScope } }
+```  
+
+### 4.2. CRUD Hierarchy (Super Admin)
+```
+GET /api/hierarchy       → list all nodes
+POST /api/hierarchy      → { type: 'godina'|'gamta'|'gurmu', name, parentId? }
+PUT /api/hierarchy/:id   → { name }
+DELETE /api/hierarchy/:id → 405 (not allowed)
+```  
+
+### 4.3. Donation Record Flow
+```
+POST /api/donations      → { donorInfo, eventName, eventDate, amount, currency, notes, hierarchyIds }
+GET /api/donations?scope…→ list by query filters
+POST /api/donations/:id/submit → moves status to pending
+POST /api/donations/:id/approve → { approverId } → generates receipt
+POST /api/donations/:id/reject  → { approverId, comment }
+GET /api/donations/:id/receipt → PDF binary
+```  
+
+### 4.4. Reporting
+```
+GET /api/reports/donations?start=&end=&godina=&gamta=&gurmu=&donorType=&event=
+Response: { rows: [...], aggregates: {...} }
+```  
+
+---
+
+## 5. Data Models & Validation
+
+```sql
+-- Donation
+CREATE TABLE Donations (
+  donation_id SERIAL PRIMARY KEY,
+  donor_id INT REFERENCES Donors,
+  event_name TEXT NOT NULL,
+  event_date DATE NOT NULL,
+  amount NUMERIC(12,2) CHECK(amount > 0),
+  currency CHAR(3) NOT NULL,
+  notes TEXT,
+  status VARCHAR(20) CHECK(status IN ('draft','pending','approved','rejected')),
+  creator_id INT NOT NULL,
+  approver_id INT,
+  hierarchy jsonb NOT NULL,  -- {godina, gamta, gurmu}
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+- **Field Rules**: `event_name` ≤ 100 chars; `currency` ISO 4217 codes only; `notes` ≤ 500 chars.
+- **Error Codes**: 400 = validation error (with field messages), 401 = unauthorized, 403 = forbidden, 404 = not found, 500 = server error.
+
+---
+
+## 6. Validations & Error States
+
+| Scenario                                   | Client UI                                 | API Response                           |
+|--------------------------------------------|-------------------------------------------|----------------------------------------|
+| Missing required field                    | Highlight field + inline error            | 400 { field: "This is required" }    |
+| Invalid date format                       | Prevent typing non‑date chars             | 400 { eventDate: "Invalid date" }    |
+| Amount ≤ 0                                 | Inline error, disable submit              | 400 { amount: "Must be > 0" }        |
+| Unauthorized access (e.g. no scope)       | Redirect to Login or "Access Denied"     | 403 { error: "Forbidden" }           |
+| Self‑approval attempt                     | Disable Approve button on UI              | 403 { error: "Cannot self‑approve" } |
+
+---
+
+## 7. Accessibility & Internationalization
+
+- **WCAG 2.1 AA**: All interactive elements keyboard‑focusable, aria attributes on form labels and table headings.
+- **i18n**: UI text keys externalized; date/currency formatting per user locale (default en‑US).
+
+---
+
+## 8. Dev Handoff & Assets
+
+- **Design Tokens**: (see `/design/tokens.json`) – color palette, spacing scale, typography.
+- **Branding**: SVG logo files, PDF receipt template mockup in `/assets/receipt_template.pdf`.
+- **Storybook**: All Atoms and Molecules implemented in `/storybook` for reference.
+- **Postman Collection**: `/api/Postman_Collection.json` with all endpoints and example payloads.
+
+---
+
+
+

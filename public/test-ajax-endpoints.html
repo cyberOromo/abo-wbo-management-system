@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test AJAX Endpoints</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Test AJAX Endpoints</h1>
+    
+    <h2>Test Gamtas by Godina</h2>
+    <select id="test-godina">
+        <option value="">Select Godina</option>
+        <option value="1">Test Godina 1</option>
+        <option value="2">Test Godina 2</option>
+    </select>
+    
+    <select id="test-gamta">
+        <option value="">Select Gamta</option>
+    </select>
+    
+    <select id="test-gurmu">
+        <option value="">Select Gurmu</option>
+    </select>
+    
+    <div id="debug-output"></div>
+    
+    <script>
+    $('#test-godina').change(function() {
+        const godinaId = $(this).val();
+        const debug = $('#debug-output');
+        debug.html('Loading gamtas...');
+        
+        if (godinaId) {
+            $.ajax({
+                url: '/users/gamtas-by-godina',
+                method: 'GET',
+                data: { godina_id: godinaId },
+                dataType: 'json',
+                success: function(response) {
+                    debug.html('<strong>Success:</strong> ' + JSON.stringify(response, null, 2));
+                    
+                    const gamtaSelect = $('#test-gamta');
+                    gamtaSelect.html('<option value="">Select Gamta</option>');
+                    
+                    if (response.success && response.gamtas) {
+                        response.gamtas.forEach(function(gamta) {
+                            gamtaSelect.append('<option value="' + gamta.id + '">' + gamta.name + '</option>');
+                        });
+                    }
+                },
+                error: function(xhr, status, error) {
+                    debug.html('<strong>Error:</strong> ' + xhr.status + ' - ' + error + '<br>' + xhr.responseText);
+                }
+            });
+        } else {
+            $('#test-gamta').html('<option value="">Select Gamta</option>');
+            $('#test-gurmu').html('<option value="">Select Gurmu</option>');
+        }
+    });
+    
+    $('#test-gamta').change(function() {
+        const gamtaId = $(this).val();
+        const debug = $('#debug-output');
+        debug.html('Loading gurmus...');
+        
+        if (gamtaId) {
+            $.ajax({
+                url: '/users/gurmus-by-gamta',
+                method: 'GET',
+                data: { gamta_id: gamtaId },
+                dataType: 'json',
+                success: function(response) {
+                    debug.html('<strong>Success:</strong> ' + JSON.stringify(response, null, 2));
+                    
+                    const gurmuSelect = $('#test-gurmu');
+                    gurmuSelect.html('<option value="">Select Gurmu</option>');
+                    
+                    if (response.success && response.gurmus) {
+                        response.gurmus.forEach(function(gurmu) {
+                            gurmuSelect.append('<option value="' + gurmu.id + '">' + gurmu.name + '</option>');
+                        });
+                    }
+                },
+                error: function(xhr, status, error) {
+                    debug.html('<strong>Error:</strong> ' + xhr.status + ' - ' + error + '<br>' + xhr.responseText);
+                }
+            });
+        } else {
+            $('#test-gurmu').html('<option value="">Select Gurmu</option>');
+        }
+    });
+    </script>
+</body>
+</html>

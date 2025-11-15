@@ -1,0 +1,301 @@
+# ABO-WBO Management System
+# Production Docker Configuration
+
+version: '3.8'
+
+services:
+  # PHP-FPM Application Container
+  app:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.app
+      target: production
+    container_name: abo-wbo-app
+    restart: unless-stopped
+    volumes:
+      - ./storage/logs:/var/www/html/storage/logs
+      - ./storage/cache:/var/www/html/storage/cache
+      - ./storage/sessions:/var/www/html/storage/sessions
+      - ./public/uploads:/var/www/html/public/uploads
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DB_HOST=mysql
+      - DB_DATABASE=abo_wbo_production
+      - DB_USERNAME=abo_wbo_user
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - abo-wbo-network
+
+  # Nginx Web Server
+  nginx:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.nginx
+    container_name: abo-wbo-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./public:/var/www/html/public:ro
+      - ./deployment/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deployment/nginx/sites-available:/etc/nginx/sites-available:ro
+      - ./deployment/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - app
+    networks:
+      - abo-wbo-network
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: abo-wbo-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: abo_wbo_production
+      MYSQL_USER: abo_wbo_user
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seeds:/docker-entrypoint-initdb.d/seeds:ro
+      - mysql-logs:/var/log/mysql
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb-buffer-pool-size=1G
+      --innodb-log-file-size=256M
+      --max-connections=200
+      --query-cache-type=1
+      --query-cache-size=64M
+      --slow-query-log=1
+      --slow-query-log-file=/var/log/mysql/slow.log
+      --long-query-time=2
+    networks:
+      - abo-wbo-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: abo-wbo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./deployment/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - abo-wbo-network
+
+  # Elasticsearch for Search and Analytics
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    container_name: abo-wbo-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx1g"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - abo-wbo-network
+
+  # Kibana for Log Analysis and Monitoring
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.0
+    container_name: abo-wbo-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=kibana.abo-wbo.local
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - abo-wbo-network
+
+  # Queue Worker for Background Jobs
+  queue-worker:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.app
+      target: production
+    container_name: abo-wbo-queue-worker
+    restart: unless-stopped
+    command: php app/Console/QueueWorker.php
+    volumes:
+      - ./storage/logs:/var/www/html/storage/logs
+      - ./storage/cache:/var/www/html/storage/cache
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DB_HOST=mysql
+      - DB_DATABASE=abo_wbo_production
+      - DB_USERNAME=abo_wbo_user
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - abo-wbo-network
+
+  # Scheduler for Cron Jobs
+  scheduler:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.app
+      target: production
+    container_name: abo-wbo-scheduler
+    restart: unless-stopped
+    command: php app/Console/Scheduler.php
+    volumes:
+      - ./storage/logs:/var/www/html/storage/logs
+      - ./storage/cache:/var/www/html/storage/cache
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DB_HOST=mysql
+      - DB_DATABASE=abo_wbo_production
+      - DB_USERNAME=abo_wbo_user
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - abo-wbo-network
+
+  # Prometheus for Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: abo-wbo-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - abo-wbo-network
+
+  # Grafana for Monitoring Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: abo-wbo-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=monitoring.abo-wbo.org
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=${MAIL_HOST}:587
+      - GF_SMTP_USER=${MAIL_USERNAME}
+      - GF_SMTP_PASSWORD=${MAIL_PASSWORD}
+      - GF_SMTP_FROM_ADDRESS=monitoring@abo-wbo.org
+    depends_on:
+      - prometheus
+    networks:
+      - abo-wbo-network
+
+  # Node Exporter for System Metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: abo-wbo-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - abo-wbo-network
+
+  # Backup Service
+  backup:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.backup
+    container_name: abo-wbo-backup
+    restart: unless-stopped
+    volumes:
+      - mysql-data:/backup/mysql:ro
+      - ./storage:/backup/storage:ro
+      - ./public/uploads:/backup/uploads:ro
+      - backup-data:/backup/archives
+      - ./deployment/backup/scripts:/backup/scripts:ro
+    environment:
+      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-0 2 * * *}
+      - MYSQL_HOST=mysql
+      - MYSQL_DATABASE=abo_wbo_production
+      - MYSQL_USER=abo_wbo_user
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET=${S3_BACKUP_BUCKET}
+    depends_on:
+      - mysql
+    networks:
+      - abo-wbo-network
+
+volumes:
+  mysql-data:
+    driver: local
+  mysql-logs:
+    driver: local
+  redis-data:
+    driver: local
+  elasticsearch-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  nginx-logs:
+    driver: local
+  backup-data:
+    driver: local
+
+networks:
+  abo-wbo-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

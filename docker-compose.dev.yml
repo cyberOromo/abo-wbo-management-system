@@ -1,0 +1,172 @@
+# ABO-WBO Management System
+# Development Docker Configuration
+
+version: '3.8'
+
+services:
+  # PHP Development Container with Xdebug
+  app:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.app
+      target: development
+    container_name: abo-wbo-app-dev
+    restart: unless-stopped
+    ports:
+      - "9000:9000"  # PHP-FPM
+      - "9003:9003"  # Xdebug
+    volumes:
+      - .:/var/www/html
+      - ./deployment/php/php-dev.ini:/usr/local/etc/php/conf.d/99-custom.ini
+    environment:
+      - APP_ENV=development
+      - APP_DEBUG=true
+      - DB_HOST=mysql
+      - DB_DATABASE=abo_wbo_development
+      - DB_USERNAME=abo_wbo_dev
+      - DB_PASSWORD=dev_password
+      - REDIS_HOST=redis
+      - XDEBUG_MODE=develop,debug
+      - XDEBUG_CONFIG=client_host=host.docker.internal client_port=9003
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - abo-wbo-dev-network
+
+  # Nginx Development Server
+  nginx:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.nginx-dev
+    container_name: abo-wbo-nginx-dev
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+      - ./deployment/nginx/nginx-dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    networks:
+      - abo-wbo-dev-network
+
+  # MySQL Development Database
+  mysql:
+    image: mysql:8.0
+    container_name: abo-wbo-mysql-dev
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: abo_wbo_development
+      MYSQL_USER: abo_wbo_dev
+      MYSQL_PASSWORD: dev_password
+    volumes:
+      - mysql-dev-data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seeds:/docker-entrypoint-initdb.d/seeds:ro
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb-buffer-pool-size=256M
+      --max-connections=100
+    networks:
+      - abo-wbo-dev-network
+
+  # Redis Development Cache
+  redis:
+    image: redis:7-alpine
+    container_name: abo-wbo-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-dev-data:/data
+    networks:
+      - abo-wbo-dev-network
+
+  # PHPMyAdmin for Database Management
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: abo-wbo-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: abo_wbo_dev
+      PMA_PASSWORD: dev_password
+      MYSQL_ROOT_PASSWORD: root_password
+    depends_on:
+      - mysql
+    networks:
+      - abo-wbo-dev-network
+
+  # MailHog for Email Testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: abo-wbo-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - abo-wbo-dev-network
+
+  # Redis Commander for Redis Management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: abo-wbo-redis-commander
+    restart: unless-stopped
+    ports:
+      - "8082:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - abo-wbo-dev-network
+
+  # Elasticsearch for Development Search
+  elasticsearch-dev:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    container_name: abo-wbo-elasticsearch-dev
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms256m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    volumes:
+      - elasticsearch-dev-data:/usr/share/elasticsearch/data
+    ports:
+      - "9201:9200"
+    networks:
+      - abo-wbo-dev-network
+
+  # Testing Database (SQLite - File-based for testing)
+  test-db:
+    image: alpine:latest
+    container_name: abo-wbo-test-db
+    volumes:
+      - ./storage/testing:/data
+    command: tail -f /dev/null
+    networks:
+      - abo-wbo-dev-network
+
+volumes:
+  mysql-dev-data:
+    driver: local
+  redis-dev-data:
+    driver: local
+  elasticsearch-dev-data:
+    driver: local
+
+networks:
+  abo-wbo-dev-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

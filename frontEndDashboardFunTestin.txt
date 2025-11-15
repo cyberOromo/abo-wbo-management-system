@@ -1,0 +1,91 @@
+Admin dashboard: when clicking in the sidebar modules 
+
+Leadership section
+
+Responsibilities
+http://abo-wbo.local/responsibilities
+
+500 - Internal Server Error
+Something went wrong. Please try again later.
+
+---
+
+Member registration
+http://abo-wbo.local/member-registration
+
+500 - Internal Server Error
+Something went wrong. Please try again later.
+
+---
+
+Reports
+http://abo-wbo.local/report
+
+500 - Internal Server Error
+Something went wrong. Please try again later.
+
+
+==================================
+
+Administration section IMPORTANT 
+
+Hierarchy Management 
+http://abo-wbo.local/hierarchy
+
+500 - Internal Server Error
+Something went wrong. Please try again later.
+
+
+
+---
+
+
+User Management IMPORTANT
+http://abo-wbo.local/user
+
+500 - Internal Server Error
+Something went wrong. Please try again later.
+
+
+----
+
+Position Management
+http://abo-wbo.local/positions
+
+500 - Internal Server Error
+Something went wrong. Please try again later.
+
+
+---
+System setting 
+http://abo-wbo.local/admin
+
+
+500 - Internal Server Error
+Something went wrong. Please try again later.
+
+
+----
+
+
+setting
+http://abo-wbo.local/settings
+
+500 - Internal Server Error
+Something went wrong. Please try again later.
+
+
+----
+
+
+
+==================
+
+
+
+
+
+
+
+
+
