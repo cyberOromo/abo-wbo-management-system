@@ -106,7 +106,7 @@ class Gurmu extends Model
         $params[':limit'] = $limit;
         $params[':offset'] = $offset;
 
-        $stmt = $db->prepare($sql);
+        $stmt = $db->query($sql);
         $stmt->execute($params);
         $gurmus = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -119,7 +119,7 @@ class Gurmu extends Model
             WHERE " . implode(' AND ', $conditions);
 
         unset($params[':limit'], $params[':offset']);
-        $countStmt = $db->prepare($countSql);
+        $countStmt = $db->query($countSql);
         $countStmt->execute($params);
         $total = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
 
@@ -168,7 +168,7 @@ class Gurmu extends Model
             GROUP BY g.id
         ";
 
-        $stmt = $db->prepare($sql);
+        $stmt = $db->query($sql);
         $stmt->execute([':id' => $id]);
         $gurmu = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -206,7 +206,7 @@ class Gurmu extends Model
             ORDER BY g.name ASC
         ";
 
-        $stmt = $db->prepare($sql);
+        $stmt = $db->query($sql);
         $stmt->execute([':gamta_id' => $gamtaId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -243,7 +243,7 @@ class Gurmu extends Model
             ORDER BY u.first_name ASC, u.last_name ASC
         ";
 
-        $stmt = $db->prepare($sql);
+        $stmt = $db->query($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -265,7 +265,7 @@ class Gurmu extends Model
             ORDER BY user_count DESC
         ";
 
-        $stmt = $db->prepare($sql);
+        $stmt = $db->query($sql);
         $stmt->execute([':gurmu_id' => $gurmuId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -289,7 +289,7 @@ class Gurmu extends Model
             GROUP BY g.id
         ";
 
-        $stmt = $db->prepare($sql);
+        $stmt = $db->query($sql);
         $stmt->execute([':gurmu_id' => $gurmuId]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
@@ -313,7 +313,7 @@ class Gurmu extends Model
             AND m.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
         ";
 
-        $stmt = $db->prepare($sql);
+        $stmt = $db->query($sql);
         $stmt->execute([':gurmu_id' => $gurmuId]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
@@ -342,9 +342,7 @@ class Gurmu extends Model
             }
 
             // Validate gamta exists
-            $gamta = $db->prepare("SELECT id, status FROM gamtas WHERE id = :id");
-            $gamta->execute([':id' => $data['gamta_id']]);
-            $gamtaData = $gamta->fetch(PDO::FETCH_ASSOC);
+            $gamtaData = $db->fetch("SELECT id, status FROM gamtas WHERE id = ?", [$data['gamta_id']]);
             
             if (!$gamtaData) {
                 throw new Exception("Parent Gamta not found");
@@ -365,42 +363,29 @@ class Gurmu extends Model
                 $data['metadata'] = json_encode($data['metadata']);
             }
 
-            // Insert gurmu
-            $sql = "
-                INSERT INTO gurmus (
-                    gamta_id, name, code, description, contact_email, contact_phone,
-                    address, website, meeting_schedule, membership_fee, currency,
-                    status, metadata, created_by
-                ) VALUES (
-                    :gamta_id, :name, :code, :description, :contact_email, :contact_phone,
-                    :address, :website, :meeting_schedule, :membership_fee, :currency,
-                    :status, :metadata, :created_by
-                )
-            ";
+            // Insert gurmu using Database insert() method
+            $insertData = [
+                'gamta_id' => $data['gamta_id'],
+                'name' => $data['name'],
+                'code' => strtoupper($data['code']),
+                'description' => $data['description'] ?? null,
+                'contact_email' => $data['contact_email'] ?? null,
+                'contact_phone' => $data['contact_phone'] ?? null,
+                'address' => $data['address'] ?? null,
+                'website' => $data['website'] ?? null,
+                'meeting_schedule' => $data['meeting_schedule'] ?? null,
+                'membership_fee' => $data['membership_fee'],
+                'currency' => $data['currency'],
+                'status' => $data['status'],
+                'metadata' => $data['metadata'] ?? null,
+                'created_by' => $data['created_by']
+            ];
 
-            $stmt = $db->prepare($sql);
-            $result = $stmt->execute([
-                ':gamta_id' => $data['gamta_id'],
-                ':name' => $data['name'],
-                ':code' => strtoupper($data['code']),
-                ':description' => $data['description'] ?? null,
-                ':contact_email' => $data['contact_email'] ?? null,
-                ':contact_phone' => $data['contact_phone'] ?? null,
-                ':address' => $data['address'] ?? null,
-                ':website' => $data['website'] ?? null,
-                ':meeting_schedule' => $data['meeting_schedule'] ?? null,
-                ':membership_fee' => $data['membership_fee'],
-                ':currency' => $data['currency'],
-                ':status' => $data['status'],
-                ':metadata' => $data['metadata'] ?? null,
-                ':created_by' => $data['created_by']
-            ]);
+            $gurmuId = $db->insert('gurmus', $insertData);
 
-            if (!$result) {
+            if (!$gurmuId) {
                 throw new Exception("Failed to create gurmu");
             }
-
-            $gurmuId = $db->lastInsertId();
 
             // Log activity
             self::logActivity($gurmuId, 'created', null, $data, $data['created_by']);
@@ -440,7 +425,7 @@ class Gurmu extends Model
 
             // Validate gamta exists if changing
             if (isset($data['gamta_id']) && $data['gamta_id'] !== $current['gamta_id']) {
-                $gamta = $db->prepare("SELECT id, status FROM gamtas WHERE id = :id");
+                $gamta = $db->query("SELECT id, status FROM gamtas WHERE id = :id");
                 $gamta->execute([':id' => $data['gamta_id']]);
                 $gamtaData = $gamta->fetch(PDO::FETCH_ASSOC);
                 
@@ -474,7 +459,7 @@ class Gurmu extends Model
             }
 
             $sql = "UPDATE gurmus SET " . implode(', ', $updateFields) . " WHERE id = :id";
-            $stmt = $db->prepare($sql);
+            $stmt = $db->query($sql);
             $result = $stmt->execute($params);
 
             if (!$result) {
@@ -510,7 +495,7 @@ class Gurmu extends Model
             }
 
             // Check if gurmu has active users
-            $userCount = $db->prepare("SELECT COUNT(*) FROM users WHERE gurmu_id = :id AND status = 'active'");
+            $userCount = $db->query("SELECT COUNT(*) FROM users WHERE gurmu_id = :id AND status = 'active'");
             $userCount->execute([':id' => $id]);
             $activeUsers = $userCount->fetchColumn();
 
@@ -519,7 +504,7 @@ class Gurmu extends Model
             }
 
             // Soft delete by setting status to inactive
-            $stmt = $db->prepare("UPDATE gurmus SET status = 'inactive', updated_at = NOW() WHERE id = :id");
+            $stmt = $db->query("UPDATE gurmus SET status = 'inactive', updated_at = NOW() WHERE id = :id");
             $result = $stmt->execute([':id' => $id]);
 
             if (!$result) {
@@ -549,14 +534,13 @@ class Gurmu extends Model
         $params = [':code' => strtoupper($code)];
 
         if ($excludeId) {
-            $conditions[] = 'id != :exclude_id';
-            $params[':exclude_id'] = $excludeId;
+            $conditions[] = 'id != ?';
+            $params[] = $excludeId;
         }
 
         $sql = "SELECT COUNT(*) FROM gurmus WHERE " . implode(' AND ', $conditions);
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchColumn() > 0;
+        $count = $db->fetchColumn($sql, $params);
+        return $count > 0;
     }
 
     /**
@@ -595,7 +579,7 @@ class Gurmu extends Model
             LIMIT :limit
         ";
 
-        $stmt = $db->prepare($sql);
+        $stmt = $db->query($sql);
         $stmt->execute([
             ':gurmu_id' => $gurmuId,
             ':limit' => $limit
@@ -611,7 +595,7 @@ class Gurmu extends Model
         $db = Database::getInstance();
         
         // Basic user statistics
-        $userStats = $db->prepare("
+        $userStats = $db->query("
             SELECT 
                 COUNT(*) as total_users,
                 COUNT(CASE WHEN status = 'active' THEN 1 END) as active_users,
@@ -626,7 +610,7 @@ class Gurmu extends Model
         $userStats = $userStats->fetch(PDO::FETCH_ASSOC);
 
         // Activity statistics
-        $activityStats = $db->prepare("
+        $activityStats = $db->query("
             SELECT 
                 COUNT(DISTINCT t.id) as total_tasks,
                 COUNT(DISTINCT CASE WHEN t.status = 'completed' THEN t.id END) as completed_tasks,
@@ -661,7 +645,7 @@ class Gurmu extends Model
                 VALUES (:user_id, :action, 'gurmus', :record_id, :old_values, :new_values, :ip_address, :user_agent)
             ";
 
-            $stmt = $db->prepare($sql);
+            $stmt = $db->query($sql);
             $stmt->execute([
                 ':user_id' => $userId,
                 ':action' => "gurmu_{$type}",
@@ -704,7 +688,7 @@ class Gurmu extends Model
             ORDER BY g.name ASC
         ";
 
-        $stmt = $db->prepare($sql);
+        $stmt = $db->query($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -720,7 +704,7 @@ class Gurmu extends Model
             $db->beginTransaction();
 
             // Validate both gurmus exist and are active
-            $gurmus = $db->prepare("SELECT id, status FROM gurmus WHERE id IN (:from_id, :to_id)");
+            $gurmus = $db->query("SELECT id, status FROM gurmus WHERE id IN (:from_id, :to_id)");
             $gurmus->execute([':from_id' => $fromGurmuId, ':to_id' => $toGurmuId]);
             $gurmuData = $gurmus->fetchAll(PDO::FETCH_ASSOC);
 
@@ -750,7 +734,7 @@ class Gurmu extends Model
 
             // Move users
             $sql = "UPDATE users SET gurmu_id = :to_gurmu_id WHERE gurmu_id = :from_gurmu_id" . $userCondition;
-            $stmt = $db->prepare($sql);
+            $stmt = $db->query($sql);
             $result = $stmt->execute($params);
 
             if (!$result) {
@@ -803,7 +787,7 @@ class Gurmu extends Model
             WHERE g.id = :gurmu_id
         ";
 
-        $stmt = $db->prepare($sql);
+        $stmt = $db->query($sql);
         $stmt->execute([':gurmu_id' => $gurmuId]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }

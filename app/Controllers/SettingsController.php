@@ -35,7 +35,7 @@ class SettingsController extends BaseController
             $settingsStats = $this->getSettingsStats();
             $securityAlerts = $this->getSecurityAlerts();
             
-            return $this->render('settings/index_modern', [
+            echo $this->render('settings/index_modern', [
                 'system_settings' => $systemSettings,
                 'system_status' => $systemStatus,
                 'recent_activities' => $recentActivities,
@@ -70,7 +70,7 @@ class SettingsController extends BaseController
             $timezones = $this->getAvailableTimezones();
             $languages = $this->getAvailableLanguages();
             
-            return $this->render('settings/general', [
+            echo $this->render('settings/general', [
                 'general_settings' => $generalSettings,
                 'timezones' => $timezones,
                 'languages' => $languages,
@@ -153,7 +153,7 @@ class SettingsController extends BaseController
             $emailSettings = $this->getEmailSettings();
             $emailTemplates = $this->getEmailTemplates();
             
-            return $this->render('settings/email', [
+            echo $this->render('settings/email', [
                 'email_settings' => $emailSettings,
                 'email_templates' => $emailTemplates,
                 'title' => 'Email Settings'
@@ -245,7 +245,7 @@ class SettingsController extends BaseController
             $notificationSettings = $this->getNotificationSettings();
             $notificationTypes = $this->getNotificationTypes();
             
-            return $this->render('settings/notifications', [
+            echo $this->render('settings/notifications', [
                 'notification_settings' => $notificationSettings,
                 'notification_types' => $notificationTypes,
                 'title' => 'Notification Settings'
@@ -320,7 +320,7 @@ class SettingsController extends BaseController
             $backups = $this->getAvailableBackups();
             $backupSettings = $this->getBackupSettings();
             
-            return $this->render('settings/backup', [
+            echo $this->render('settings/backup', [
                 'backups' => $backups,
                 'backup_settings' => $backupSettings,
                 'title' => 'Backup & Restore'
@@ -393,7 +393,7 @@ class SettingsController extends BaseController
             $maintenanceSettings = $this->getMaintenanceSettings();
             $systemHealth = $this->getSystemHealthStatus();
             
-            return $this->render('settings/maintenance', [
+            echo $this->render('settings/maintenance', [
                 'maintenance_settings' => $maintenanceSettings,
                 'system_health' => $systemHealth,
                 'title' => 'System Maintenance'

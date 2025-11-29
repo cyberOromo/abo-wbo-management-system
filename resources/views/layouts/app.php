@@ -8,10 +8,8 @@
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons - Updated to latest stable version -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <!-- Bootstrap Icons Fallback -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.1/font/bootstrap-icons.min.css" rel="stylesheet" onerror="this.onerror=null; this.href='https://unpkg.com/bootstrap-icons@1.11.1/font/bootstrap-icons.css'">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <!-- Custom CSS -->
     <style>
         :root {
@@ -53,13 +51,6 @@
             color: white;
         }
         
-        .sidebar-heading {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #6c757d !important;
-        }
-        
         .main-content {
             padding: 2rem;
         }
@@ -92,66 +83,39 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <?php if (auth_check()): ?>
-                        <?php 
-                        $user = auth_user(); 
-                        $userRole = $user['role'] ?? 'member';
-                        $isAdmin = $userRole === 'admin';
-                        $isExecutive = $userRole === 'executive';
-                        $isMember = $userRole === 'member';
-                        ?>
                         <li class="nav-item">
                             <a class="nav-link" href="/dashboard">
                                 <i class="bi bi-speedometer2 me-1"></i>Dashboard
                             </a>
                         </li>
-                        
-                        <!-- Organization dropdown - Different content based on role -->
-                        <?php if ($isAdmin): ?>
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                    <i class="bi bi-diagram-3 me-1"></i>Organization
-                                </a>
-                                <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="/hierarchy">Hierarchy Management</a></li>
-                                    <li><a class="dropdown-item" href="/positions">Position Management</a></li>
-                                    <li><a class="dropdown-item" href="/users">User Management</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item" href="/responsibilities">
-                                        <i class="bi bi-diagram-3 me-2 text-primary"></i>
-                                        Shared Responsibilities
-                                        <small class="d-block text-muted">5 Core Areas</small>
-                                    </a></li>
-                                </ul>
-                            </li>
-                        <?php elseif ($isExecutive): ?>
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                    <i class="bi bi-people me-1"></i>Leadership
-                                </a>
-                                <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="/responsibilities">My Responsibilities</a></li>
-                                    <li><a class="dropdown-item" href="/member-registration">Register Members</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item" href="/reports">Reports & Analytics</a></li>
-                                </ul>
-                            </li>
-                        <?php endif; ?>
-                        
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-diagram-3 me-1"></i>Organization
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="/hierarchy">Hierarchy</a></li>
+                                <li><a class="dropdown-item" href="/positions">Positions</a></li>
+                                <li><a class="dropdown-item" href="/users">Users</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="/responsibilities">
+                                    <i class="bi bi-diagram-3 me-2 text-primary"></i>
+                                    Shared Responsibilities
+                                    <small class="d-block text-muted">5 Core Areas</small>
+                                </a></li>
+                            </ul>
+                        </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-calendar-event me-1"></i>Activities
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="/tasks">My Tasks</a></li>
-                                <li><a class="dropdown-item" href="/meetings">My Meetings</a></li>
-                                <li><a class="dropdown-item" href="/events">Community Events</a></li>
+                                <li><a class="dropdown-item" href="/tasks">Tasks</a></li>
+                                <li><a class="dropdown-item" href="/meetings">Meetings</a></li>
+                                <li><a class="dropdown-item" href="/events">Events</a></li>
                             </ul>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="/donations">
-                                <i class="bi bi-heart me-1"></i>Donations
-                            </a>
-                        </li>
                                 <i class="bi bi-heart me-1"></i>Donations
                             </a>
                         </li>
@@ -216,104 +180,56 @@
     <div class="container-fluid flex-grow-1">
         <div class="row">
             <?php if (auth_check()): ?>
-                <?php 
-                $user = auth_user(); 
-                $userRole = $user['role'] ?? 'member';
-                $isAdmin = $userRole === 'admin';
-                $isExecutive = $userRole === 'executive';
-                $isMember = $userRole === 'member';
-                ?>
                 <!-- Sidebar -->
                 <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
                     <div class="position-sticky pt-3">
                         <ul class="nav flex-column">
-                            <!-- Dashboard - Available to all authenticated users -->
                             <li class="nav-item">
                                 <a class="nav-link" href="/dashboard">
                                     <i class="bi bi-speedometer2 me-2"></i>Dashboard
                                 </a>
                             </li>
-                            
-                            <!-- My Activities - Available to all users -->
-                            <li class="nav-item mb-2">
-                                <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
-                                    <span>My Activities</span>
-                                </h6>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/users">
+                                    <i class="bi bi-people me-2"></i>Users
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/hierarchy">
+                                    <i class="bi bi-diagram-3 me-2"></i>Hierarchy
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/positions">
+                                    <i class="bi bi-briefcase me-2"></i>Positions
+                                </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="/tasks">
-                                    <i class="bi bi-check-square me-2"></i>My Tasks
+                                    <i class="bi bi-check-square me-2"></i>Tasks
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="/meetings">
-                                    <i class="bi bi-camera-video me-2"></i>My Meetings
+                                    <i class="bi bi-camera-video me-2"></i>Meetings
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="/events">
-                                    <i class="bi bi-calendar-event me-2"></i>Community Events
+                                    <i class="bi bi-calendar-event me-2"></i>Events
                                 </a>
                             </li>
-                            
-                            <!-- Donations - Available to all users -->
                             <li class="nav-item">
                                 <a class="nav-link" href="/donations">
-                                    <i class="bi bi-heart me-2"></i>My Donations
+                                    <i class="bi bi-heart me-2"></i>Donations
                                 </a>
                             </li>
-                            
-                            <!-- Executive/Leadership Functions - Only for executives and admins -->
-                            <?php if ($isExecutive || $isAdmin): ?>
-                                <li class="nav-item mb-2">
-                                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
-                                        <span>Leadership</span>
-                                    </h6>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="/responsibilities">
-                                        <i class="bi bi-diagram-3 me-2"></i>Responsibilities
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="/member-registration">
-                                        <i class="bi bi-person-plus-fill me-2"></i>Register Members
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="/reports">
-                                        <i class="bi bi-graph-up me-2"></i>Reports
-                                    </a>
-                                </li>
-                            <?php endif; ?>
-                            
-                            <!-- System Administration - Admin only -->
-                            <?php if ($isAdmin): ?>
-                                <li class="nav-item mb-2">
-                                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
-                                        <span>Administration</span>
-                                    </h6>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="/users">
-                                        <i class="bi bi-people me-2"></i>User Management
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="/hierarchy">
-                                        <i class="bi bi-diagram-3 me-2"></i>Hierarchy Management
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="/positions">
-                                        <i class="bi bi-briefcase me-2"></i>Position Management
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="/admin">
-                                        <i class="bi bi-gear me-2"></i>System Settings
-                                    </a>
-                                </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/reports">
+                                    <i class="bi bi-graph-up me-2"></i>Reports
+                                </a>
+                            </li>
+                            <?php if (auth_user()['role'] === 'admin'): ?>
                                 <li class="nav-item">
                                     <a class="nav-link" href="/settings">
                                         <i class="bi bi-gear me-2"></i>Settings

@@ -163,7 +163,7 @@ class Event extends Model
                              COUNT(ep.id) as total_registrations,
                              SUM(CASE WHEN ep.status = 'confirmed' THEN 1 ELSE 0 END) as confirmed_registrations
                       FROM {$this->table} e
-                      LEFT JOIN users u ON e.created_by = u.id
+                      LEFT JOIN users u ON e.organized_by = u.id
                       LEFT JOIN event_participants ep ON e.id = ep.event_id
                       WHERE e.level_scope = :scope";
             
@@ -232,7 +232,7 @@ class Event extends Model
                              ep.status as participation_status,
                              ep.registered_at
                       FROM {$this->table} e
-                      LEFT JOIN users u ON e.created_by = u.id
+                      LEFT JOIN users u ON e.organized_by = u.id
                       LEFT JOIN event_participants ep ON e.id = ep.event_id AND ep.user_id = :user_id
                       WHERE e.start_datetime >= NOW() 
                       AND e.status IN ('open_registration', 'registration_closed', 'in_progress')
@@ -496,7 +496,7 @@ class Event extends Model
                              u.last_name as creator_last_name,
                              COUNT(ep.id) as total_registrations
                       FROM {$this->table} e
-                      LEFT JOIN users u ON e.created_by = u.id
+                      LEFT JOIN users u ON e.organized_by = u.id
                       LEFT JOIN event_participants ep ON e.id = ep.event_id
                       WHERE 1=1";
             
@@ -693,7 +693,7 @@ class Event extends Model
                              u.last_name as creator_last_name,
                              COUNT(ep.id) as registration_count
                       FROM {$this->table} e
-                      LEFT JOIN users u ON e.created_by = u.id
+                      LEFT JOIN users u ON e.organized_by = u.id
                       LEFT JOIN event_participants ep ON e.id = ep.event_id
                       WHERE e.status IN ('open_registration', 'registration_closed', 'in_progress')
                       AND e.start_datetime >= NOW()

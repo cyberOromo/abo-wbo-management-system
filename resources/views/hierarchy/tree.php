@@ -1,961 +1,603 @@
-<?php
-$pageTitle = $title ?? 'Hierarchy Tree View';
-$breadcrumbs = [
-    ['title' => 'Dashboard', 'url' => '/dashboard'],
-    ['title' => 'Hierarchy', 'url' => '/hierarchy'],
-    ['title' => 'Tree View', 'url' => '/hierarchy/tree', 'active' => true]
-];
-?>
-
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">
-        <i class="bi bi-diagram-2 me-2"></i>
-        Organizational Hierarchy Tree
-    </h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <div class="btn-group me-2">
-            <button type="button" class="btn btn-outline-secondary" id="expandAllBtn">
-                <i class="bi bi-arrows-expand me-1"></i>
-                Expand All
-            </button>
-            <button type="button" class="btn btn-outline-secondary" id="collapseAllBtn">
-                <i class="bi bi-arrows-collapse me-1"></i>
-                Collapse All
-            </button>
-        </div>
-        <div class="btn-group me-2">
-            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                <i class="bi bi-funnel me-1"></i>
-                Filter
-            </button>
-            <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="#" data-filter="all">Show All</a></li>
-                <li><a class="dropdown-item" href="#" data-filter="active">Active Only</a></li>
-                <li><a class="dropdown-item" href="#" data-filter="inactive">Inactive Only</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item" href="#" data-filter="with-users">With Users</a></li>
-                <li><a class="dropdown-item" href="#" data-filter="empty">Empty Units</a></li>
-            </ul>
-        </div>
-        <div class="btn-group">
-            <a href="/hierarchy" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i>
-                Back to Overview
-            </a>
-        </div>
-    </div>
-</div>
-
-<!-- Tree Controls -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <div class="input-group">
-                            <span class="input-group-text">
-                                <i class="bi bi-search"></i>
-                            </span>
-                            <input type="text" class="form-control" id="searchInput" placeholder="Search hierarchy...">
-                            <button class="btn btn-outline-secondary" type="button" id="clearSearch">
-                                <i class="bi bi-x"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="d-flex justify-content-end gap-2">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="showUserCount" checked>
-                                <label class="form-check-label" for="showUserCount">
-                                    Show User Count
-                                </label>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="enableDragDrop">
-                                <label class="form-check-label" for="enableDragDrop">
-                                    Enable Drag & Drop
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Hierarchy Tree -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-diagram-3 me-2"></i>
-                    Interactive Hierarchy Tree
-                </h5>
-            </div>
-            <div class="card-body">
-                <!-- Loading State -->
-                <div id="loading-state" class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-3 text-muted">Loading organizational hierarchy...</p>
-                </div>
-                
-                <!-- Error State -->
-                <div id="error-state" class="text-center py-5" style="display: none;">
-                    <i class="bi bi-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
-                    <h4 class="text-danger mt-3">Failed to Load Hierarchy</h4>
-                    <p class="text-muted">There was an error loading the organizational hierarchy.</p>
-                    <button class="btn btn-outline-primary" onclick="loadHierarchyTree()">
-                        <i class="bi bi-arrow-clockwise me-1"></i>
-                        Try Again
-                    </button>
-                </div>
-                
-                <!-- Empty State -->
-                <div id="empty-state" class="text-center py-5" style="display: none;">
-                    <i class="bi bi-diagram-3 text-muted" style="font-size: 3rem;"></i>
-                    <h4 class="text-muted mt-3">No Hierarchy Data</h4>
-                    <p class="text-muted">No organizational units have been created yet.</p>
-                    <div class="d-flex gap-2 justify-content-center">
-                        <a href="/hierarchy/create?type=godina" class="btn btn-primary">
-                            <i class="bi bi-plus-circle me-1"></i>
-                            Create First Godina
-                        </a>
-                    </div>
-                </div>
-                
-                <!-- Tree Container -->
-                <div id="hierarchy-tree" style="display: none;">
-                    <!-- Tree content will be populated here -->
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Legend -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <h6 class="card-title">Legend</h6>
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center mb-2">
-                            <div class="legend-item godina-legend me-3"></div>
-                            <span><i class="bi bi-globe me-1"></i> Godina (Regional Unit)</span>
-                        </div>
-                        <div class="d-flex align-items-center mb-2">
-                            <div class="legend-item gamta-legend me-3"></div>
-                            <span><i class="bi bi-house me-1"></i> Gamta (Local Unit)</span>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center mb-2">
-                            <span class="badge bg-success me-2">Active</span>
-                            <span class="text-muted">Unit is active and operational</span>
-                        </div>
-                        <div class="d-flex align-items-center mb-2">
-                            <span class="badge bg-secondary me-2">Inactive</span>
-                            <span class="text-muted">Unit is temporarily inactive</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Context Menu -->
-<div class="context-menu" id="contextMenu" style="display: none;">
-    <ul class="list-unstyled mb-0">
-        <li><a href="#" class="context-item" data-action="view">
-            <i class="bi bi-eye me-2"></i>View Details
-        </a></li>
-        <li><a href="#" class="context-item" data-action="edit">
-            <i class="bi bi-pencil me-2"></i>Edit
-        </a></li>
-        <li><hr class="my-1"></li>
-        <li><a href="#" class="context-item" data-action="add-gamta">
-            <i class="bi bi-plus me-2"></i>Add Gamta
-        </a></li>
-        <li><a href="#" class="context-item" data-action="assign-users">
-            <i class="bi bi-people me-2"></i>Assign Users
-        </a></li>
-        <li><hr class="my-1"></li>
-        <li><a href="#" class="context-item text-danger" data-action="delete">
-            <i class="bi bi-trash me-2"></i>Delete
-        </a></li>
-    </ul>
-</div>
-
-<style>
-.hierarchy-tree {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-.tree-node {
-    margin: 0.5rem 0;
-    position: relative;
-}
-
-.node-content {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    user-select: none;
-}
-
-.node-content:hover {
-    transform: translateX(3px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.godina-node .node-content {
-    background-color: #e3f2fd;
-    border-left: 4px solid #2196f3;
-    font-weight: 600;
-}
-
-.gamta-node .node-content {
-    background-color: #f3e5f5;
-    border-left: 4px solid #9c27b0;
-    margin-left: 2rem;
-}
-
-.node-content.active {
-    border-left-color: #4caf50;
-}
-
-.node-content.inactive {
-    opacity: 0.6;
-    border-left-color: #9e9e9e;
-}
-
-.node-toggle {
-    width: 20px;
-    height: 20px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 0.5rem;
-    border-radius: 50%;
-    transition: background-color 0.2s;
-}
-
-.node-toggle:hover {
-    background-color: rgba(0,0,0,0.1);
-}
-
-.node-info {
-    flex-grow: 1;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.node-title {
-    font-weight: 500;
-    margin: 0;
-}
-
-.node-subtitle {
-    font-size: 0.875rem;
-    color: #6c757d;
-    margin: 0;
-}
-
-.node-badges {
-    display: flex;
-    gap: 0.25rem;
-    align-items: center;
-}
-
-.node-actions {
-    display: flex;
-    gap: 0.25rem;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.node-content:hover .node-actions {
-    opacity: 1;
-}
-
-.node-children {
-    margin-top: 0.5rem;
-    margin-left: 1rem;
-    border-left: 2px dotted #dee2e6;
-    padding-left: 1rem;
-}
-
-.node-children.collapsed {
-    display: none;
-}
-
-.legend-item {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-    display: inline-block;
-}
-
-.godina-legend {
-    background-color: #e3f2fd;
-    border-left: 4px solid #2196f3;
-}
-
-.gamta-legend {
-    background-color: #f3e5f5;
-    border-left: 4px solid #9c27b0;
-}
-
-.context-menu {
-    position: fixed;
-    background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 0.375rem;
-    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
-    z-index: 1050;
-    min-width: 160px;
-    padding: 0.5rem 0;
-}
-
-.context-item {
-    display: block;
-    padding: 0.375rem 1rem;
-    color: #212529;
-    text-decoration: none;
-    transition: background-color 0.2s;
-}
-
-.context-item:hover {
-    background-color: #f8f9fa;
-    color: #212529;
-}
-
-.tree-node.highlighted .node-content {
-    background-color: #fff3cd !important;
-    border-left-color: #ffc107 !important;
-}
-
-.tree-node.drag-over .node-content {
-    background-color: #d1ecf1 !important;
-    border-left-color: #17a2b8 !important;
-}
-
-/* Animations */
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        max-height: 0;
-    }
-    to {
-        opacity: 1;
-        max-height: 500px;
-    }
-}
-
-.node-children {
-    animation: slideDown 0.3s ease-out;
-}
-</style>
-
-<script>
-let hierarchyData = [];
-let filteredData = [];
-let currentFilter = 'all';
-let showUserCount = true;
-let enableDragDrop = false;
-let contextMenuTarget = null;
-
-document.addEventListener('DOMContentLoaded', function() {
-    loadHierarchyTree();
-    initializeEventListeners();
-});
-
-function initializeEventListeners() {
-    // Search functionality
-    document.getElementById('searchInput').addEventListener('input', handleSearch);
-    document.getElementById('clearSearch').addEventListener('click', clearSearch);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= $pageTitle ?? 'Organizational Hierarchy Tree' ?> - ABO-WBO Management System</title>
     
-    // Control buttons
-    document.getElementById('expandAllBtn').addEventListener('click', expandAll);
-    document.getElementById('collapseAllBtn').addEventListener('click', collapseAll);
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- D3.js for tree visualization -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     
-    // Settings toggles
-    document.getElementById('showUserCount').addEventListener('change', toggleUserCount);
-    document.getElementById('enableDragDrop').addEventListener('change', toggleDragDrop);
-    
-    // Filter options
-    document.querySelectorAll('[data-filter]').forEach(item => {
-        item.addEventListener('click', function(e) {
-            e.preventDefault();
-            setFilter(this.dataset.filter);
-        });
-    });
-    
-    // Context menu
-    document.addEventListener('click', hideContextMenu);
-    document.addEventListener('contextmenu', function(e) {
-        if (e.target.closest('.node-content')) {
-            e.preventDefault();
-            showContextMenu(e, e.target.closest('.tree-node'));
+    <style>
+        :root {
+            --abo-primary: #dc3545;
+            --abo-secondary: #28a745;
+            --godina-color: #dc3545;
+            --gamta-color: #28a745;
+            --gurmu-color: #ffc107;
+            --global-color: #343a40;
         }
-    });
-}
 
-function loadHierarchyTree() {
-    showLoadingState();
-    
-    fetch('/hierarchy/tree/data')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                hierarchyData = data.data;
-                filteredData = [...hierarchyData];
-                renderHierarchyTree();
-                hideLoadingState();
-            } else {
-                showErrorState();
-            }
-        })
-        .catch(error => {
-            console.error('Error loading hierarchy:', error);
-            showErrorState();
-        });
-}
+        body {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            min-height: 100vh;
+        }
 
-function showLoadingState() {
-    document.getElementById('loading-state').style.display = 'block';
-    document.getElementById('error-state').style.display = 'none';
-    document.getElementById('empty-state').style.display = 'none';
-    document.getElementById('hierarchy-tree').style.display = 'none';
-}
+        .tree-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin: 2rem auto;
+            max-width: 98%;
+        }
 
-function showErrorState() {
-    document.getElementById('loading-state').style.display = 'none';
-    document.getElementById('error-state').style.display = 'block';
-    document.getElementById('empty-state').style.display = 'none';
-    document.getElementById('hierarchy-tree').style.display = 'none';
-}
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
 
-function showEmptyState() {
-    document.getElementById('loading-state').style.display = 'none';
-    document.getElementById('error-state').style.display = 'none';
-    document.getElementById('empty-state').style.display = 'block';
-    document.getElementById('hierarchy-tree').style.display = 'none';
-}
+        .legend {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
 
-function hideLoadingState() {
-    document.getElementById('loading-state').style.display = 'none';
-    document.getElementById('error-state').style.display = 'none';
-    
-    if (hierarchyData.length === 0) {
-        showEmptyState();
-    } else {
-        document.getElementById('empty-state').style.display = 'none';
-        document.getElementById('hierarchy-tree').style.display = 'block';
-    }
-}
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
 
-function renderHierarchyTree() {
-    const container = document.getElementById('hierarchy-tree');
-    
-    if (filteredData.length === 0) {
-        container.innerHTML = '<div class="text-center py-4 text-muted">No hierarchy units match the current filter.</div>';
-        return;
-    }
-    
-    let html = '<div class="hierarchy-tree">';
-    
-    filteredData.forEach(godina => {
-        html += renderGodinaNode(godina);
-    });
-    
-    html += '</div>';
-    container.innerHTML = html;
-    
-    // Add event listeners to tree nodes
-    addTreeEventListeners();
-}
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
 
-function renderGodinaNode(godina) {
-    const hasChildren = godina.children && godina.children.length > 0;
-    const userCount = hasChildren ? godina.children.reduce((sum, gamta) => sum + (parseInt(gamta.user_count) || 0), 0) : 0;
-    
-    let html = `
-        <div class="tree-node godina-node" data-id="${godina.id}" data-type="godina">
-            <div class="node-content ${godina.status}" ${enableDragDrop ? 'draggable="true"' : ''}>
-                ${hasChildren ? `<button class="node-toggle" data-target="godina-${godina.id}">
-                    <i class="bi bi-chevron-down"></i>
-                </button>` : '<div style="width: 20px;"></div>'}
-                
-                <div class="node-info">
-                    <i class="bi bi-globe text-primary me-2"></i>
-                    <div>
-                        <div class="node-title">${godina.name}</div>
-                        <div class="node-subtitle">${godina.code} • ${godina.location || 'No location'}</div>
-                    </div>
+        #tree-svg {
+            width: 100%;
+            height: 800px;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            background: #f8f9fa;
+            cursor: grab;
+        }
+
+        #tree-svg:active {
+            cursor: grabbing;
+        }
+
+        .node circle {
+            fill: #fff;
+            stroke-width: 3px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .node circle:hover {
+            stroke-width: 5px;
+            filter: brightness(1.1);
+        }
+
+        .node text {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .node.global circle {
+            stroke: var(--global-color);
+            fill: var(--global-color);
+        }
+
+        .node.godina circle {
+            stroke: var(--godina-color);
+        }
+
+        .node.gamta circle {
+            stroke: var(--gamta-color);
+        }
+
+        .node.gurmu circle {
+            stroke: var(--gurmu-color);
+        }
+
+        .link {
+            fill: none;
+            stroke: #ccc;
+            stroke-width: 2px;
+        }
+
+        .node-badge {
+            font-size: 10px;
+            fill: #666;
+        }
+
+        .tooltip {
+            position: absolute;
+            text-align: left;
+            padding: 12px;
+            font-size: 12px;
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-width: 300px;
+            z-index: 1000;
+        }
+
+        .tooltip.show {
+            opacity: 1;
+        }
+
+        .tooltip h6 {
+            margin: 0 0 8px 0;
+            color: var(--abo-primary);
+            font-weight: 600;
+        }
+
+        .tooltip p {
+            margin: 4px 0;
+            line-height: 1.4;
+        }
+
+        .stats-bar {
+            background: linear-gradient(90deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            padding: 1rem;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .btn-zoom {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-zoom:hover {
+            background: #f8f9fa;
+            transform: scale(1.1);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="tree-container">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="mb-0">
+                    <i class="bi bi-diagram-3 me-2" style="color: var(--abo-primary);"></i>
+                    Organizational Hierarchy Tree
+                </h2>
+                <a href="/hierarchy" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Hierarchy
+                </a>
+            </div>
+
+            <!-- Statistics Bar -->
+            <div class="stats-bar" id="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-value" id="total-godinas">-</span>
+                    <span class="stat-label">Godinas</span>
                 </div>
-                
-                <div class="node-badges">
-                    <span class="badge ${godina.status === 'active' ? 'bg-success' : 'bg-secondary'}">${godina.status}</span>
-                    ${showUserCount ? `<span class="badge bg-info">${userCount} users</span>` : ''}
-                    ${hasChildren ? `<span class="badge bg-primary">${godina.children.length} gamtas</span>` : ''}
+                <div class="stat-item">
+                    <span class="stat-value" id="total-gamtas">-</span>
+                    <span class="stat-label">Gamtas</span>
                 </div>
-                
-                <div class="node-actions">
-                    <a href="/hierarchy/${godina.id}?type=godina" class="btn btn-sm btn-outline-primary" title="View Details">
-                        <i class="bi bi-eye"></i>
-                    </a>
-                    <a href="/hierarchy/${godina.id}/edit?type=godina" class="btn btn-sm btn-outline-warning" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                    </a>
+                <div class="stat-item">
+                    <span class="stat-value" id="total-gurmus">-</span>
+                    <span class="stat-label">Gurmus</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="total-users">-</span>
+                    <span class="stat-label">Total Users</span>
                 </div>
             </div>
-    `;
-    
-    if (hasChildren) {
-        html += `<div class="node-children" id="godina-${godina.id}">`;
-        godina.children.forEach(gamta => {
-            html += renderGamtaNode(gamta);
-        });
-        html += '</div>';
-    }
-    
-    html += '</div>';
-    return html;
-}
 
-function renderGamtaNode(gamta) {
-    const hasGurmus = gamta.gurmus && gamta.gurmus.length > 0;
-    const gurmusId = `gurmus-${gamta.id}`;
-    
-    let html = `
-        <div class="tree-node gamta-node" data-id="${gamta.id}" data-type="gamta">
-            <div class="node-content ${gamta.status}" ${enableDragDrop ? 'draggable="true"' : ''}>
-                ${hasGurmus ? `
-                    <button class="node-toggle" data-target="${gurmusId}">
-                        <i class="bi bi-chevron-right"></i>
+            <!-- Controls -->
+            <div class="controls">
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--global-color);"></div>
+                        <span>Global</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--godina-color);"></div>
+                        <span>Godina (Regional)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--gamta-color);"></div>
+                        <span>Gamta (Local)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--gurmu-color);"></div>
+                        <span>Gurmu (Community)</span>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn-zoom" id="zoom-in" title="Zoom In">
+                        <i class="bi bi-zoom-in"></i>
                     </button>
-                ` : '<div style="width: 20px;"></div>'}
-                
-                <div class="node-info">
-                    <i class="bi bi-house text-purple me-2"></i>
-                    <div>
-                        <div class="node-title">${gamta.name}</div>
-                        <div class="node-subtitle">${gamta.code} • ${gamta.location || 'No location'}</div>
-                    </div>
-                </div>
-                
-                <div class="node-badges">
-                    <span class="badge ${gamta.status === 'active' ? 'bg-success' : 'bg-secondary'}">${gamta.status}</span>
-                    ${showUserCount ? `<span class="badge bg-info">${gamta.user_count || 0} users</span>` : ''}
-                    ${hasGurmus ? `<span class="badge bg-warning">${gamta.gurmus.length} gurmus</span>` : ''}
-                </div>
-                
-                <div class="node-actions">
-                    <a href="/hierarchy/${gamta.id}?type=gamta" class="btn btn-sm btn-outline-primary" title="View Details">
-                        <i class="bi bi-eye"></i>
-                    </a>
-                    <a href="/hierarchy/${gamta.id}/edit?type=gamta" class="btn btn-sm btn-outline-warning" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                    </a>
+                    <button class="btn-zoom" id="zoom-out" title="Zoom Out">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn-zoom" id="reset-zoom" title="Reset View">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm" id="expand-all">
+                        <i class="bi bi-arrows-expand me-1"></i> Expand All
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" id="collapse-all">
+                        <i class="bi bi-arrows-collapse me-1"></i> Collapse All
+                    </button>
                 </div>
             </div>
-            
-            ${hasGurmus ? `
-                <div class="tree-children collapsed" id="${gurmusId}">
-                    ${gamta.gurmus.map(gurmu => renderGurmuNode(gurmu)).join('')}
-                </div>
-            ` : ''}
-        </div>
-    `;
-    
-    return html;
-}
 
-function renderGurmuNode(gurmu) {
-    return `
-        <div class="tree-node gurmu-node" data-id="${gurmu.id}" data-type="gurmu">
-            <div class="node-content ${gurmu.status}" ${enableDragDrop ? 'draggable="true"' : ''}>
-                <div style="width: 20px;"></div>
-                
-                <div class="node-info">
-                    <i class="bi bi-people text-warning me-2"></i>
-                    <div>
-                        <div class="node-title">${gurmu.name}</div>
-                        <div class="node-subtitle">${gurmu.code} • ${gurmu.location || 'No location'}</div>
-                    </div>
+            <!-- Tree Visualization -->
+            <div id="loading" class="loading">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
                 </div>
-                
-                <div class="node-badges">
-                    <span class="badge ${gurmu.status === 'active' ? 'bg-success' : 'bg-secondary'}">${gurmu.status}</span>
-                    ${showUserCount ? `<span class="badge bg-info">${gurmu.user_count || 0} members</span>` : ''}
-                </div>
-                
-                <div class="node-actions">
-                    <a href="/hierarchy/${gurmu.id}?type=gurmu" class="btn btn-sm btn-outline-primary" title="View Details">
-                        <i class="bi bi-eye"></i>
-                    </a>
-                    <a href="/hierarchy/${gurmu.id}/edit?type=gurmu" class="btn btn-sm btn-outline-warning" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                    </a>
-                </div>
+                <p class="mt-3 text-muted">Loading organizational hierarchy...</p>
             </div>
+            <svg id="tree-svg" style="display: none;"></svg>
         </div>
-    `;
-}
+    </div>
 
-function addTreeEventListeners() {
-    // Toggle functionality
-    document.querySelectorAll('.node-toggle').forEach(toggle => {
-        toggle.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const targetId = this.dataset.target;
-            const target = document.getElementById(targetId);
-            const icon = this.querySelector('i');
-            
-            if (target.classList.contains('collapsed')) {
-                target.classList.remove('collapsed');
-                icon.className = 'bi bi-chevron-down';
-            } else {
-                target.classList.add('collapsed');
-                icon.className = 'bi bi-chevron-right';
-            }
-        });
-    });
-    
-    // Drag and drop functionality (if enabled)
-    if (enableDragDrop) {
-        addDragDropListeners();
-    }
-}
+    <!-- Tooltip -->
+    <div id="tooltip" class="tooltip"></div>
 
-function addDragDropListeners() {
-    document.querySelectorAll('[draggable="true"]').forEach(node => {
-        node.addEventListener('dragstart', function(e) {
-            e.dataTransfer.setData('text/plain', JSON.stringify({
-                id: this.closest('.tree-node').dataset.id,
-                type: this.closest('.tree-node').dataset.type
-            }));
-            this.style.opacity = '0.5';
-        });
-        
-        node.addEventListener('dragend', function(e) {
-            this.style.opacity = '1';
-            document.querySelectorAll('.drag-over').forEach(el => {
-                el.classList.remove('drag-over');
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Tree visualization configuration
+        const width = document.getElementById('tree-svg').clientWidth;
+        const height = 800;
+        const margin = { top: 40, right: 120, bottom: 40, left: 120 };
+
+        // Create SVG
+        const svg = d3.select('#tree-svg')
+            .attr('width', width)
+            .attr('height', height);
+
+        const g = svg.append('g')
+            .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        // Zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 3])
+            .on('zoom', (event) => {
+                g.attr('transform', event.transform);
             });
-        });
-        
-        node.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            this.closest('.tree-node').classList.add('drag-over');
-        });
-        
-        node.addEventListener('dragleave', function(e) {
-            this.closest('.tree-node').classList.remove('drag-over');
-        });
-        
-        node.addEventListener('drop', function(e) {
-            e.preventDefault();
-            const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
-            const dropTarget = this.closest('.tree-node');
-            
-            dropTarget.classList.remove('drag-over');
-            handleDrop(dragData, dropTarget);
-        });
-    });
-}
 
-function handleDrop(dragData, dropTarget) {
-    const sourceType = dragData.type;
-    const targetType = dropTarget.dataset.type;
-    
-    // Only allow Gamta to be moved to different Godina
-    if (sourceType === 'gamta' && targetType === 'godina') {
-        const sourceId = dragData.id;
-        const targetId = dropTarget.dataset.id;
-        
-        if (confirm('Move this Gamta to the selected Godina?')) {
-            moveGamtaToGodina(sourceId, targetId);
-        }
-    } else {
-        alert('Invalid drop operation. Only Gamtas can be moved between Godinas.');
-    }
-}
+        svg.call(zoom);
 
-function moveGamtaToGodina(gamtaId, godinaId) {
-    fetch('/hierarchy/move-gamta', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': window.csrfToken
-        },
-        body: JSON.stringify({
-            gamta_id: gamtaId,
-            godina_id: godinaId
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            loadHierarchyTree(); // Reload the tree
-            alert('Gamta moved successfully!');
-        } else {
-            alert('Failed to move Gamta: ' + (data.message || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('Error moving Gamta:', error);
-        alert('An error occurred while moving the Gamta.');
-    });
-}
+        // Zoom controls
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            svg.transition().duration(300).call(zoom.scaleBy, 1.3);
+        });
 
-function handleSearch() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
-    
-    if (searchTerm === '') {
-        // Reset to current filter
-        setFilter(currentFilter);
-        return;
-    }
-    
-    // Filter hierarchy based on search term
-    filteredData = hierarchyData.filter(godina => {
-        const godinaMatches = godina.name.toLowerCase().includes(searchTerm) ||
-                             godina.code.toLowerCase().includes(searchTerm) ||
-                             (godina.location && godina.location.toLowerCase().includes(searchTerm));
-        
-        if (godinaMatches) {
-            return true;
-        }
-        
-        // Check if any gamta matches
-        if (godina.children) {
-            const matchingGamtas = godina.children.filter(gamta => 
-                gamta.name.toLowerCase().includes(searchTerm) ||
-                gamta.code.toLowerCase().includes(searchTerm) ||
-                (gamta.location && gamta.location.toLowerCase().includes(searchTerm))
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            svg.transition().duration(300).call(zoom.scaleBy, 0.7);
+        });
+
+        document.getElementById('reset-zoom').addEventListener('click', () => {
+            svg.transition().duration(500).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(margin.left, margin.top)
             );
-            
-            if (matchingGamtas.length > 0) {
-                // Return godina with only matching gamtas
-                return {
-                    ...godina,
-                    children: matchingGamtas
-                };
+        });
+
+        // Tooltip
+        const tooltip = d3.select('#tooltip');
+
+        // Tree layout
+        const treeLayout = d3.tree()
+            .size([height - margin.top - margin.bottom, width - margin.left - margin.right - 200]);
+
+        let root;
+        let nodeData;
+
+        // Load data
+        fetch('/hierarchy/api/tree-data', {
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json'
+            }
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                nodeData = data;
+                updateStatistics(data);
+                renderTree(data);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('tree-svg').style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Error loading tree data:', error);
+                document.getElementById('loading').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Failed to load hierarchy data: ${error.message}<br>
+                        <small>Please make sure you are logged in and try refreshing the page.</small>
+                    </div>
+                `;
+            });
+
+        function updateStatistics(data) {
+            let godinaCount = 0;
+            let gamtaCount = 0;
+            let gurmuCount = 0;
+            let userCount = 0;
+
+            function countNodes(node) {
+                if (node.type === 'godina') godinaCount++;
+                if (node.type === 'gamta') gamtaCount++;
+                if (node.type === 'gurmu') gurmuCount++;
+                if (node.userCount) userCount += node.userCount;
+                
+                if (node.children) {
+                    node.children.forEach(countNodes);
+                }
+            }
+
+            countNodes(data);
+
+            document.getElementById('total-godinas').textContent = godinaCount;
+            document.getElementById('total-gamtas').textContent = gamtaCount;
+            document.getElementById('total-gurmus').textContent = gurmuCount;
+            document.getElementById('total-users').textContent = userCount;
+        }
+
+        function renderTree(data) {
+            root = d3.hierarchy(data);
+            root.x0 = height / 2;
+            root.y0 = 0;
+
+            // Collapse all children initially except first level
+            if (root.children) {
+                root.children.forEach(collapseAfterLevel);
+            }
+
+            update(root);
+        }
+
+        function collapseAfterLevel(d) {
+            if (d.children) {
+                d._children = d.children;
+                d._children.forEach(collapseAfterLevel);
+                d.children = null;
             }
         }
-        
-        return false;
-    }).map(godina => {
-        if (typeof godina === 'boolean') return godina;
-        
-        // Filter gamtas within godina
-        const filteredGamtas = godina.children ? godina.children.filter(gamta =>
-            gamta.name.toLowerCase().includes(searchTerm) ||
-            gamta.code.toLowerCase().includes(searchTerm) ||
-            (gamta.location && gamta.location.toLowerCase().includes(searchTerm))
-        ) : [];
-        
-        return {
-            ...godina,
-            children: filteredGamtas
-        };
-    });
-    
-    renderHierarchyTree();
-    
-    // Highlight matching terms
-    highlightSearchTerms(searchTerm);
-}
 
-function highlightSearchTerms(searchTerm) {
-    document.querySelectorAll('.tree-node').forEach(node => {
-        const content = node.textContent.toLowerCase();
-        if (content.includes(searchTerm)) {
-            node.classList.add('highlighted');
+        function expandAll(d) {
+            if (d._children) {
+                d.children = d._children;
+                d._children = null;
+            }
+            if (d.children) {
+                d.children.forEach(expandAll);
+            }
         }
-    });
-}
 
-function clearSearch() {
-    document.getElementById('searchInput').value = '';
-    setFilter(currentFilter);
-}
-
-function setFilter(filterType) {
-    currentFilter = filterType;
-    
-    // Update active filter button
-    document.querySelectorAll('[data-filter]').forEach(item => {
-        item.classList.remove('active');
-    });
-    document.querySelector(`[data-filter="${filterType}"]`).classList.add('active');
-    
-    // Apply filter
-    switch (filterType) {
-        case 'all':
-            filteredData = [...hierarchyData];
-            break;
-        case 'active':
-            filteredData = hierarchyData.filter(godina => godina.status === 'active')
-                .map(godina => ({
-                    ...godina,
-                    children: godina.children ? godina.children.filter(gamta => gamta.status === 'active') : []
-                }));
-            break;
-        case 'inactive':
-            filteredData = hierarchyData.filter(godina => godina.status === 'inactive')
-                .map(godina => ({
-                    ...godina,
-                    children: godina.children ? godina.children.filter(gamta => gamta.status === 'inactive') : []
-                }));
-            break;
-        case 'with-users':
-            filteredData = hierarchyData.filter(godina => {
-                const hasUsersInGamtas = godina.children && godina.children.some(gamta => (gamta.user_count || 0) > 0);
-                return hasUsersInGamtas;
-            }).map(godina => ({
-                ...godina,
-                children: godina.children ? godina.children.filter(gamta => (gamta.user_count || 0) > 0) : []
-            }));
-            break;
-        case 'empty':
-            filteredData = hierarchyData.filter(godina => {
-                const hasEmptyGamtas = godina.children && godina.children.some(gamta => (gamta.user_count || 0) === 0);
-                const hasNoGamtas = !godina.children || godina.children.length === 0;
-                return hasEmptyGamtas || hasNoGamtas;
-            }).map(godina => ({
-                ...godina,
-                children: godina.children ? godina.children.filter(gamta => (gamta.user_count || 0) === 0) : []
-            }));
-            break;
-    }
-    
-    renderHierarchyTree();
-}
-
-function expandAll() {
-    document.querySelectorAll('.node-children.collapsed').forEach(node => {
-        node.classList.remove('collapsed');
-    });
-    document.querySelectorAll('.node-toggle i').forEach(icon => {
-        icon.className = 'bi bi-chevron-down';
-    });
-}
-
-function collapseAll() {
-    document.querySelectorAll('.node-children').forEach(node => {
-        node.classList.add('collapsed');
-    });
-    document.querySelectorAll('.node-toggle i').forEach(icon => {
-        icon.className = 'bi bi-chevron-right';
-    });
-}
-
-function toggleUserCount() {
-    showUserCount = document.getElementById('showUserCount').checked;
-    renderHierarchyTree();
-}
-
-function toggleDragDrop() {
-    enableDragDrop = document.getElementById('enableDragDrop').checked;
-    renderHierarchyTree();
-}
-
-function showContextMenu(event, treeNode) {
-    contextMenuTarget = treeNode;
-    const contextMenu = document.getElementById('contextMenu');
-    
-    contextMenu.style.display = 'block';
-    contextMenu.style.left = event.pageX + 'px';
-    contextMenu.style.top = event.pageY + 'px';
-    
-    // Update context menu based on node type
-    const nodeType = treeNode.dataset.type;
-    const addGamtaItem = contextMenu.querySelector('[data-action="add-gamta"]');
-    
-    if (nodeType === 'godina') {
-        addGamtaItem.style.display = 'block';
-    } else {
-        addGamtaItem.style.display = 'none';
-    }
-}
-
-function hideContextMenu() {
-    document.getElementById('contextMenu').style.display = 'none';
-    contextMenuTarget = null;
-}
-
-// Context menu actions
-document.querySelectorAll('.context-item').forEach(item => {
-    item.addEventListener('click', function(e) {
-        e.preventDefault();
-        
-        if (!contextMenuTarget) return;
-        
-        const action = this.dataset.action;
-        const nodeId = contextMenuTarget.dataset.id;
-        const nodeType = contextMenuTarget.dataset.type;
-        
-        switch (action) {
-            case 'view':
-                window.location.href = `/hierarchy/${nodeId}?type=${nodeType}`;
-                break;
-            case 'edit':
-                window.location.href = `/hierarchy/${nodeId}/edit?type=${nodeType}`;
-                break;
-            case 'add-gamta':
-                window.location.href = `/hierarchy/create?type=gamta&godina_id=${nodeId}`;
-                break;
-            case 'assign-users':
-                window.location.href = `/users?filter=unassigned&assign_to=${nodeType}_${nodeId}`;
-                break;
-            case 'delete':
-                if (confirm('Are you sure you want to delete this organizational unit?')) {
-                    deleteHierarchyUnit(nodeId, nodeType);
-                }
-                break;
+        function collapseAll(d) {
+            if (d.children) {
+                d._children = d.children;
+                d._children.forEach(collapseAll);
+                d.children = null;
+            }
         }
-        
-        hideContextMenu();
-    });
-});
 
-function deleteHierarchyUnit(id, type) {
-    fetch(`/hierarchy/${id}?type=${type}`, {
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-TOKEN': window.csrfToken,
-            'Content-Type': 'application/json'
+        document.getElementById('expand-all').addEventListener('click', () => {
+            expandAll(root);
+            update(root);
+        });
+
+        document.getElementById('collapse-all').addEventListener('click', () => {
+            if (root.children) {
+                root.children.forEach(collapseAfterLevel);
+            }
+            update(root);
+        });
+
+        function update(source) {
+            const treeData = treeLayout(root);
+            const nodes = treeData.descendants();
+            const links = treeData.links();
+
+            // Normalize for fixed-depth
+            nodes.forEach(d => {
+                d.y = d.depth * 250;
+            });
+
+            // Update nodes
+            const node = g.selectAll('.node')
+                .data(nodes, d => d.id || (d.id = Math.random()));
+
+            // Enter new nodes
+            const nodeEnter = node.enter().append('g')
+                .attr('class', d => `node ${d.data.type}`)
+                .attr('transform', d => `translate(${source.y0},${source.x0})`)
+                .on('click', click)
+                .on('mouseover', showTooltip)
+                .on('mouseout', hideTooltip);
+
+            nodeEnter.append('circle')
+                .attr('r', 8)
+                .style('fill', d => d._children ? getNodeColor(d.data.type) : '#fff');
+
+            nodeEnter.append('text')
+                .attr('dy', '.35em')
+                .attr('x', d => d.children || d._children ? -13 : 13)
+                .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
+                .text(d => `${d.data.name} ${d.data.code ? '(' + d.data.code + ')' : ''}`);
+
+            // User count badge
+            nodeEnter.append('text')
+                .attr('class', 'node-badge')
+                .attr('dy', '1.8em')
+                .attr('x', d => d.children || d._children ? -13 : 13)
+                .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
+                .style('fill', '#666')
+                .text(d => d.data.userCount ? `👤 ${d.data.userCount}` : '');
+
+            // Merge and update
+            const nodeUpdate = nodeEnter.merge(node);
+
+            nodeUpdate.transition()
+                .duration(500)
+                .attr('transform', d => `translate(${d.y},${d.x})`);
+
+            nodeUpdate.select('circle')
+                .attr('r', 8)
+                .style('fill', d => d._children ? getNodeColor(d.data.type) : '#fff');
+
+            // Remove exiting nodes
+            const nodeExit = node.exit().transition()
+                .duration(500)
+                .attr('transform', d => `translate(${source.y},${source.x})`)
+                .remove();
+
+            nodeExit.select('circle').attr('r', 0);
+            nodeExit.select('text').style('fill-opacity', 0);
+
+            // Update links
+            const link = g.selectAll('.link')
+                .data(links, d => d.target.id);
+
+            const linkEnter = link.enter().insert('path', 'g')
+                .attr('class', 'link')
+                .attr('d', d => {
+                    const o = { x: source.x0, y: source.y0 };
+                    return diagonal(o, o);
+                });
+
+            const linkUpdate = linkEnter.merge(link);
+
+            linkUpdate.transition()
+                .duration(500)
+                .attr('d', d => diagonal(d.source, d.target));
+
+            link.exit().transition()
+                .duration(500)
+                .attr('d', d => {
+                    const o = { x: source.x, y: source.y };
+                    return diagonal(o, o);
+                })
+                .remove();
+
+            // Store old positions
+            nodes.forEach(d => {
+                d.x0 = d.x;
+                d.y0 = d.y;
+            });
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            loadHierarchyTree();
-            alert('Organizational unit deleted successfully!');
-        } else {
-            alert('Failed to delete: ' + (data.message || 'Unknown error'));
+
+        function diagonal(s, d) {
+            return `M ${s.y} ${s.x}
+                    C ${(s.y + d.y) / 2} ${s.x},
+                      ${(s.y + d.y) / 2} ${d.x},
+                      ${d.y} ${d.x}`;
         }
-    })
-    .catch(error => {
-        console.error('Error deleting unit:', error);
-        alert('An error occurred while deleting the organizational unit.');
-    });
-}
-</script>
+
+        function click(event, d) {
+            if (d.children) {
+                d._children = d.children;
+                d.children = null;
+            } else {
+                d.children = d._children;
+                d._children = null;
+            }
+            update(d);
+        }
+
+        function getNodeColor(type) {
+            const colors = {
+                'global': 'var(--global-color)',
+                'godina': 'var(--godina-color)',
+                'gamta': 'var(--gamta-color)',
+                'gurmu': 'var(--gurmu-color)'
+            };
+            return colors[type] || '#999';
+        }
+
+        function showTooltip(event, d) {
+            const data = d.data;
+            let content = `<h6>${data.name}</h6>`;
+            
+            if (data.code) content += `<p><strong>Code:</strong> ${data.code}</p>`;
+            if (data.type) content += `<p><strong>Type:</strong> ${data.type.charAt(0).toUpperCase() + data.type.slice(1)}</p>`;
+            if (data.description) content += `<p><strong>Description:</strong> ${data.description}</p>`;
+            if (data.userCount) content += `<p><strong>Users:</strong> ${data.userCount}</p>`;
+            if (data.contact_email) content += `<p><strong>Email:</strong> ${data.contact_email}</p>`;
+            if (data.contact_phone) content += `<p><strong>Phone:</strong> ${data.contact_phone}</p>`;
+            if (data.address) content += `<p><strong>Address:</strong> ${data.address}</p>`;
+
+            tooltip.html(content)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 10) + 'px')
+                .classed('show', true);
+        }
+
+        function hideTooltip() {
+            tooltip.classed('show', false);
+        }
+    </script>
+</body>
+</html>

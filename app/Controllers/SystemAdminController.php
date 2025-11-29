@@ -2,8 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Controller;
-use App\Utils\Database;
-use App\Models\Global as GlobalModel;
+use App\Models\Global;
 use App\Models\Godina;
 use App\Models\Gamta;
 use App\Models\Gurmu;
@@ -56,7 +55,7 @@ class SystemAdminController extends Controller
      */
     public function globalSettings()
     {
-        $globalModel = new GlobalModel();
+        $globalModel = new Global();
         $global = $globalModel->getDefault();
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -78,7 +77,7 @@ class SystemAdminController extends Controller
             $this->validateCSRF();
             
             $data = $_POST;
-            $globalModel = new GlobalModel();
+            $globalModel = new Global();
             $global = $globalModel->getDefault();
             
             $updateData = [
@@ -805,28 +804,23 @@ class SystemAdminController extends Controller
      */
     
     /**
-     * Database instance
+     * Check if user is system admin
      */
-    private $db;
-    
-    /**
-     * Initialize database connection
-     */
-    private function initDatabase()
+    private function requireSystemAdmin()
     {
-        if (!$this->db) {
-            $this->db = Database::getInstance();
+        $user = auth_user();
+        
+        // Check if user has system admin role
+        $sql = "SELECT p.name FROM user_assignments ua
+                INNER JOIN positions p ON ua.position_id = p.id
+                WHERE ua.user_id = ? AND ua.status = 'active'
+                AND p.name IN ('System Administrator', 'Super Admin')";
+        
+        $result = $this->query($sql, [$user['id']]);
+        
+        if (empty($result)) {
+            $this->forbidden('System Administrator access required');
         }
-        return $this->db;
-    }
-    
-    /**
-     * Execute database query
-     */
-    private function query($sql, $params = [])
-    {
-        $this->initDatabase();
-        return $this->db->fetchAll($sql, $params);
     }
     
     /**
@@ -855,11 +849,11 @@ class SystemAdminController extends Controller
      */
     private function getCompleteHierarchy()
     {
-        $globalModel = new GlobalModel();
+        $globalModel = new Global();
         $global = $globalModel->getDefault();
         
         if ($global) {
-            $globalObject = new GlobalModel();
+            $globalObject = new Global();
             $globalObject->fill($global);
             return $globalObject->getHierarchicalStructure();
         }
@@ -891,7 +885,56 @@ class SystemAdminController extends Controller
         ];
     }
     
-
+    /**
+     * Handle hierarchy operations (CRUD)
+     */
+    private function handleGodinaOperation()
+    {
+        $action = $_POST['action'] ?? '';
+        
+        switch ($action) {
+            case 'create':
+                return $this->createGodina();
+            case 'update':
+                return $this->updateGodina();
+            case 'delete':
+                return $this->deleteGodina();
+            default:
+                return $this->jsonResponse(['error' => 'Invalid action'], 400);
+        }
+    }
+    
+    private function handleGamtaOperation()
+    {
+        $action = $_POST['action'] ?? '';
+        
+        switch ($action) {
+            case 'create':
+                return $this->createGamta();
+            case 'update':
+                return $this->updateGamta();
+            case 'delete':
+                return $this->deleteGamta();
+            default:
+                return $this->jsonResponse(['error' => 'Invalid action'], 400);
+        }
+    }
+    
+    private function handleGurmuOperation()
+    {
+        $action = $_POST['action'] ?? '';
+        
+        switch ($action) {
+            case 'create':
+                return $this->createGurmu();
+            case 'update':
+                return $this->updateGurmu();
+            case 'delete':
+                return $this->deleteGurmu();
+            default:
+                return $this->jsonResponse(['error' => 'Invalid action'], 400);
+        }
+    }
     
     /**
      * Placeholder methods for actual implementations
@@ -1083,200 +1126,50 @@ class SystemAdminController extends Controller
         exit;
     }
     
-
-    
     /**
-     * INTERNAL EMAIL MANAGEMENT
+     * Get complete hierarchy data
      */
-    
-    /**
-     * User Email Management Dashboard
-     */
-    public function userEmailManagement()
+    private function getCompleteHierarchy()
     {
-        $db = Database::getInstance();
+        $godinaModel = new Godina();
+        $gamtaModel = new Gamta();
+        $gurmuModel = new Gurmu();
         
-        // Get users with their email status
-        $users = $db->fetchAll("
-            SELECT 
-                u.id,
-                u.first_name,
-                u.last_name,
-                u.email as personal_email,
-                u.internal_email,
-                u.status,
-                u.account_type,
-                ua.level_scope,
-                GROUP_CONCAT(DISTINCT p.name ORDER BY p.name) as positions,
-                ie.internal_email as table_internal_email,
-                ie.status as internal_email_status,
-                ie.cpanel_account_created,
-                ie.created_at as email_created_at
-            FROM users u
-            LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
-            LEFT JOIN positions p ON ua.position_id = p.id
-            LEFT JOIN internal_emails ie ON u.id = ie.user_id
-            WHERE u.status IN ('active', 'pending')
-            GROUP BY u.id
-            ORDER BY u.id
-        ");
+        $godinas = $godinaModel->getActive();
+        $hierarchy = [];
         
-        // Generate statistics
-        $stats = [
-            'total_users' => count($users),
-            'has_internal_email' => count(array_filter($users, fn($u) => !empty($u['internal_email']))),
-            'missing_internal_email' => count(array_filter($users, fn($u) => empty($u['internal_email']))),
-            'has_assignments' => count(array_filter($users, fn($u) => !empty($u['positions']))),
-            'cpanel_accounts' => count(array_filter($users, fn($u) => $u['cpanel_account_created'] == 1))
-        ];
-        
-        return $this->render('admin.user_email_management', [
-            'title' => 'User Email Management',
-            'users' => $users,
-            'stats' => $stats
-        ]);
-    }
-    
-    /**
-     * Generate missing internal emails for users
-     */
-    public function generateInternalEmails()
-    {
-        try {
-            require_once __DIR__ . '/../../scripts/analyze-user-emails.php';
+        foreach ($godinas as $godina) {
+            $gamtas = $gamtaModel->where('godina_id', $godina['id'])->get();
+            $godina['gamtas'] = [];
             
-            $analyzer = new \App\Scripts\UserEmailAnalyzer();
-            
-            // Get users missing emails
-            $missingEmails = $this->getUsersMissingEmails();
-            
-            if (empty($missingEmails)) {
-                return $this->jsonResponse([
-                    'success' => true,
-                    'message' => 'All users already have internal emails',
-                    'generated' => 0
-                ]);
+            foreach ($gamtas as $gamta) {
+                $gurmus = $gurmuModel->where('gamta_id', $gamta['id'])->get();
+                $gamta['gurmus'] = $gurmus;
+                $godina['gamtas'][] = $gamta;
             }
             
-            $generated = 0;
-            $errors = [];
-            
-            foreach ($missingEmails as $issue) {
-                $result = $analyzer->generateEmailForSpecificUser($issue['user_id']);
-                
-                if ($result['success']) {
-                    $generated++;
-                } else {
-                    $errors[] = "User {$issue['user_id']}: {$result['message']}";
-                }
-            }
-            
-            return $this->jsonResponse([
-                'success' => true,
-                'message' => "Successfully generated {$generated} internal emails",
-                'generated' => $generated,
-                'errors' => $errors
-            ]);
-            
-        } catch (Exception $e) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'Error generating emails: ' . $e->getMessage()
-            ]);
+            $hierarchy[] = $godina;
         }
-    }
-    
-    /**
-     * Regenerate internal email for specific user
-     */
-    public function regenerateUserEmail($userId)
-    {
-        try {
-            $db = Database::getInstance();
-            
-            // Verify user exists
-            $user = $db->fetch("SELECT * FROM users WHERE id = ?", [$userId]);
-            if (!$user) {
-                return $this->jsonResponse([
-                    'success' => false,
-                    'message' => 'User not found'
-                ]);
-            }
-            
-            require_once __DIR__ . '/../../scripts/analyze-user-emails.php';
-            $analyzer = new \App\Scripts\UserEmailAnalyzer();
-            
-            // Delete existing internal email
-            $db->query("DELETE FROM internal_emails WHERE user_id = ?", [$userId]);
-            $db->query("UPDATE users SET internal_email = NULL WHERE id = ?", [$userId]);
-            
-            // Generate new email
-            $result = $analyzer->generateEmailForSpecificUser($userId);
-            
-            return $this->jsonResponse($result);
-            
-        } catch (Exception $e) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'Error regenerating email: ' . $e->getMessage()
-            ]);
-        }
-    }
-    
-    /**
-     * Hybrid Registration Management Dashboard
-     */
-    public function hybridRegistrationManagement()
-    {
-        $db = Database::getInstance();
         
-        // Get hybrid registration statistics
-        $stats = [
-            'total_registrations' => $db->fetchColumn("SELECT COUNT(*) FROM hybrid_registrations"),
-            'pending_registrations' => $db->fetchColumn("SELECT COUNT(*) FROM hybrid_registrations WHERE status = 'pending'"),
-            'approved_registrations' => $db->fetchColumn("SELECT COUNT(*) FROM hybrid_registrations WHERE status = 'approved'"),
-            'rejected_registrations' => $db->fetchColumn("SELECT COUNT(*) FROM hybrid_registrations WHERE status = 'rejected'")
+        return $hierarchy;
+    }
+    
+    /**
+     * Get hierarchy statistics
+     */
+    private function getHierarchyStatistics()
+    {
+        $godinaModel = new Godina();
+        $gamtaModel = new Gamta();
+        $gurmuModel = new Gurmu();
+        $userModel = new User();
+        
+        return [
+            'total_godinas' => $godinaModel->where('status', 'active')->count(),
+            'total_gamtas' => $gamtaModel->where('status', 'active')->count(),
+            'total_gurmus' => $gurmuModel->where('status', 'active')->count(),
+            'total_members' => $userModel->where('status', 'active')->count()
         ];
-        
-        // Get recent registrations
-        $recentRegistrations = $db->fetchAll("
-            SELECT hr.*, u.first_name, u.last_name, u.email
-            FROM hybrid_registrations hr
-            LEFT JOIN users u ON hr.user_id = u.id
-            ORDER BY hr.created_at DESC
-            LIMIT 20
-        ");
-        
-        return $this->render('admin.hybrid_registration_management', [
-            'title' => 'Hybrid Registration Management',
-            'stats' => $stats,
-            'recent_registrations' => $recentRegistrations
-        ]);
-    }
-    
-    /**
-     * Get users missing internal emails
-     */
-    private function getUsersMissingEmails()
-    {
-        $db = Database::getInstance();
-        
-        return $db->fetchAll("
-            SELECT 
-                u.id as user_id,
-                CONCAT(u.first_name, ' ', u.last_name) as name,
-                u.email,
-                GROUP_CONCAT(DISTINCT p.name ORDER BY p.name) as positions,
-                ua.level_scope
-            FROM users u
-            LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
-            LEFT JOIN positions p ON ua.position_id = p.id
-            WHERE u.status IN ('active', 'pending')
-            AND (u.internal_email IS NULL OR u.internal_email = '')
-            AND ua.user_id IS NOT NULL
-            GROUP BY u.id
-            ORDER BY u.id
-        ");
     }
     
     /**

@@ -145,7 +145,7 @@ class Meeting extends Model
                              u.first_name as creator_first_name, 
                              u.last_name as creator_last_name
                       FROM {$this->table} m
-                      LEFT JOIN users u ON m.created_by = u.id
+                      LEFT JOIN users u ON m.organized_by = u.id
                       WHERE m.level_scope = :scope";
             
             $params = ['scope' => $scope];
@@ -217,11 +217,11 @@ class Meeting extends Model
                              u.last_name as creator_last_name,
                              mp.status as participation_status
                       FROM {$this->table} m
-                      LEFT JOIN users u ON m.created_by = u.id
+                      LEFT JOIN users u ON m.organized_by = u.id
                       LEFT JOIN meeting_participants mp ON m.id = mp.meeting_id AND mp.user_id = :user_id
                       WHERE m.start_datetime >= NOW() 
                       AND m.status = 'scheduled'
-                      AND (m.created_by = :user_id 
+                      AND (m.organized_by = :user_id 
                            OR mp.user_id = :user_id 
                            OR m.is_public = 1
                            OR JSON_CONTAINS(m.moderators, :user_id_json))
@@ -547,9 +547,9 @@ class Meeting extends Model
                              u.first_name as creator_first_name, 
                              u.last_name as creator_last_name
                       FROM {$this->table} m
-                      LEFT JOIN users u ON m.created_by = u.id
+                      LEFT JOIN users u ON m.organized_by = u.id
                       LEFT JOIN meeting_participants mp ON m.id = mp.meeting_id
-                      WHERE (m.created_by = :user_id 
+                      WHERE (m.organized_by = :user_id 
                              OR mp.user_id = :user_id 
                              OR m.is_public = 1
                              OR JSON_CONTAINS(m.moderators, :user_id_json))";
@@ -631,7 +631,7 @@ class Meeting extends Model
                       FROM {$this->table} m
                       LEFT JOIN meeting_participants mp ON m.id = mp.meeting_id AND mp.user_id = :user_id
                       WHERE m.status = 'scheduled'
-                      AND (m.created_by = :user_id 
+                      AND (m.organized_by = :user_id 
                            OR mp.user_id = :user_id 
                            OR JSON_CONTAINS(m.moderators, :user_id_json))
                       AND ((m.start_datetime <= :start_datetime AND m.end_datetime > :start_datetime)

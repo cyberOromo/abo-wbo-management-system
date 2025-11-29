@@ -48,7 +48,7 @@ class FinanceController extends Controller
         $recentDonations = $this->getRecentDonations($hierarchyScope, 10);
         $activeCampaigns = DonationCampaign::getActiveCampaigns($hierarchyScope['level'], $hierarchyScope['id']);
         
-        return $this->render('finance.dashboard', [
+        return echo $this->render('finance.dashboard', [
             'title' => 'Finance Dashboard',
             'user' => $user,
             'donation_stats' => $donationStats,
@@ -89,7 +89,7 @@ class FinanceController extends Controller
         $campaigns = DonationCampaign::getByHierarchyScope($hierarchyScope['level'], $hierarchyScope['id']);
         $stats = Donation::getDashboardStats($hierarchyScope['level'], $hierarchyScope['id']);
         
-        return $this->render('finance.donations.index', [
+        return echo $this->render('finance.donations.index', [
             'title' => 'Donation Management',
             'donations' => $donations,
             'campaigns' => $campaigns,
@@ -110,7 +110,7 @@ class FinanceController extends Controller
         $campaigns = DonationCampaign::getActiveCampaigns($hierarchyScope['level'], $hierarchyScope['id']);
         $donors = $this->getRecentDonors(20);
         
-        return $this->render('finance.donations.create', [
+        return echo $this->render('finance.donations.create', [
             'title' => 'Create Donation Record',
             'campaigns' => $campaigns,
             'donors' => $donors,
@@ -221,7 +221,7 @@ class FinanceController extends Controller
         $submittedBy = $donationObj->submittedBy();
         $approvedBy = $donationObj->approvedBy();
         
-        return $this->render('finance.donations.show', [
+        return echo $this->render('finance.donations.show', [
             'title' => 'Donation Details',
             'donation' => $donation,
             'donor' => $donor,
@@ -355,7 +355,7 @@ class FinanceController extends Controller
         $topDonors = Donor::getTopDonors(10);
         $geoDistribution = Donor::getGeographicDistribution();
         
-        return $this->render('finance.donors.index', [
+        return echo $this->render('finance.donors.index', [
             'title' => 'Donor Management',
             'donors' => $donors,
             'top_donors' => $topDonors,
@@ -382,7 +382,7 @@ class FinanceController extends Controller
         $donationsByYear = $donorObj->getDonationsByYear();
         $donationsByCampaign = $donorObj->getDonationsByCampaign();
         
-        return $this->render('finance.donors.show', [
+        return echo $this->render('finance.donors.show', [
             'title' => 'Donor Profile',
             'donor' => $donor,
             'statistics' => $statistics,
@@ -414,7 +414,7 @@ class FinanceController extends Controller
         
         $campaigns = DonationCampaign::getByHierarchyScope($hierarchyScope['level'], $hierarchyScope['id'], $filters);
         
-        return $this->render('finance.campaigns.index', [
+        return echo $this->render('finance.campaigns.index', [
             'title' => 'Campaign Management',
             'campaigns' => $campaigns,
             'filters' => $filters,
@@ -440,7 +440,7 @@ class FinanceController extends Controller
         $timeline = $campaignObj->getDonationTimeline();
         $performance = $campaignObj->getPerformanceComparison();
         
-        return $this->render('finance.campaigns.show', [
+        return echo $this->render('finance.campaigns.show', [
             'title' => 'Campaign Details',
             'campaign' => $campaign,
             'statistics' => $statistics,
@@ -462,7 +462,7 @@ class FinanceController extends Controller
         $user = auth_user();
         $hierarchyScope = $this->getUserHierarchyScope($user);
         
-        return $this->render('finance.reports.index', [
+        return echo $this->render('finance.reports.index', [
             'title' => 'Financial Reports',
             'hierarchy_scope' => $hierarchyScope
         ]);
@@ -502,7 +502,7 @@ class FinanceController extends Controller
                 return $this->jsonResponse($reportData);
             }
             
-            return $this->render('finance.reports.donation_report', $reportData);
+            return echo $this->render('finance.reports.donation_report', $reportData);
             
         } catch (\Exception $e) {
             return $this->jsonResponse(['error' => $e->getMessage()], 500);

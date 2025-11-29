@@ -69,7 +69,19 @@ abstract class Controller
     protected function getViewPath(string $view): string
     {
         $viewPath = str_replace('.', DIRECTORY_SEPARATOR, $view);
-        return config('paths.views') . DIRECTORY_SEPARATOR . $viewPath . '.php';
+        $basePath = config('app.paths.views');
+        
+        // Fallback if config not available
+        if (!$basePath) {
+            $basePath = __DIR__ . '/../../resources/views';
+        }
+        
+        $fullPath = $basePath . DIRECTORY_SEPARATOR . $viewPath . '.php';
+        
+        // Normalize path separators for Windows
+        $fullPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $fullPath);
+        
+        return $fullPath;
     }
     
     /**
@@ -77,7 +89,19 @@ abstract class Controller
      */
     protected function getLayoutPath(string $layout): string
     {
-        return config('paths.views') . DIRECTORY_SEPARATOR . 'layouts' . DIRECTORY_SEPARATOR . $layout . '.php';
+        $basePath = config('app.paths.views');
+        
+        // Fallback if config not available
+        if (!$basePath) {
+            $basePath = __DIR__ . '/../../resources/views';
+        }
+        
+        $fullPath = $basePath . DIRECTORY_SEPARATOR . 'layouts' . DIRECTORY_SEPARATOR . $layout . '.php';
+        
+        // Normalize path separators for Windows
+        $fullPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $fullPath);
+        
+        return $fullPath;
     }
     
     /**
@@ -444,17 +468,17 @@ abstract class Controller
         // Define permission mappings
         $permissions = [
             'user.create' => ['admin'],
-            'user.edit' => ['admin', 'executive'],
+            'user.edit' => ['admin', 'moderator'],
             'user.delete' => ['admin'],
-            'user.view' => ['admin', 'executive', 'member'],
+            'user.view' => ['admin', 'moderator', 'user'],
             'hierarchy.manage' => ['admin'],
-            'position.manage' => ['admin', 'executive'],
-            'task.create' => ['admin', 'executive'],
-            'task.assign' => ['admin', 'executive'],
-            'meeting.create' => ['admin', 'executive'],
-            'event.create' => ['admin', 'executive'],
-            'donation.view' => ['admin', 'executive'],
-            'report.view' => ['admin', 'executive']
+            'position.manage' => ['admin', 'moderator'],
+            'task.create' => ['admin', 'moderator'],
+            'task.assign' => ['admin', 'moderator'],
+            'meeting.create' => ['admin', 'moderator'],
+            'event.create' => ['admin', 'moderator'],
+            'donation.view' => ['admin', 'moderator'],
+            'report.view' => ['admin', 'moderator']
         ];
         
         $allowedRoles = $permissions[$permission] ?? [];

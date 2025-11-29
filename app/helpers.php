@@ -3,6 +3,40 @@
  * Helper Functions for ABO-WBO Management System
  */
 
+if (!function_exists('loadEnv')) {
+    /**
+     * Load environment variables from .env file
+     */
+    function loadEnv($path) {
+        if (!file_exists($path)) {
+            return;
+        }
+        
+        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            // Skip comments
+            if (strpos(trim($line), '#') === 0) {
+                continue;
+            }
+            
+            // Parse KEY=VALUE
+            if (strpos($line, '=') !== false) {
+                list($key, $value) = explode('=', $line, 2);
+                $key = trim($key);
+                $value = trim($value);
+                
+                // Remove quotes if present
+                if (preg_match('/^(["\'])(.*)\\1$/', $value, $matches)) {
+                    $value = $matches[2];
+                }
+                
+                $_ENV[$key] = $value;
+                putenv("$key=$value");
+            }
+        }
+    }
+}
+
 if (!function_exists('env')) {
     /**
      * Get environment variable
@@ -410,7 +444,145 @@ if (!function_exists('auth_user')) {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        return $_SESSION['user'] ?? null;
+        $user = $_SESSION['user'] ?? null;
+        
+        // Map user_type to role for backward compatibility
+        if ($user && isset($user['user_type'])) {
+            $user['role'] = $user['user_type'] === 'system_admin' ? 'admin' : $user['user_type'];
+        }
+        
+        return $user;
+    }
+}
+
+// ============================================================================
+// USER TYPE & ROLE HELPERS (Member/Executive/Admin Logic)
+// ============================================================================
+
+if (!function_exists('is_member')) {
+    /**
+     * Check if authenticated user is a regular member (no positions assigned)
+     */
+    function is_member() {
+        $user = auth_user();
+        return $user && ($user['user_type'] ?? 'member') === 'member';
+    }
+}
+
+if (!function_exists('is_executive')) {
+    /**
+     * Check if authenticated user is an executive (has position assignments)
+     */
+    function is_executive() {
+        $user = auth_user();
+        return $user && ($user['user_type'] ?? 'member') === 'executive';
+    }
+}
+
+if (!function_exists('is_system_admin')) {
+    /**
+     * Check if authenticated user is a system administrator
+     */
+    function is_system_admin() {
+        $user = auth_user();
+        return $user && ($user['user_type'] ?? 'member') === 'system_admin';
+    }
+}
+
+if (!function_exists('has_position')) {
+    /**
+     * Check if user has any active position assignments
+     */
+    function has_position($userId = null) {
+        $userId = $userId ?? auth_user()['id'] ?? null;
+        if (!$userId) return false;
+        
+        $db = \App\Utils\Database::getInstance();
+        $result = $db->fetch(
+            "SELECT COUNT(*) as count FROM user_assignments 
+             WHERE user_id = ? AND status = 'active'",
+            [$userId]
+        );
+        
+        return ($result['count'] ?? 0) > 0;
+    }
+}
+
+if (!function_exists('get_user_positions')) {
+    /**
+     * Get all active positions for a user
+     */
+    function get_user_positions($userId = null) {
+        $userId = $userId ?? auth_user()['id'] ?? null;
+        if (!$userId) return [];
+        
+        $db = \App\Utils\Database::getInstance();
+        return $db->fetchAll(
+            "SELECT ua.*, p.key_name, p.name_en, p.name_om, p.level_scope as position_level
+             FROM user_assignments ua
+             JOIN positions p ON ua.position_id = p.id
+             WHERE ua.user_id = ? AND ua.status = 'active'
+             ORDER BY FIELD(ua.level_scope, 'global', 'godina', 'gamta', 'gurmu')",
+            [$userId]
+        );
+    }
+}
+
+if (!function_exists('get_primary_position')) {
+    /**
+     * Get user's primary (highest-level) position
+     */
+    function get_primary_position($userId = null) {
+        $positions = get_user_positions($userId);
+        return $positions[0] ?? null;
+    }
+}
+
+if (!function_exists('user_type_label')) {
+    /**
+     * Get human-readable label for user type
+     */
+    function user_type_label($userType = null) {
+        $userType = $userType ?? auth_user()['user_type'] ?? 'member';
+        $labels = [
+            'member' => 'Member',
+            'executive' => 'Executive',
+            'system_admin' => 'System Administrator'
+        ];
+        return $labels[$userType] ?? 'Member';
+    }
+}
+
+if (!function_exists('can_manage_gurmu')) {
+    /**
+     * Check if user can manage a specific Gurmu (is executive in that Gurmu or above)
+     */
+    function can_manage_gurmu($gurmuId) {
+        if (is_system_admin()) return true;
+        
+        $positions = get_user_positions();
+        foreach ($positions as $position) {
+            // Can manage if position is at this Gurmu
+            if ($position['level_scope'] === 'gurmu' && $position['organizational_unit_id'] == $gurmuId) {
+                return true;
+            }
+            
+            // Can manage if position is at parent Gamta
+            if ($position['level_scope'] === 'gamta') {
+                $db = \App\Utils\Database::getInstance();
+                $gurmu = $db->fetch("SELECT gamta_id FROM gurmus WHERE id = ?", [$gurmuId]);
+                if ($gurmu && $gurmu['gamta_id'] == $position['organizational_unit_id']) {
+                    return true;
+                }
+            }
+            
+            // Can manage if position is at parent Godina or Global
+            if (in_array($position['level_scope'], ['godina', 'global'])) {
+                return true; // Higher level executives can manage all Gurmus in their scope
+            }
+        }
+        
+        return false;
     }
 }
 

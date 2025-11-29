@@ -1,0 +1,76 @@
+============================================================================
+QUICK REFERENCE: COPY/PASTE THESE 3 BLOCKS IN ORDER
+MySQL 5.x and 8.x Compatible Version
+============================================================================
+
+▶ SINGLE BLOCK: Paste ALL of this in SQL tab, click Go (wait 5-10 seconds)
+============================================================================
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP VIEW IF EXISTS active_tasks_view;
+DROP VIEW IF EXISTS user_summary_view;
+DROP VIEW IF EXISTS hierarchy_view;
+
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS system_logs;
+DROP TABLE IF EXISTS file_uploads;
+DROP TABLE IF EXISTS lesson_progress;
+DROP TABLE IF EXISTS course_enrollments;
+DROP TABLE IF EXISTS lessons;
+DROP TABLE IF EXISTS courses;
+DROP TABLE IF EXISTS course_categories;
+DROP TABLE IF EXISTS event_participants;
+DROP TABLE IF EXISTS event_registrations;
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS donations;
+DROP TABLE IF EXISTS donation_campaigns;
+DROP TABLE IF EXISTS donors;
+DROP TABLE IF EXISTS meeting_activities;
+DROP TABLE IF EXISTS meeting_attendees;
+DROP TABLE IF EXISTS meetings;
+DROP TABLE IF EXISTS task_activities;
+DROP TABLE IF EXISTS task_comments;
+DROP TABLE IF EXISTS task_assignments;
+DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS user_roles;
+DROP TABLE IF EXISTS responsibility_assignments;
+DROP TABLE IF EXISTS user_assignments;
+DROP TABLE IF EXISTS email_verification_tokens;
+DROP TABLE IF EXISTS password_reset_tokens;
+DROP TABLE IF EXISTS user_sessions;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS roles;
+DROP TABLE IF EXISTS shared_responsibilities;
+DROP TABLE IF EXISTS individual_responsibilities;
+DROP TABLE IF EXISTS responsibilities;
+DROP TABLE IF EXISTS positions;
+DROP TABLE IF EXISTS finances;
+DROP TABLE IF EXISTS gurmus;
+DROP TABLE IF EXISTS gamtas;
+DROP TABLE IF EXISTS godinas;
+DROP TABLE IF EXISTS globals;
+DROP TABLE IF EXISTS system_settings;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+
+▶ VERIFY: Check database is empty
+============================================================================
+SELECT TABLE_NAME FROM information_schema.TABLES 
+WHERE TABLE_SCHEMA = 'jabowbo_abo_staging' AND TABLE_TYPE = 'BASE TABLE';
+
+Expected: Empty set (0 rows)
+
+
+============================================================================
+✅ DATABASE CLEAN - NOW IMPORT SCHEMA
+============================================================================
+
+Next steps:
+1. Import schema.sql (38 tables + 3 views)
+2. Import comprehensive_data_insertion.sql (data + system admin)
+3. Run verify_staging_import.sql (verification queries)
+4. Test login: admin@abo-wbo.org / admin123
+
+============================================================================

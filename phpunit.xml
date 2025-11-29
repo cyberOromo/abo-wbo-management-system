@@ -25,12 +25,6 @@
         <testsuite name="Feature">
             <directory suffix="Test.php">tests/Feature</directory>
         </testsuite>
-        
-        <testsuite name="HybridRegistration">
-            <directory suffix="Test.php">tests/Unit/Services</directory>
-            <directory suffix="Test.php">tests/Unit/Controllers</directory>
-            <directory suffix="Test.php">tests/Integration/HybridRegistration</directory>
-        </testsuite>
     </testsuites>
 
     <source>

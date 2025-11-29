@@ -39,7 +39,7 @@ class TaskController extends BaseController
             $tasks = $this->getTasksForUserScope($userScope);
             $taskStats = $this->getTaskStatistics($userScope);
             
-            return $this->render('tasks/index_modern', [
+            return echo $this->render('tasks/index_modern', [
                 'title' => 'Tasks Management',
                 'tasks' => $tasks,
                 'task_stats' => $taskStats,

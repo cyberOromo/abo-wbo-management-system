@@ -211,24 +211,96 @@ MAIL_FROM_NAME="ABO-WBO Staging"
 
 ## 🗃️ STEP 6: Database Setup
 
-### 6.1 Import Database Structure
+### 6.1 Import Database Structure (3 Files in Order)
+
+**IMPORTANT**: Import these files in EXACT ORDER to avoid foreign key errors
+
+#### File 1: Drop Existing Tables (Optional - only if re-importing)
 ```
 1. In cPanel, go to "phpMyAdmin"
 2. Select staging database: [cpanel_user]_abo_staging
 3. Click "Import" tab
-4. Upload file: database/schema.sql
+4. Upload file: database/drop_all_tables.sql
 5. Click "Go"
 ```
 
-### 6.2 Run Initial Data Setup
+#### File 2: Create Database Schema (38 Tables + 3 Views)
 ```
-Option A - Via phpMyAdmin:
-1. Upload and run: database/comprehensive_data_insertion.sql
+1. Still in phpMyAdmin → [cpanel_user]_abo_staging database
+2. Click "Import" tab
+3. Upload file: database/schema.sql
+4. Click "Go"
+5. Wait for import to complete (30-60 seconds)
+6. Verify: 38 tables + 3 views created successfully
+```
 
-Option B - Via File Manager (if you have PHP script):
-1. Navigate to your staging site in browser
-2. Run: https://staging.j-abo-wbo.org/database/run_migrations.php
+**Tables Created**: globals, godinas, gamtas, gurmus, users, user_assignments, user_roles, positions, individual_responsibilities, shared_responsibilities, responsibilities, responsibility_assignments, tasks, meetings, events, finances, donations, courses, notifications, audit_logs, etc.
+
+**Views Created**: 
+- `hierarchy_view` - Active organizational hierarchy
+- `user_summary_view` - User info with primary position (uses user_assignments)
+- `active_tasks_view` - Current active tasks
+
+#### File 3: Import Organizational Data
 ```
+1. Still in phpMyAdmin → [cpanel_user]_abo_staging database
+2. Click "Import" tab
+3. Upload file: database/comprehensive_data_insertion.sql
+4. Click "Go"
+5. Wait for import to complete (20-30 seconds)
+```
+
+**Data Inserted**:
+- 1 Global organization
+- 6 Godinas, 20 Gamtas, 48 Gurmus
+- 7 Executive positions
+- 75 Total responsibilities (35 individual + 5 shared + 35 general)
+- **1 System Admin**: admin@abo-wbo.org / admin123 (user_type='system_admin')
+
+### 6.2 Verify Import Success
+
+Run these verification queries in phpMyAdmin SQL tab:
+
+```sql
+-- Check table count (should be 38)
+SELECT COUNT(*) as table_count 
+FROM information_schema.tables 
+WHERE table_schema = '[cpanel_user]_abo_staging' 
+AND table_type = 'BASE TABLE';
+
+-- Verify organizational hierarchy
+SELECT 
+    (SELECT COUNT(*) FROM globals) as globals,
+    (SELECT COUNT(*) FROM godinas) as godinas,
+    (SELECT COUNT(*) FROM gamtas) as gamtas,
+    (SELECT COUNT(*) FROM gurmus) as gurmus;
+
+-- Verify system admin user
+SELECT id, email, user_type, level_scope, status 
+FROM users 
+WHERE email = 'admin@abo-wbo.org';
+
+-- Test user_summary_view (should work without errors)
+SELECT * FROM user_summary_view LIMIT 5;
+```
+
+**Expected Results**:
+- ✅ 38 tables created
+- ✅ 1 global, 6 godinas, 20 gamtas, 48 gurmus
+- ✅ 1 system admin with user_type='system_admin'
+- ✅ All views return data without errors
+
+### 6.3 Common Issues & Solutions
+
+**Error: "Unknown column 'u.position_id' in field list"**
+- **Cause**: Old view definition trying to use removed position_id column
+- **Solution**: This is FIXED in latest schema.sql - user_summary_view now uses user_assignments table
+- **Action**: Re-import schema.sql (it will DROP and recreate views)
+
+**Error: Foreign key constraint fails**
+- **Cause**: Tables imported out of order
+- **Solution**: Import drop_all_tables.sql first, then schema.sql, then data insertion
+- **Action**: Start fresh with clean database
 
 ---
 

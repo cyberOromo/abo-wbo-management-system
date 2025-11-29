@@ -161,13 +161,14 @@ class Router
      */
     protected function convertToRegex(string $path): string
     {
-        // Escape special regex characters except for parameter placeholders
-        $pattern = preg_quote($path, '/');
+        // Use # as delimiter to avoid issues with forward slashes
+        $pattern = preg_quote($path, '#');
         
         // Convert parameter placeholders to regex groups
+        // preg_quote escapes { and } to \{ and \}, so we need to match those
         $pattern = preg_replace('/\\\{([^}]+)\\\}/', '([^/]+)', $pattern);
         
-        return '/^' . $pattern . '$/';
+        return '#^' . $pattern . '$#';
     }
     
     /**

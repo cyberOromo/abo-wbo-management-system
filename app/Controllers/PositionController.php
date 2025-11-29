@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Models\Godina;
 use App\Models\Gamta;
 use App\Models\Gurmu;
+use App\Utils\Database;
+use PDO;
 use Exception;
 
 /**
@@ -60,7 +62,7 @@ class PositionController extends Controller
                 'expiringSoon' => $expiringSoon
             ];
             
-            $this->render('positions/index', $data);
+            echo $this->render('positions/index', $data);
             
         } catch (Exception $e) {
             error_log("Error in PositionController::index: " . $e->getMessage());
@@ -97,7 +99,7 @@ class PositionController extends Controller
                 'assignmentHistory' => $assignmentHistory
             ];
             
-            $this->render('positions/show', $data);
+            echo $this->render('positions/show', $data);
             
         } catch (Exception $e) {
             error_log("Error in PositionController::show: " . $e->getMessage());
@@ -116,7 +118,7 @@ class PositionController extends Controller
             'electionCycles' => ['elected', 'appointed', 'volunteer']
         ];
         
-        $this->render('positions/create', $data);
+        echo $this->render('positions/create', $data);
     }
     
     /**
@@ -177,7 +179,7 @@ class PositionController extends Controller
                 'electionCycles' => ['elected', 'appointed', 'volunteer']
             ];
             
-            $this->render('positions/edit', $data);
+            echo $this->render('positions/edit', $data);
             
         } catch (Exception $e) {
             error_log("Error in PositionController::edit: " . $e->getMessage());
@@ -276,7 +278,7 @@ class PositionController extends Controller
                 'availableUsers' => $availableUsers
             ];
             
-            $this->render('positions/assign', $data);
+            echo $this->render('positions/assign', $data);
             
         } catch (Exception $e) {
             error_log("Error in PositionController::assign: " . $e->getMessage());
@@ -341,7 +343,7 @@ class PositionController extends Controller
                 'filters' => $filters
             ];
             
-            $this->render('positions/assignments', $data);
+            echo $this->render('positions/assignments', $data);
             
         } catch (Exception $e) {
             error_log("Error in PositionController::assignments: " . $e->getMessage());
@@ -464,6 +466,9 @@ class PositionController extends Controller
      */
     private function getAvailableUsers(string $levelScope, int $unitId): array
     {
+        $db = Database::getInstance();
+        $pdo = $db->getPdo();
+        
         // Get users without current active assignments
         $query = "
             SELECT u.id, u.first_name, u.last_name, u.email
@@ -477,11 +482,15 @@ class PositionController extends Controller
         switch ($levelScope) {
             case 'gurmu':
                 $query .= " AND u.gurmu_id = ?";
-                return $this->db->fetchAll($query, [$unitId]);
+                $stmt = $pdo->prepare($query);
+                $stmt->execute([$unitId]);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
             case 'gamta':
                 $query .= " AND u.gurmu_id IN (SELECT id FROM gurmus WHERE gamta_id = ?)";
-                return $this->db->fetchAll($query, [$unitId]);
+                $stmt = $pdo->prepare($query);
+                $stmt->execute([$unitId]);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
             case 'godina':
                 $query .= " AND u.gurmu_id IN (
@@ -489,10 +498,13 @@ class PositionController extends Controller
                     JOIN gamtas gam ON gur.gamta_id = gam.id
                     WHERE gam.godina_id = ?
                 )";
-                return $this->db->fetchAll($query, [$unitId]);
+                $stmt = $pdo->prepare($query);
+                $stmt->execute([$unitId]);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
             case 'global':
-                return $this->db->fetchAll($query);
+                $stmt = $pdo->query($query);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
             default:
                 return [];

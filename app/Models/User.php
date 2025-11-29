@@ -14,7 +14,7 @@ class User extends Model
     
     protected $fillable = [
         'first_name', 'middle_name', 'last_name', 'email', 'phone', 'password',
-        'date_of_birth', 'gender', 'profile_photo', 'gurmu_id', 'position_id',
+        'date_of_birth', 'gender', 'profile_photo', 'gurmu_id', 'user_type',
         'level_scope', 'language_preference', 'timezone', 'notification_preferences',
         'status', 'approval_status', 'approved_by', 'approved_at', 'rejection_reason',
         'verification_token', 'reset_token', 'reset_token_expires_at', 'remember_token',
@@ -425,12 +425,96 @@ class User extends Model
     public function search($term, $limit = 10)
     {
         return $this->db->fetchAll("
-            SELECT id, first_name, last_name, email, role
+            SELECT id, first_name, last_name, email, user_type
             FROM {$this->table}
             WHERE status = 'active' 
             AND (first_name LIKE ? OR last_name LIKE ? OR email LIKE ?)
             ORDER BY first_name, last_name
             LIMIT ?
         ", ["%{$term}%", "%{$term}%", "%{$term}%", $limit]);
+    }
+    
+    /**
+     * Check if user is a regular member
+     */
+    public function isMember($userId = null)
+    {
+        $userId = $userId ?? $this->id ?? null;
+        if (!$userId) return false;
+        
+        $user = $this->find($userId);
+        return $user && ($user['user_type'] ?? 'member') === 'member';
+    }
+    
+    /**
+     * Check if user is an executive
+     */
+    public function isExecutive($userId = null)
+    {
+        $userId = $userId ?? $this->id ?? null;
+        if (!$userId) return false;
+        
+        $user = $this->find($userId);
+        return $user && ($user['user_type'] ?? 'member') === 'executive';
+    }
+    
+    /**
+     * Check if user is system admin
+     */
+    public function isSystemAdmin($userId = null)
+    {
+        $userId = $userId ?? $this->id ?? null;
+        if (!$userId) return false;
+        
+        $user = $this->find($userId);
+        return $user && ($user['user_type'] ?? 'member') === 'system_admin';
+    }
+    
+    /**
+     * Get user's active position assignments
+     */
+    public function getActivePositions($userId)
+    {
+        return $this->db->fetchAll("
+            SELECT ua.*, p.key_name, p.name_en, p.name_om, p.level_scope as position_level
+            FROM user_assignments ua
+            JOIN positions p ON ua.position_id = p.id
+            WHERE ua.user_id = ? AND ua.status = 'active'
+            ORDER BY FIELD(ua.level_scope, 'global', 'godina', 'gamta', 'gurmu')
+        ", [$userId]);
+    }
+    
+    /**
+     * Promote member to executive (when assigned first position)
+     */
+    public function promoteToExecutive($userId)
+    {
+        return $this->db->update(
+            $this->table,
+            ['user_type' => 'executive'],
+            ['id' => $userId]
+        );
+    }
+    
+    /**
+     * Demote executive to member (when all positions removed)
+     */
+    public function demoteToMember($userId)
+    {
+        // Check if user has any active positions
+        $hasPositions = $this->db->fetch(
+            "SELECT COUNT(*) as count FROM user_assignments WHERE user_id = ? AND status = 'active'",
+            [$userId]
+        );
+        
+        if (($hasPositions['count'] ?? 0) == 0) {
+            return $this->db->update(
+                $this->table,
+                ['user_type' => 'member'],
+                ['id' => $userId]
+            );
+        }
+        
+        return false;
     }
 }

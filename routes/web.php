@@ -77,6 +77,18 @@ $router->group(['prefix' => 'hierarchy', 'middleware' => 'auth'], function() use
     $router->get('/positions', 'HierarchyController@positions')->name('hierarchy.positions');
     $router->get('/assignments', 'HierarchyController@assignments')->name('hierarchy.assignments');
     
+    // Create forms for hierarchy units
+    $router->get('/create/godina', 'HierarchyController@createGodina')->name('hierarchy.create.godina');
+    $router->post('/create/godina', 'HierarchyController@storeGodina')->name('hierarchy.store.godina');
+    $router->get('/create/gamta', 'HierarchyController@createGamta')->name('hierarchy.create.gamta');
+    $router->post('/create/gamta', 'HierarchyController@storeGamta')->name('hierarchy.store.gamta');
+    $router->get('/create/gurmu', 'HierarchyController@createGurmu')->name('hierarchy.create.gurmu');
+    $router->post('/create/gurmu', 'HierarchyController@storeGurmu')->name('hierarchy.store.gurmu');
+    
+    // Tree view
+    $router->get('/tree', 'HierarchyController@tree')->name('hierarchy.tree');
+    $router->get('/api/tree-data', 'HierarchyController@getTreeData')->name('hierarchy.api.tree_data');
+    
     // API endpoints for hierarchy data
     $router->get('/api/hierarchy', 'HierarchyController@getHierarchy')->name('hierarchy.api.hierarchy');
     $router->get('/api/organizational-path', 'HierarchyController@getOrganizationalPath')->name('hierarchy.api.path');
@@ -95,21 +107,23 @@ $router->group(['prefix' => 'hierarchy', 'middleware' => 'auth'], function() use
     // Export functionality
     $router->get('/export', 'HierarchyController@export')->name('hierarchy.export');
     
-    // Legacy routes for backward compatibility
+    // Hierarchy tree view - MUST come before /{id} route to avoid conflicts
+    $router->get('/tree/view', 'HierarchyController@treeView')->name('hierarchy.tree.view');
+    $router->get('/tree/data', 'HierarchyController@treeData')->name('hierarchy.tree.data');
+    
+    // List endpoints for dropdowns - MUST come before /{id} route
+    $router->get('/godinas/list', 'HierarchyController@listGodinas')->name('hierarchy.godinas.list');
+    $router->get('/gamtas/list', 'HierarchyController@listGamtas')->name('hierarchy.gamtas.list');
+    
+    // Legacy routes for backward compatibility - /{id} MUST be last
     $router->get('/create', 'HierarchyController@create')->name('hierarchy.create');
     $router->post('/', 'HierarchyController@store')->name('hierarchy.store');
-    $router->get('/{id}', 'HierarchyController@show')->name('hierarchy.show');
     $router->get('/{id}/edit', 'HierarchyController@edit')->name('hierarchy.edit');
     $router->put('/{id}', 'HierarchyController@update')->name('hierarchy.update');
     $router->delete('/{id}', 'HierarchyController@destroy')->name('hierarchy.destroy');
     
-    // Hierarchy tree view
-    $router->get('/tree/view', 'HierarchyController@treeView')->name('hierarchy.tree');
-    $router->get('/tree/data', 'HierarchyController@treeData')->name('hierarchy.tree.data');
-    
-    // List endpoints for dropdowns
-    $router->get('/godinas/list', 'HierarchyController@listGodinas')->name('hierarchy.godinas.list');
-    $router->get('/gamtas/list', 'HierarchyController@listGamtas')->name('hierarchy.gamtas.list');
+    // Show route - MUST be LAST because it's a catch-all
+    $router->get('/{id}', 'HierarchyController@show')->name('hierarchy.show');
 });
 
 // Position management routes
@@ -214,6 +228,35 @@ $router->group(['prefix' => 'events', 'middleware' => 'auth'], function() use ($
     // Event calendar
     $router->get('/calendar/view', 'EventController@calendar')->name('events.calendar');
     $router->get('/calendar/data', 'EventController@calendarData')->name('events.calendar.data');
+});
+
+// Internal Email Management routes
+$router->group(['prefix' => 'user-emails', 'middleware' => 'auth'], function() use ($router) {
+    // Main email management
+    $router->get('/', 'UserEmailController@index')->name('user_emails.index');
+    $router->get('/create', 'UserEmailController@create')->name('user_emails.create');
+    $router->post('/', 'UserEmailController@store')->name('user_emails.store');
+    $router->get('/{id}', 'UserEmailController@view')->name('user_emails.view');
+    $router->get('/{id}/edit', 'UserEmailController@edit')->name('user_emails.edit');
+    $router->put('/{id}', 'UserEmailController@update')->name('user_emails.update');
+    $router->delete('/{id}', 'UserEmailController@destroy')->name('user_emails.destroy');
+    
+    // Email operations
+    $router->post('/{id}/reset-password', 'UserEmailController@resetPassword')->name('user_emails.reset_password');
+    $router->post('/{id}/update-quota', 'UserEmailController@updateQuota')->name('user_emails.update_quota');
+    $router->post('/{id}/setup-forwarding', 'UserEmailController@setupForwarding')->name('user_emails.setup_forwarding');
+    $router->delete('/{id}/remove-forwarding', 'UserEmailController@removeForwarding')->name('user_emails.remove_forwarding');
+    $router->post('/{id}/deactivate', 'UserEmailController@deactivate')->name('user_emails.deactivate');
+    $router->post('/{id}/reactivate', 'UserEmailController@reactivate')->name('user_emails.reactivate');
+    
+    // Bulk operations
+    $router->post('/bulk/activate', 'UserEmailController@bulkActivate')->name('user_emails.bulk_activate');
+    $router->post('/bulk/deactivate', 'UserEmailController@bulkDeactivate')->name('user_emails.bulk_deactivate');
+    $router->post('/bulk/delete', 'UserEmailController@bulkDelete')->name('user_emails.bulk_delete');
+    
+    // Statistics and reports
+    $router->get('/statistics', 'UserEmailController@statistics')->name('user_emails.statistics');
+    $router->get('/export', 'UserEmailController@export')->name('user_emails.export');
 });
 
 // Donation management routes

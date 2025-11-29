@@ -9,14 +9,12 @@ use App\Models\IndividualResponsibility;
 use App\Models\SharedResponsibility;
 use App\Models\User;
 use App\Models\UserAssignment;
-use App\Utils\Database;
 use Exception;
 
 /**
  * HierarchyService
  * Comprehensive service for managing the ABO-WBO organizational hierarchy
  * Implements the 4-tier structure: Global -> Godina -> Gamta -> Gurmu
- * Enhanced with advanced hierarchy operations for tasks, events, and more
  */
 class HierarchyService
 {
@@ -28,11 +26,9 @@ class HierarchyService
     private $sharedResponsibility;
     private $user;
     private $userAssignment;
-    private $db;
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
         $this->godina = new Godina();
         $this->gamta = new Gamta();
         $this->gurmu = new Gurmu();
@@ -42,144 +38,6 @@ class HierarchyService
         $this->user = new User();
         $this->userAssignment = new UserAssignment();
     }
-
-    // ===== NEW ENHANCED HIERARCHY METHODS =====
-
-    /**
-     * Get all entities (tasks, events, meetings) for a user's hierarchy scope
-     */
-    public function getHierarchyScopedData($userScope, $entityType, $filters = [])
-    {
-        $level = $userScope['level_scope'];
-        
-        $conditions = [];
-        $params = [];
-        
-        // Build hierarchy filtering
-        switch ($level) {
-            case 'gurmu':
-                if ($userScope['gurmu_id']) {
-                    $conditions[] = "(level_scope = 'gurmu' AND gurmu_id = ?) OR level_scope = 'personal'";
-                    $params[] = $userScope['gurmu_id'];
-                }
-                break;
-            case 'gamta':
-                if ($userScope['gamta_id']) {
-                    $conditions[] = "(level_scope IN ('gamta', 'gurmu') AND gamta_id = ?) OR level_scope = 'personal'";
-                    $params[] = $userScope['gamta_id'];
-                }
-                break;
-            case 'godina':
-                if ($userScope['godina_id']) {
-                    $conditions[] = "(level_scope IN ('godina', 'gamta', 'gurmu') AND godina_id = ?) OR level_scope = 'personal'";
-                    $params[] = $userScope['godina_id'];
-                }
-                break;
-            case 'global':
-                $conditions[] = "1=1"; // Global users see all
-                break;
-        }
-        
-        // Apply additional filters
-        foreach ($filters as $field => $value) {
-            $conditions[] = "$field = ?";
-            $params[] = $value;
-        }
-        
-        $whereClause = implode(" AND ", $conditions);
-        
-        $sql = "SELECT * FROM $entityType WHERE $whereClause ORDER BY created_at DESC";
-        
-        return $this->db->fetchAll($sql, $params);
-    }
-
-    /**
-     * Create a task with proper hierarchy assignment
-     */
-    public function createHierarchyTask($taskData, $creatorScope)
-    {
-        // Auto-assign hierarchy data based on creator's scope
-        $taskData['created_by'] = $creatorScope['user_id'];
-        $taskData['level_scope'] = $taskData['level_scope'] ?? $creatorScope['level_scope'];
-        
-        // Set hierarchy IDs based on level scope
-        switch ($taskData['level_scope']) {
-            case 'gurmu':
-                $taskData['gurmu_id'] = $creatorScope['gurmu_id'];
-                $taskData['gamta_id'] = $creatorScope['gamta_id'];
-                $taskData['godina_id'] = $creatorScope['godina_id'];
-                $taskData['scope_id'] = $creatorScope['gurmu_id'];
-                break;
-            case 'gamta':
-                $taskData['gurmu_id'] = null;
-                $taskData['gamta_id'] = $creatorScope['gamta_id'];
-                $taskData['godina_id'] = $creatorScope['godina_id'];
-                $taskData['scope_id'] = $creatorScope['gamta_id'];
-                break;
-            case 'godina':
-                $taskData['gurmu_id'] = null;
-                $taskData['gamta_id'] = null;
-                $taskData['godina_id'] = $creatorScope['godina_id'];
-                $taskData['scope_id'] = $creatorScope['godina_id'];
-                break;
-            case 'global':
-                $taskData['gurmu_id'] = null;
-                $taskData['gamta_id'] = null;
-                $taskData['godina_id'] = null;
-                $taskData['scope_id'] = null;
-                break;
-            case 'personal':
-                $taskData['gurmu_id'] = $creatorScope['gurmu_id'];
-                $taskData['gamta_id'] = $creatorScope['gamta_id'];
-                $taskData['godina_id'] = $creatorScope['godina_id'];
-                $taskData['scope_id'] = null;
-                break;
-        }
-        
-        $fields = implode(', ', array_keys($taskData));
-        $placeholders = implode(', ', array_fill(0, count($taskData), '?'));
-        
-        $sql = "INSERT INTO tasks ($fields) VALUES ($placeholders)";
-        
-        return $this->db->execute($sql, array_values($taskData));
-    }
-
-    /**
-     * Get hierarchy metrics for reporting
-     */
-    public function getHierarchyMetrics($scope, $metricType = null, $period = 'monthly')
-    {
-        $conditions = [
-            "level_scope = ?",
-            "scope_id = ?",
-            "measurement_period = ?"
-        ];
-        $params = [$scope['level_scope'], $scope['scope_id'], $period];
-        
-        if ($metricType) {
-            $conditions[] = "metric_type = ?";
-            $params[] = $metricType;
-        }
-        
-        $sql = "SELECT * FROM hierarchy_metrics 
-                WHERE " . implode(" AND ", $conditions) . "
-                ORDER BY measurement_date DESC";
-        
-        return $this->db->fetchAll($sql, $params);
-    }
-
-    /**
-     * Get hierarchy overview with statistics
-     */
-    public function getHierarchyOverview($scope)
-    {
-        $sql = "SELECT * FROM vw_hierarchy_overview 
-                WHERE level_scope = ? AND scope_id = ?";
-        
-        return $this->db->fetch($sql, [$scope['level_scope'], $scope['scope_id']]);
-    }
-
-    // ===== EXISTING HIERARCHY METHODS =====
 
     /**
      * Get complete hierarchy structure

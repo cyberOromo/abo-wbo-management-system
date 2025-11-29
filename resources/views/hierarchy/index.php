@@ -19,13 +19,13 @@ $breadcrumbs = [
                     Add New
                 </button>
                 <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="/hierarchy/create?type=godina">
+                    <li><a class="dropdown-item" href="/hierarchy/create/godina">
                         <i class="bi bi-globe me-2"></i>Create Godina
                     </a></li>
-                    <li><a class="dropdown-item" href="/hierarchy/create?type=gamta">
+                    <li><a class="dropdown-item" href="/hierarchy/create/gamta">
                         <i class="bi bi-house me-2"></i>Create Gamta
                     </a></li>
-                    <li><a class="dropdown-item" href="/hierarchy/create?type=gurmu">
+                    <li><a class="dropdown-item" href="/hierarchy/create/gurmu">
                         <i class="bi bi-people me-2"></i>Create Gurmu
                     </a></li>
                 </ul>
@@ -155,14 +155,14 @@ $breadcrumbs = [
                         </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <a href="/hierarchy/create?type=godina" class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3">
+                        <a href="/hierarchy/create/godina" class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3">
                             <i class="bi bi-globe-americas mb-2" style="font-size: 2rem;"></i>
                             <span>Create Godina</span>
                             <small class="text-muted">Add new regional unit</small>
                         </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <a href="/hierarchy/create?type=gamta" class="btn btn-outline-info w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3">
+                        <a href="/hierarchy/create/gamta" class="btn btn-outline-info w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3">
                             <i class="bi bi-house-add mb-2" style="font-size: 2rem;"></i>
                             <span>Create Gamta</span>
                             <small class="text-muted">Add new local unit</small>
