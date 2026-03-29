@@ -84,7 +84,7 @@ class MeetingController extends BaseController
                 'scope' => $scope
             ];
             
-            return echo $this->render('meetings/index_modern', $data);
+            return $this->render('meetings/index_modern', $data);
             
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to load meetings: ' . $e->getMessage());

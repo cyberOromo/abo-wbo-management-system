@@ -370,7 +370,7 @@ class DashboardController extends Controller
                 ua.gamta_id,
                 ua.gurmu_id,
                 ua.level_scope,
-                p.name as position_name,
+                    p.name_en as position_name,
                 p.key_name as position_key,
                 p.hierarchy_type as hierarchy_type,
                 p.responsibilities as responsibilities,
@@ -456,7 +456,7 @@ class DashboardController extends Controller
             'Committee Member' => 'committee_member'
         ];
         
-        return $roleMappings[$position['name']] ?? 'member';
+            return $roleMappings[$position['name_en']] ?? 'member';
     }
     
     /**

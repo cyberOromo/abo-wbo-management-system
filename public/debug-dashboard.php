@@ -1,7 +1,12 @@
 <?php
 /**
  * Debug Dashboard 500 Error
+ * NOTE: session_start() must be called before any output!
  */
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Define application constants
 define('APP_ROOT', dirname(__DIR__));

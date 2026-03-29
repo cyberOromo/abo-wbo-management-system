@@ -2,7 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Controller;
-use App\Models\Global;
+use App\Models\GlobalModel;
 use App\Models\Godina;
 use App\Models\Gamta;
 use App\Models\Gurmu;
@@ -55,7 +55,7 @@ class SystemAdminController extends Controller
      */
     public function globalSettings()
     {
-        $globalModel = new Global();
+        $globalModel = new GlobalModel();
         $global = $globalModel->getDefault();
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -77,7 +77,7 @@ class SystemAdminController extends Controller
             $this->validateCSRF();
             
             $data = $_POST;
-            $globalModel = new Global();
+            $globalModel = new GlobalModel();
             $global = $globalModel->getDefault();
             
             $updateData = [
@@ -274,7 +274,7 @@ class SystemAdminController extends Controller
     /**
      * Handle Gamta CRUD Operations
      */
-    private function handleGamtaOperation()
+    private function handleGamtaHierarchyOperation()
     {
         try {
             $this->validateCSRF();
@@ -408,7 +408,7 @@ class SystemAdminController extends Controller
     /**
      * Handle Gurmu CRUD Operations
      */
-    private function handleGurmuOperation()
+    private function handleGurmuHierarchyOperation()
     {
         try {
             $this->validateCSRF();
@@ -806,12 +806,12 @@ class SystemAdminController extends Controller
     /**
      * Check if user is system admin
      */
-    private function requireSystemAdmin()
+    private function requireSystemAdminRole()
     {
         $user = auth_user();
         
         // Check if user has system admin role
-        $sql = "SELECT p.name FROM user_assignments ua
+            $sql = "SELECT p.name FROM user_assignments ua
                 INNER JOIN positions p ON ua.position_id = p.id
                 WHERE ua.user_id = ? AND ua.status = 'active'
                 AND p.name IN ('System Administrator', 'Super Admin')";
@@ -847,13 +847,13 @@ class SystemAdminController extends Controller
     /**
      * Get complete hierarchy structure
      */
-    private function getCompleteHierarchy()
+    private function getFullHierarchyData()
     {
-        $globalModel = new Global();
+        $globalModel = new GlobalModel();
         $global = $globalModel->getDefault();
         
         if ($global) {
-            $globalObject = new Global();
+            $globalObject = new GlobalModel();
             $globalObject->fill($global);
             return $globalObject->getHierarchicalStructure();
         }
@@ -864,7 +864,7 @@ class SystemAdminController extends Controller
     /**
      * Get hierarchy statistics
      */
-    private function getHierarchyStatistics()
+    private function getFullHierarchyStatistics()
     {
         return [
             'godinas' => [
@@ -886,9 +886,9 @@ class SystemAdminController extends Controller
     }
     
     /**
-     * Handle hierarchy operations (CRUD)
-     */
-    private function handleGodinaOperation()
+    * Handle hierarchy operations (CRUD)
+    */
+    private function handleGodinaHierarchyOperation()
     {
         $action = $_POST['action'] ?? '';
         

@@ -3,6 +3,18 @@
  * Helper Functions for ABO-WBO Management System
  */
 
+if (!function_exists('require_env')) {
+    /**
+     * Enforce required environment variable
+     */
+    function require_env($key) {
+        if (!isset($_ENV[$key]) || $_ENV[$key] === '') {
+            throw new \Exception("Missing required environment variable: $key");
+        }
+        return $_ENV[$key];
+    }
+}
+
 if (!function_exists('loadEnv')) {
     /**
      * Load environment variables from .env file

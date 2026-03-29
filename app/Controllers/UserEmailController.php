@@ -53,7 +53,7 @@ class UserEmailController extends Controller
         // Build query
         $sql = "SELECT ie.*, 
                        u.first_name, u.last_name, u.email as personal_email, u.role,
-                       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as position_name
+                      GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as position_name
                 FROM internal_emails ie
                 LEFT JOIN users u ON ie.user_id = u.id
                 LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'

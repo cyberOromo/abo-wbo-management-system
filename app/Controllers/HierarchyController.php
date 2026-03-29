@@ -1343,11 +1343,11 @@ class HierarchyController extends Controller
         
         // Users by position
         $positionStats = $this->db->fetchAll(
-            "SELECT COALESCE(p.name_en, 'Member') as position_name, COUNT(*) as count 
+            "SELECT COALESCE(p.name, 'Member') as position_name, COUNT(*) as count 
              FROM users u
              LEFT JOIN positions p ON u.position_id = p.id
              WHERE u.gurmu_id = ? AND u.status = 'active' 
-             GROUP BY u.position_id, p.name_en
+             GROUP BY u.position_id, p.name
              ORDER BY count DESC",
             [$gurmuId]
         );

@@ -28,7 +28,7 @@ class DonationController extends BaseController
             $donations = $this->getDonationsForUserScope($userScope);
             $stats = $this->getDonationStatistics($userScope);
             
-            return echo $this->render('donations/index_modern', [
+            return $this->render('donations/index_modern', [
                 'donations' => $donations,
                 'stats' => $stats,
                 'user_scope' => $userScope,
@@ -57,7 +57,7 @@ class DonationController extends BaseController
             $categories = $this->getDonationCategories();
             $organizationUnits = $this->getOrganizationUnitsForScope($userScope);
             
-            return echo $this->render('donations/create', [
+            return $this->render('donations/create', [
                 'donation_types' => $donationTypes,
                 'categories' => $categories,
                 'organization_units' => $organizationUnits,
@@ -147,7 +147,7 @@ class DonationController extends BaseController
             
             $activities = $this->getDonationActivities($id);
             
-            return echo $this->render('donations/show', [
+            return $this->render('donations/show', [
                 'donation' => $donation,
                 'activities' => $activities,
                 'can_edit' => $this->canEditDonation($donation, $user),
@@ -181,7 +181,7 @@ class DonationController extends BaseController
             $donationTypes = $this->getDonationTypes();
             $categories = $this->getDonationCategories();
             
-            return echo $this->render('donations/edit', [
+            return $this->render('donations/edit', [
                 'donation' => $donation,
                 'donation_types' => $donationTypes,
                 'categories' => $categories,
@@ -305,7 +305,7 @@ class DonationController extends BaseController
             
             $summaryData = $this->generateDonationSummary($userScope, $dateRange, $type);
             
-            return echo $this->render('donations/reports/summary', [
+            return $this->render('donations/reports/summary', [
                 'summary' => $summaryData,
                 'user_scope' => $userScope,
                 'filters' => compact('dateRange', 'type'),
@@ -337,7 +337,7 @@ class DonationController extends BaseController
             
             $detailedData = $this->generateDetailedDonationReport($userScope, $filters);
             
-            return echo $this->render('donations/reports/detailed', [
+            return $this->render('donations/reports/detailed', [
                 'data' => $detailedData,
                 'user_scope' => $userScope,
                 'filters' => $filters,

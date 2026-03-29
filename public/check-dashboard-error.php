@@ -1,7 +1,12 @@
 <?php
 /**
  * Comprehensive Dashboard Error Checker
+ * NOTE: session_start() must be called before any output!
  */
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
