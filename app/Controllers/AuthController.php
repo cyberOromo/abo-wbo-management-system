@@ -50,7 +50,10 @@ class AuthController extends Controller
             [$data['email']]
         );
         
-        if ($user && password_verify($data['password'], $user['password_hash'])) {
+        // Support both 'password_hash' and 'password' column names for compatibility
+        $storedHash = $user['password_hash'] ?? $user['password'] ?? null;
+        
+        if ($user && $storedHash && password_verify($data['password'], $storedHash)) {
             // Login successful
             session_regenerate_id(true);
             session_set('user_id', $user['id']);
@@ -64,7 +67,7 @@ class AuthController extends Controller
             
             $this->redirectWithMessage('/dashboard', 'Welcome back!', 'success');
         } else {
-            $this->redirectBack(['email' => 'Invalid email or password']);
+            $this->redirectBack(['email' => 'Invalid email or password'], ['email' => $data['email'] ?? '']);
         }
     }
     
