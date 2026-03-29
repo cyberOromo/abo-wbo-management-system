@@ -1,3 +1,24 @@
+<style>
+    .hierarchy-stat-item, .email-stat-item {
+        transition: all 0.3s ease;
+        padding: 0.5rem;
+        border-radius: 8px;
+    }
+    
+    .hierarchy-stat-item:hover, .email-stat-item:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-2px);
+    }
+    
+    .hierarchy-stat-item h4, .email-stat-item h4 {
+        transition: all 0.2s ease;
+    }
+    
+    .hierarchy-stat-item:hover h4, .email-stat-item:hover h4 {
+        transform: scale(1.1);
+    }
+</style>
+
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">
         <i class="bi bi-shield-check me-2"></i>
@@ -109,26 +130,28 @@
             <div class="card-body">
                 <div class="row text-center">
                     <div class="col-3">
-                        <div class="border-end">
+                        <div class="border-end hierarchy-stat-item" onclick="window.location='/hierarchy?filter=godina'" style="cursor: pointer;" title="Click to view all Godinas">
                             <h4 class="text-primary"><?= $hierarchy_overview['total_godinas'] ?? 0 ?></h4>
                             <small class="text-muted">Godinas</small>
                         </div>
                     </div>
                     <div class="col-3">
-                        <div class="border-end">
+                        <div class="border-end hierarchy-stat-item" onclick="window.location='/hierarchy?filter=gamta'" style="cursor: pointer;" title="Click to view all Gamtas">
                             <h4 class="text-success"><?= $hierarchy_overview['total_gamtas'] ?? 0 ?></h4>
                             <small class="text-muted">Gamtas</small>
                         </div>
                     </div>
                     <div class="col-3">
-                        <div class="border-end">
+                        <div class="border-end hierarchy-stat-item" onclick="window.location='/hierarchy?filter=gurmu'" style="cursor: pointer;" title="Click to view all Gurmus">
                             <h4 class="text-info"><?= $hierarchy_overview['total_gurmus'] ?? 0 ?></h4>
                             <small class="text-muted">Gurmus</small>
                         </div>
                     </div>
                     <div class="col-3">
-                        <h4 class="text-warning"><?= $hierarchy_overview['total_assignments'] ?? 0 ?></h4>
-                        <small class="text-muted">Assignments</small>
+                        <div class="hierarchy-stat-item" onclick="window.location='/positions/assignments'" style="cursor: pointer;" title="Click to view all assignments">
+                            <h4 class="text-warning"><?= $hierarchy_overview['total_assignments'] ?? 0 ?></h4>
+                            <small class="text-muted">Assignments</small>
+                        </div>
                     </div>
                 </div>
                 <hr>
@@ -138,6 +161,52 @@
                     </a>
                     <a href="/positions" class="btn btn-outline-primary btn-sm ms-2">
                         <i class="bi bi-person-badge me-1"></i>Manage Positions
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Internal Email Management -->
+    <div class="col-lg-6 mb-3">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-envelope-at me-2"></i>
+                    Internal Email System
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center mb-3">
+                    <div class="col-4">
+                        <div class="border-end email-stat-item" onclick="window.location='/user-emails'" style="cursor: pointer;" title="Click to view all emails">
+                            <h4 class="text-primary"><?= $email_stats['total_emails'] ?? 0 ?></h4>
+                            <small class="text-muted">Total Emails</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border-end email-stat-item" onclick="window.location='/user-emails?status=active'" style="cursor: pointer;" title="Click to view active emails">
+                            <h4 class="text-success"><?= $email_stats['active_emails'] ?? 0 ?></h4>
+                            <small class="text-muted">Active</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="email-stat-item" onclick="window.location='/user-emails?status=inactive'" style="cursor: pointer;" title="Click to view inactive emails">
+                            <h4 class="text-secondary"><?= $email_stats['inactive_emails'] ?? 0 ?></h4>
+                            <small class="text-muted">Inactive</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-light border mb-3">
+                    <small><strong>Domain:</strong> j-abo-wbo.org</small><br>
+                    <small><strong>Format:</strong> {position}.{hierarchy}.{firstname}.{lastname}@j-abo-wbo.org</small>
+                </div>
+                <div class="text-center">
+                    <a href="/user-emails" class="btn btn-info btn-sm text-white">
+                        <i class="bi bi-envelope-at me-1"></i>Manage Emails
+                    </a>
+                    <a href="/user-emails/create" class="btn btn-outline-info btn-sm ms-2">
+                        <i class="bi bi-plus-circle me-1"></i>Create Email
                     </a>
                 </div>
             </div>

@@ -16,7 +16,7 @@ class Gamta extends Model
         'godina_id', 'name', 'code', 'description', 'location', 'timezone',
         'contact_person', 'contact_email', 'contact_phone',
         'address', 'meeting_day', 'meeting_time', 'meeting_location',
-        'status', 'metadata', 'created_by', 'updated_by', 'deleted_by'
+        'status', 'metadata', 'created_by', 'deleted_by'
     ];
     
     protected $casts = [
@@ -33,14 +33,11 @@ class Gamta extends Model
                    god.name as godina_name,
                    god.code as godina_code,
                    creator.first_name as created_by_name,
-                   updater.first_name as updated_by_name,
-                   COUNT(u.id) as user_count,
-                   COUNT(CASE WHEN u.status = 'active' THEN u.id END) as active_users
+                   COUNT(DISTINCT gu.id) as gurmu_count
             FROM gamtas ga
             LEFT JOIN godinas god ON ga.godina_id = god.id
             LEFT JOIN users creator ON ga.created_by = creator.id
-            LEFT JOIN users updater ON ga.updated_by = updater.id
-            LEFT JOIN users u ON ga.id = u.gamta_id
+            LEFT JOIN gurmus gu ON ga.id = gu.gamta_id AND gu.status != 'deleted'
             WHERE ga.id = ?
             GROUP BY ga.id
         ";
@@ -246,8 +243,7 @@ class Gamta extends Model
         
         return $this->update($id, [
             'status' => $status,
-            'updated_at' => date('Y-m-d H:i:s'),
-            'updated_by' => auth_user()['id'] ?? null
+            'updated_at' => date('Y-m-d H:i:s')
         ]);
     }
     
@@ -282,8 +278,7 @@ class Gamta extends Model
             'status' => 'active',
             'deleted_at' => null,
             'deleted_by' => null,
-            'updated_at' => date('Y-m-d H:i:s'),
-            'updated_by' => auth_user()['id'] ?? null
+            'updated_at' => date('Y-m-d H:i:s')
         ]);
     }
     
@@ -304,8 +299,7 @@ class Gamta extends Model
         
         return $this->update($gamtaId, [
             'godina_id' => $newGodinaId,
-            'updated_at' => date('Y-m-d H:i:s'),
-            'updated_by' => auth_user()['id'] ?? null
+            'updated_at' => date('Y-m-d H:i:s')
         ]);
     }
     
@@ -373,8 +367,7 @@ class Gamta extends Model
             'meeting_day' => $meetingDay,
             'meeting_time' => $meetingTime,
             'meeting_location' => $meetingLocation,
-            'updated_at' => date('Y-m-d H:i:s'),
-            'updated_by' => auth_user()['id'] ?? null
+            'updated_at' => date('Y-m-d H:i:s')
         ]);
     }
     

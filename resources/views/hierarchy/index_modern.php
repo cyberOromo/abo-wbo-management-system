@@ -18,13 +18,13 @@ $layout = 'modern'; // Use the modern layout
                 Add New
             </button>
             <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="/hierarchy/create?type=godina">
+                <li><a class="dropdown-item" href="/hierarchy/create/godina">
                     <i class="bi bi-globe me-2"></i>Create Godina
                 </a></li>
-                <li><a class="dropdown-item" href="/hierarchy/create?type=gamta">
+                <li><a class="dropdown-item" href="/hierarchy/create/gamta">
                     <i class="bi bi-house me-2"></i>Create Gamta
                 </a></li>
-                <li><a class="dropdown-item" href="/hierarchy/create?type=gurmu">
+                <li><a class="dropdown-item" href="/hierarchy/create/gurmu">
                     <i class="bi bi-people me-2"></i>Create Gurmu
                 </a></li>
             </ul>
@@ -143,7 +143,7 @@ $layout = 'modern'; // Use the modern layout
                     </div>
                     
                     <div class="col-lg-3 col-md-6">
-                        <a href="/hierarchy/create?type=godina" class="text-decoration-none">
+                        <a href="/hierarchy/create/godina" class="text-decoration-none">
                             <div class="action-card">
                                 <div class="action-icon">
                                     <i class="bi bi-globe-americas"></i>
@@ -155,7 +155,7 @@ $layout = 'modern'; // Use the modern layout
                     </div>
                     
                     <div class="col-lg-3 col-md-6">
-                        <a href="/hierarchy/create?type=gamta" class="text-decoration-none">
+                        <a href="/hierarchy/create/gamta" class="text-decoration-none">
                             <div class="action-card">
                                 <div class="action-icon">
                                     <i class="bi bi-house-add"></i>

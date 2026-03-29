@@ -9,8 +9,9 @@ $pageTitle = __('auth.login_title');
 $pageDescription = __('auth.login_description');
 $bodyClass = 'login-page';
 
-// CSRF token
-$csrfToken = $_SESSION['csrf_token'] ?? '';
+// CSRF token - use the csrf_token() helper which stores to $_SESSION['_csrf_token'],
+// the same key that csrf_verify() checks in the controller.
+$csrfToken = csrf_token();
 
 // Language settings
 $currentLang = $_SESSION['language'] ?? 'en';
@@ -19,10 +20,18 @@ $languages = [
     'om' => ['name' => 'Afaan Oromoo', 'flag' => '🇪🇹']
 ];
 
-// Flash messages
-$flashMessages = $_SESSION['flash_messages'] ?? [];
-$errors = $_SESSION['errors'] ?? [];
-unset($_SESSION['flash_messages'], $_SESSION['errors']);
+// Flash messages - session_flash() stores data in $_SESSION['_flash'][key]
+$_flashData = $_SESSION['_flash'] ?? [];
+$errors = $_flashData['errors'] ?? [];
+$flashMessages = [];
+foreach (['success', 'error', 'info', 'warning'] as $_ft) {
+    if (isset($_flashData[$_ft])) {
+        // Bootstrap uses 'danger' for errors, not 'error'
+        $alertType = $_ft === 'error' ? 'danger' : $_ft;
+        $flashMessages[$alertType] = is_array($_flashData[$_ft]) ? $_flashData[$_ft] : [$_flashData[$_ft]];
+    }
+}
+unset($_SESSION['_flash'], $_flashData, $_ft, $alertType);
 ?>
 
 <!DOCTYPE html>
@@ -253,7 +262,7 @@ unset($_SESSION['flash_messages'], $_SESSION['errors']);
                                        id="email" 
                                        name="email" 
                                        placeholder="<?= __('auth.email_placeholder') ?>"
-                                       value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
+                                       value="<?= htmlspecialchars(old('email')) ?>"
                                        required
                                        autocomplete="email"
                                        autofocus>
@@ -262,7 +271,7 @@ unset($_SESSION['flash_messages'], $_SESSION['errors']);
                                 </label>
                                 <?php if (isset($errors['email'])): ?>
                                     <div class="invalid-feedback">
-                                        <?= htmlspecialchars($errors['email'][0]) ?>
+                                        <?= htmlspecialchars(is_array($errors['email']) ? $errors['email'][0] : $errors['email']) ?>
                                     </div>
                                 <?php endif; ?>
                             </div>

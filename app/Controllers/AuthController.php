@@ -27,7 +27,8 @@ class AuthController extends Controller
             $this->redirect('/dashboard');
         }
         
-        return $this->layout('auth')->render('auth.login', [
+        $this->layout = 'auth';
+        echo $this->render('auth.login', [
             'title' => 'Login'
         ]);
     }
@@ -49,7 +50,10 @@ class AuthController extends Controller
             [$data['email']]
         );
         
-        if ($user && password_verify($data['password'], $user['password_hash'])) {
+        // Support both 'password_hash' and 'password' column names for compatibility
+        $storedHash = $user['password_hash'] ?? $user['password'] ?? null;
+        
+        if ($user && $storedHash && password_verify($data['password'], $storedHash)) {
             // Login successful
             session_regenerate_id(true);
             session_set('user_id', $user['id']);
@@ -63,7 +67,7 @@ class AuthController extends Controller
             
             $this->redirectWithMessage('/dashboard', 'Welcome back!', 'success');
         } else {
-            $this->redirectBack(['email' => 'Invalid email or password']);
+            $this->redirectBack(['email' => 'Invalid email or password'], ['email' => $data['email'] ?? '']);
         }
     }
     
@@ -77,7 +81,8 @@ class AuthController extends Controller
             $this->redirect('/dashboard');
         }
         
-        return $this->layout('auth')->render('auth.register', [
+        $this->layout = 'auth';
+        echo $this->render('auth.register', [
             'title' => 'Register'
         ]);
     }
@@ -103,7 +108,7 @@ class AuthController extends Controller
                 'last_name' => $data['last_name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'],
-                'password_hash' => password_hash($data['password'], PASSWORD_DEFAULT),
+                'password' => password_hash($data['password'], PASSWORD_DEFAULT),
                 'status' => 'pending', // Requires admin activation
                 'email_verification_token' => bin2hex(random_bytes(32))
             ]);
@@ -139,7 +144,8 @@ class AuthController extends Controller
      */
     public function showForgotPassword()
     {
-        return $this->layout('auth')->render('auth.forgot-password', [
+        $this->layout = 'auth';
+        echo $this->render('auth.forgot-password', [
             'title' => 'Forgot Password'
         ]);
     }
@@ -197,7 +203,8 @@ class AuthController extends Controller
             );
         }
         
-        return $this->layout('auth')->render('auth.reset-password', [
+        $this->layout = 'auth';
+        echo $this->render('auth.reset-password', [
             'title' => 'Reset Password',
             'token' => $token
         ]);
@@ -228,7 +235,7 @@ class AuthController extends Controller
         }
         
         $this->db->update('users', [
-            'password_hash' => password_hash($data['password'], PASSWORD_DEFAULT),
+            'password' => password_hash($data['password'], PASSWORD_DEFAULT),
             'password_reset_token' => null,
             'password_reset_expires' => null
         ], ['id' => $user['id']]);

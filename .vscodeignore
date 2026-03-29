@@ -1,0 +1,48 @@
+# VS Code Performance Optimization
+# Files and folders to exclude from VS Code indexing
+
+# Dependencies
+vendor/**
+node_modules/**
+
+# Build artifacts
+.git/objects/**
+.git/logs/**
+
+# Storage and temporary files
+storage/logs/**
+storage/cache/**
+storage/sessions/**
+storage/temp/**
+storage/backups/**
+
+# Large files
+*.log
+*.sql
+*.zip
+*.tar
+*.gz
+
+# Documentation (can be indexed but lower priority)
+*.md
+
+# Deployment files
+deployment/**
+monitoring/**
+
+# Test debug files
+test_*.php
+debug_*.php
+quick_test.php
+final_verification.php
+status_check.php
+ui_progress_check.php
+
+# Batch and shell scripts
+*.bat
+*.sh
+
+# Lock files
+composer.lock
+package-lock.json
+yarn.lock

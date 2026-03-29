@@ -107,7 +107,7 @@ class EventController extends BaseController
                 'isEdit' => false
             ];
             
-            $this->render('events/create', $data);
+            echo $this->render('events/create', $data);
             
         } catch (Exception $e) {
             $this->setError('Failed to load create form: ' . $e->getMessage());
@@ -149,7 +149,7 @@ class EventController extends BaseController
             
         } catch (Exception $e) {
             $this->setError('Failed to create event: ' . $e->getMessage());
-            $this->render('events/create', ['event' => $_POST, 'isEdit' => false]);
+            echo $this->render('events/create', ['event' => $_POST, 'isEdit' => false]);
         }
     }
 
@@ -190,7 +190,7 @@ class EventController extends BaseController
                 'canRegister' => $this->canRegisterForEvent($event, $userRegistration)
             ];
             
-            $this->render('events/show', $data);
+            echo $this->render('events/show', $data);
             
         } catch (Exception $e) {
             $this->setError('Failed to load event: ' . $e->getMessage());
@@ -223,7 +223,7 @@ class EventController extends BaseController
                 'isEdit' => true
             ];
             
-            $this->render('events/edit', $data);
+            echo $this->render('events/edit', $data);
             
         } catch (Exception $e) {
             $this->setError('Failed to load edit form: ' . $e->getMessage());
@@ -267,7 +267,7 @@ class EventController extends BaseController
             
         } catch (Exception $e) {
             $this->setError('Failed to update event: ' . $e->getMessage());
-            $this->render('events/edit', ['event' => array_merge($event, $_POST), 'isEdit' => true]);
+            echo $this->render('events/edit', ['event' => array_merge($event, $_POST), 'isEdit' => true]);
         }
     }
 

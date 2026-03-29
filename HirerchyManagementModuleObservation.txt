@@ -1,0 +1,451 @@
+Admin Dashboard
+Hierarchy Overview card Details - functionality
+on click of 'View' button for Godina and Gamtas
+it navigates to selected view and gives 500
+parcial list of pages 
+http://localhost/hierarchy/8?type=godina
+http://localhost/hierarchy/9?type=godina
+http://localhost/hierarchy/10?type=godina
+http://localhost/hierarchy/12?type=godina
+http://localhost/hierarchy/16?type=godina
+http://localhost/hierarchy/10?type=gamta
+http://localhost/hierarchy/25?type=gamta
+http://localhost/hierarchy/13?type=gamta
+
+this are jus to list afew.
+
+we are getting 500
+'500 - Internal Server Error
+Something went wrong. Please try again later.'
+
+We need to comprehensively implement this functionalities. we need a modern, advaced, adnd industry standard informative Heirarachy view. Alos make sure the UIUX is modern and advaced. Let's buld the Heirarcy Managemnt module as advaced as posiple and add anything that we are missing or suggest and implement advanced functinalities. Left finish Heirarachy Management module before we move to User Management module. comprehensively continue.
+
+this is the card 
+<div id="hierarchy-detailed" class="hierarchy-view" style="display: block;" data-loaded="true"><div class="hierarchy-tree">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-globe text-success me-2"></i>
+                        <strong>Afrikaa (AFR)</strong>
+                    </div>
+                    <a href="/hierarchy/8?type=godina" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye me-1"></i>View
+                    </a>
+                </div>
+                <div class="card-body">
+        <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Afrikaa Kibbaa (ZAF)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/8?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Ejiipt (EGY)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/9?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Jibuutii (DJI)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">4 users</span>
+                                <a href="/hierarchy/10?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Keenyaa (KEN)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/11?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Somaliyaa (SOM)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/12?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Ugaandaa (UGA)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/13?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div></div></div>
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-globe text-success me-2"></i>
+                        <strong>Afrikaa ()</strong>
+                    </div>
+                    <a href="/hierarchy/14?type=godina" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye me-1"></i>View
+                    </a>
+                </div>
+                <div class="card-body">
+        <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Jibuutii ()</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/29?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div></div></div>
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-globe text-success me-2"></i>
+                        <strong>Asiyaa fi Gidduu Galeessa Bahaa (AME)</strong>
+                    </div>
+                    <a href="/hierarchy/9?type=godina" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye me-1"></i>View
+                    </a>
+                </div>
+                <div class="card-body">
+        <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Dambalii Qeerroo Bilisummaa Oromoo Sawudii Arabiyaa (SAU-QBO)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/14?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Deeggarsa WBO Sawudii Arabiyaa (SAU-WBO)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/15?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Hawaasa Oromoo Dubayi (UAE-DUB)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/16?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Tokkummaa Baqattoota Oromoo Yamanii (YEM-REF)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/17?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div></div></div>
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-globe text-success me-2"></i>
+                        <strong>Auwustraliyaa (AUS)</strong>
+                    </div>
+                    <a href="/hierarchy/10?type=godina" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye me-1"></i>View
+                    </a>
+                </div>
+                <div class="card-body">
+        <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Awustraaliyaa (AUS-AUS)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/18?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Newuzlaandii (NZL)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/19?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div></div></div>
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-globe text-success me-2"></i>
+                        <strong>Awuroopaa (EUR)</strong>
+                    </div>
+                    <a href="/hierarchy/11?type=godina" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye me-1"></i>View
+                    </a>
+                </div>
+                <div class="card-body">
+        <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Britaaniya (GBR)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/22?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Faransaay (FRA)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/20?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Jarmal (GER)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/21?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div></div></div>
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-globe text-success me-2"></i>
+                        <strong>Kaanadaa (CAN)</strong>
+                    </div>
+                    <a href="/hierarchy/12?type=godina" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye me-1"></i>View
+                    </a>
+                </div>
+                <div class="card-body">
+        <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Kaanadaa Bahaa (CAN-EAST)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/23?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Kaanadaa Lixa (CAN-WEST)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/24?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div></div></div>
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-globe text-success me-2"></i>
+                        <strong>South America (SOU)</strong>
+                    </div>
+                    <a href="/hierarchy/16?type=godina" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye me-1"></i>View
+                    </a>
+                </div>
+                <div class="card-body">
+        <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Gamta Brazil (SOU-GAM2)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/33?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Gamta Mexico (SOU-GAMT)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/31?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>Gamta Peru (SOU-GAM1)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/32?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div></div></div>
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-globe text-success me-2"></i>
+                        <strong>USA (USA)</strong>
+                    </div>
+                    <a href="/hierarchy/13?type=godina" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye me-1"></i>View
+                    </a>
+                </div>
+                <div class="card-body">
+        <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>USA Bahaa (USA-EAST)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/25?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>USA Gidduu (USA-CENTRAL)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">2 users</span>
+                                <a href="/hierarchy/27?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-house text-info me-2"></i>
+                                <span>USA Lixa (USA-WEST)</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2">0 users</span>
+                                <a href="/hierarchy/26?type=gamta" class="btn btn-sm btn-outline-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div></div></div></div></div>
+
+
+
+
+                ----------------------------------------
+
+
+                Also the for  Internal Email System
+
+Now we are getting 500 on 
+http://localhost/user-emails
+http://localhost/user-emails?status=active
+http://localhost/user-emails?status=inactive
+manage emailshttp://localhost/user-emails
+Create emailhttp://localhost/user-emails/create
+
+
+500 - Internal Server Error
+Something went wrong. Please try again later.

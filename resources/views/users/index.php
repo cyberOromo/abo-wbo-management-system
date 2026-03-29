@@ -57,9 +57,9 @@ $breadcrumbs = [
                         <label for="role" class="form-label">Role</label>
                         <select class="form-select" id="role" name="role">
                             <option value="">All Roles</option>
-                            <option value="admin" <?= ($roleFilter ?? '') === 'admin' ? 'selected' : '' ?>>Admin</option>
-                            <option value="moderator" <?= ($roleFilter ?? '') === 'moderator' ? 'selected' : '' ?>>Moderator</option>
-                            <option value="user" <?= ($roleFilter ?? '') === 'user' ? 'selected' : '' ?>>User</option>
+                            <option value="system_admin" <?= ($roleFilter ?? '') === 'system_admin' ? 'selected' : '' ?>>System Admin</option>
+                            <option value="executive" <?= ($roleFilter ?? '') === 'executive' ? 'selected' : '' ?>>Executive</option>
+                            <option value="member" <?= ($roleFilter ?? '') === 'member' ? 'selected' : '' ?>>Member</option>
                         </select>
                     </div>
                     <div class="col-md-4">
@@ -114,7 +114,7 @@ $breadcrumbs = [
         <div class="card text-center">
             <div class="card-body">
                 <i class="bi bi-shield-shaded text-info mb-2" style="font-size: 2rem;"></i>
-                <h4 class="card-title"><?= number_format(count(array_filter($users ?? [], fn($u) => $u['role'] === 'admin'))) ?></h4>
+                <h4 class="card-title"><?= number_format(array_filter($users ?? [], fn($u) => $u['role'] === 'admin')) ?></h4>
                 <p class="card-text text-muted">Administrators</p>
             </div>
         </div>

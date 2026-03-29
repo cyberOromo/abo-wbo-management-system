@@ -8,7 +8,7 @@ return [
     'app_name' => $_ENV['APP_NAME'] ?? 'ABO-WBO Management System',
     'app_version' => $_ENV['APP_VERSION'] ?? '1.0.0',
     'app_url' => $_ENV['APP_URL'] ?? 'http://localhost',
-    'debug' => filter_var($_ENV['APP_DEBUG'] ?? true, FILTER_VALIDATE_BOOLEAN), // Enable debug temporarily
+    'debug' => filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN),
     'timezone' => 'UTC',
     
     // Security Keys
@@ -128,3 +128,8 @@ return [
         'admin' => \App\Middleware\AdminMiddleware::class,
     ]
 ];
+
+
+
+
+

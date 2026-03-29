@@ -1,0 +1,263 @@
+============================================================================
+PHPMYADMIN DROP TABLES - AGGRESSIVE METHOD (WORKS WHEN OTHERS FAIL)
+MySQL 5.x and 8.x Compatible
+============================================================================
+
+⚠️ IF FOREIGN_KEY_CHECKS = 0 STILL FAILS, USE THIS METHOD ⚠️
+
+SINGLE STEP - COPY THIS ENTIRE BLOCK:
+============================================================================
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP VIEW IF EXISTS active_tasks_view;
+DROP VIEW IF EXISTS user_summary_view;
+DROP VIEW IF EXISTS hierarchy_view;
+
+-- Drop child tables FIRST (tables that reference users)
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS task_activities;
+DROP TABLE IF EXISTS task_comments;
+DROP TABLE IF EXISTS task_assignments;
+DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS meeting_activities;
+DROP TABLE IF EXISTS meeting_attendees;
+DROP TABLE IF EXISTS meetings;
+DROP TABLE IF EXISTS event_participants;
+DROP TABLE IF EXISTS event_registrations;
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS donations;
+DROP TABLE IF EXISTS lesson_progress;
+DROP TABLE IF EXISTS course_enrollments;
+DROP TABLE IF EXISTS user_roles;
+DROP TABLE IF EXISTS responsibility_assignments;
+DROP TABLE IF EXISTS user_assignments;
+DROP TABLE IF EXISTS email_verification_tokens;
+DROP TABLE IF EXISTS password_reset_tokens;
+DROP TABLE IF EXISTS user_sessions;
+
+-- Drop users table (gurmus→users and users→gurmus circular FK)
+DROP TABLE IF EXISTS users;
+
+-- Drop organizational tables AFTER users
+DROP TABLE IF EXISTS gurmus;
+DROP TABLE IF EXISTS gamtas;
+DROP TABLE IF EXISTS godinas;
+
+-- Drop remaining tables
+DROP TABLE IF EXISTS system_logs;
+DROP TABLE IF EXISTS file_uploads;
+DROP TABLE IF EXISTS lessons;
+DROP TABLE IF EXISTS courses;
+DROP TABLE IF EXISTS course_categories;
+DROP TABLE IF EXISTS donation_campaigns;
+DROP TABLE IF EXISTS donors;
+DROP TABLE IF EXISTS roles;
+DROP TABLE IF EXISTS shared_responsibilities;
+DROP TABLE IF EXISTS individual_responsibilities;
+DROP TABLE IF EXISTS responsibilities;
+DROP TABLE IF EXISTS positions;
+DROP TABLE IF EXISTS finances;
+DROP TABLE IF EXISTS globals;
+DROP TABLE IF EXISTS system_settings;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+============================================================================
+
+INSTRUCTIONS:
+1. In phpMyAdmin, select database: jabowbo_abo_staging
+2. Click "SQL" tab
+3. Copy the ENTIRE block above (from SET FOREIGN_KEY_CHECKS = 0 to = 1)
+4. Paste into SQL tab
+5. Click "Go"
+6. Wait 5-10 seconds
+
+This drops tables in correct dependency order:
+- Child tables (reference users) → First
+- Organizational tables (godinas, gamtas, gurmus) → Second  
+- Users table → Third (after all FKs to it are gone)
+- Independent tables → Last
+
+============================================================================
+
+ORIGINAL 3-STEP METHOD (if you still want to try it):
+============================================================================
+
+STEP 1: DISABLE FOREIGN KEY CHECKS
+============================================================================
+
+1. In phpMyAdmin, select database: jabowbo_abo_staging
+2. Click "SQL" tab at the top
+3. Copy and paste ONLY this line:
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+4. Click "Go" button
+5. Wait for success message
+
+
+STEP 2: DROP VIEWS AND TABLES (INCLUDES FK CHECK DISABLE!)
+============================================================================
+
+1. Still in SQL tab
+2. Copy and paste this ENTIRE block (includes SET FOREIGN_KEY_CHECKS = 0):
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP VIEW IF EXISTS active_tasks_view;
+DROP VIEW IF EXISTS user_summary_view;
+DROP VIEW IF EXISTS hierarchy_view;
+
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS system_logs;
+DROP TABLE IF EXISTS file_uploads;
+DROP TABLE IF EXISTS lesson_progress;
+DROP TABLE IF EXISTS course_enrollments;
+DROP TABLE IF EXISTS lessons;
+DROP TABLE IF EXISTS courses;
+DROP TABLE IF EXISTS course_categories;
+DROP TABLE IF EXISTS event_participants;
+DROP TABLE IF EXISTS event_registrations;
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS donations;
+DROP TABLE IF EXISTS donation_campaigns;
+DROP TABLE IF EXISTS donors;
+DROP TABLE IF EXISTS meeting_activities;
+DROP TABLE IF EXISTS meeting_attendees;
+DROP TABLE IF EXISTS meetings;
+DROP TABLE IF EXISTS task_activities;
+DROP TABLE IF EXISTS task_comments;
+DROP TABLE IF EXISTS task_assignments;
+DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS user_roles;
+DROP TABLE IF EXISTS responsibility_assignments;
+DROP TABLE IF EXISTS user_assignments;
+DROP TABLE IF EXISTS email_verification_tokens;
+DROP TABLE IF EXISTS password_reset_tokens;
+DROP TABLE IF EXISTS user_sessions;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS roles;
+DROP TABLE IF EXISTS shared_responsibilities;
+DROP TABLE IF EXISTS individual_responsibilities;
+DROP TABLE IF EXISTS responsibilities;
+DROP TABLE IF EXISTS positions;
+DROP TABLE IF EXISTS finances;
+DROP TABLE IF EXISTS gurmus;
+DROP TABLE IF EXISTS gamtas;
+DROP TABLE IF EXISTS godinas;
+DROP TABLE IF EXISTS globals;
+DROP TABLE IF EXISTS system_settings;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+3. Click "Go" button
+4. Wait for all tables to drop (may take 5-10 seconds)
+
+NOTE: Step 2 now includes SET FOREIGN_KEY_CHECKS = 0 and = 1 within the same
+block because phpMyAdmin doesn't maintain session state between SQL executions.
+
+
+STEP 3: VERIFY DATABASE IS EMPTY (Skip the separate SET command)
+============================================================================
+
+Run this query in SQL tab:
+
+SELECT TABLE_NAME 
+FROM information_schema.TABLES 
+WHERE TABLE_SCHEMA = 'jabowbo_abo_staging' 
+AND TABLE_TYPE = 'BASE TABLE';
+
+Expected result: Empty set (0 rows) - No tables remaining
+
+============================================================================
+ALTERNATIVE FILES AVAILABLE
+============================================================================
+
+If you prefer single-step execution, use these SQL files:
+
+1. drop_all_tables_simple.sql
+   - All commands in one file
+   - Import via phpMyAdmin Import tab
+   - Drops FK constraints first, then tables
+
+2. drop_all_tables_3step.sql
+   - Contains the 3-step method above
+   - Clearly separated into Step 1, Step 2, Step 3
+   - Copy each step separately and execute in SQL tab
+
+3. drop_all_tables.sql
+   - Updated main script with FK drops
+   - Can be imported or executed in SQL tab
+
+============================================================================
+
+OPTION 2: DROP DATABASE AND RECREATE (FASTEST)
+============================================================================
+
+1. In phpMyAdmin left sidebar, click on: jabowbo_abo_staging
+2. Click "Operations" tab at the top
+3. Scroll to "Remove database" section
+4. Click "DROP the database (DROP)"
+5. Confirm the action
+
+6. Go back to cPanel → MySQL Databases
+7. Create new database: jabowbo_abo_staging
+8. Add user jabowbo_abo_user with ALL PRIVILEGES
+
+9. Return to phpMyAdmin and import schema.sql to fresh database
+
+OPTION 3: USE STRUCTURE TAB (SLOWER BUT SAFE)
+============================================================================
+
+1. In phpMyAdmin, select database: jabowbo_abo_staging
+2. Click "Structure" tab
+3. Click "Check All" checkbox at bottom of table list
+4. In "With selected:" dropdown, choose "Drop"
+5. Confirm the action
+
+Note: This may fail if foreign keys exist. Use Option 1 or 2 instead.
+
+============================================================================
+WHY FOREIGN KEY ERROR OCCURS
+============================================================================
+
+The error "#1217 - Cannot delete or update a parent row: a foreign key 
+constraint fails" happens when:
+
+1. phpMyAdmin executes SQL statements individually, not as a batch
+2. SET FOREIGN_KEY_CHECKS = 0; doesn't apply to subsequent statements
+3. Tables are dropped in wrong order (parents before children)
+
+SOLUTION: Use the SQL in Option 1 above, which:
+- Disables FK checks
+- Drops all tables in ONE statement (comma-separated)
+- Re-enables FK checks
+- All executed as single transaction
+
+============================================================================
+RECOMMENDED WORKFLOW
+============================================================================
+
+1. Use Option 1 (SQL tab with comma-separated DROP)
+2. If that fails, use Option 2 (DROP and recreate database)
+3. Then import schema.sql
+4. Then import comprehensive_data_insertion.sql
+5. Run verify_staging_import.sql
+
+============================================================================
+AFTER DROPPING - VERIFY CLEAN DATABASE
+============================================================================
+
+Run this query in SQL tab:
+
+SELECT TABLE_NAME 
+FROM information_schema.TABLES 
+WHERE TABLE_SCHEMA = 'jabowbo_abo_staging' 
+AND TABLE_TYPE = 'BASE TABLE';
+
+Expected result: Empty set (0 rows) - No tables remaining
+
+============================================================================

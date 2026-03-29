@@ -2,111 +2,487 @@
 namespace App\Controllers;
 
 use App\Core\Controller;
-use App\Models\User;
-use App\Models\Position;
-use App\Models\UserAssignment;
+use App\Services\InternalEmailGenerator;
+use App\Services\ApprovalWorkflowService;
+use App\Services\NotificationService;
 use App\Utils\Database;
+use App\Utils\Validator;
 use Exception;
 
 /**
- * System Admin Hierarchical User Registration Controller
+ * System Admin Registration Controller
  * 
- * This controller handles the comprehensive registration of users across
- * the organizational hierarchy with proper position assignments.
+ * Handles registration and management of system administrators
+ * Includes approval workflow and internal email generation
  * 
  * Features:
- * - Create users at any hierarchy level (Global, Godina, Gamta, Gurmu)
- * - Assign organizational positions to users
- * - Set up module permissions based on positions
- * - Handle executive and member role assignments
- * - Generate secure temporary passwords
- * - Send welcome emails with login credentials
+ * - Multi-step registration process
+ * - Email verification
+ * - Approval workflow by existing admins
+ * - Internal email generation
+ * - Security validations
+ * - Admin user management
  */
 class SystemAdminRegistrationController extends Controller
 {
-    protected $userModel;
-    protected $positionModel;
-    protected $assignmentModel;
     protected $db;
+    protected $emailGenerator;
+    protected $approvalService;
+    protected $notificationService;
+    protected $validator;
     
     public function __construct()
     {
         parent::__construct();
-        $this->requireAuth();
-        $this->requireRole(['admin']); // Only system admins can access
-        
         $this->db = Database::getInstance();
-        $this->userModel = new User();
-        $this->positionModel = new Position();
-        $this->assignmentModel = new UserAssignment();
+        $this->emailGenerator = new InternalEmailGenerator();
+        $this->approvalService = new ApprovalWorkflowService();
+        $this->notificationService = new NotificationService();
+        $this->validator = new Validator();
     }
     
     /**
-     * Show hierarchical user registration dashboard
+     * Display system admin registration form
      */
     public function index()
     {
-        // Get hierarchy data for the form
-        $hierarchyData = $this->getHierarchyData();
-        $positions = $this->getAvailablePositions();
-        $recentRegistrations = $this->getRecentRegistrations();
-        $registrationStats = $this->getRegistrationStats();
+        // Check if current user has permission to initiate system admin registration
+        $this->requirePermission('register_system_admin');
         
-        return $this->render('admin.hierarchical-registration', [
-            'title' => 'Hierarchical User Registration',
-            'hierarchy_data' => $hierarchyData,
-            'positions' => $positions,
-            'recent_registrations' => $recentRegistrations,
-            'stats' => $registrationStats,
-            'current_user' => auth_user()
+        echo $this->render('admin/system-admin-registration', [
+            'title' => 'Register New System Administrator',
+            'page_title' => 'System Admin Registration'
         ]);
     }
     
     /**
-     * Handle hierarchical user registration
+     * Submit system admin registration request
      */
-    public function register()
+    public function submit()
     {
         try {
-            $this->validateCSRF();
+            $this->requirePermission('register_system_admin');
+            $this->validateCsrfToken();
             
-            // Validate input data
-            $data = $this->validateRegistrationData();
+            // Validate required fields
+            $requiredFields = [
+                'first_name', 'last_name', 'personal_email', 
+                'phone', 'date_of_birth', 'gender'
+            ];
             
-            // Check if email already exists
-            $existingUser = $this->userModel->findByEmail($data['email']);
-            if ($existingUser) {
-                throw new Exception('A user with this email already exists.');
+            $this->validateRequiredFields($requiredFields);
+            
+            // Sanitize and prepare data
+            $data = [
+                'first_name' => $this->sanitizeInput($_POST['first_name']),
+                'last_name' => $this->sanitizeInput($_POST['last_name']),
+                'personal_email' => filter_var($_POST['personal_email'], FILTER_SANITIZE_EMAIL),
+                'phone' => $this->sanitizeInput($_POST['phone']),
+                'date_of_birth' => $_POST['date_of_birth'],
+                'gender' => $_POST['gender'],
+                'address' => $this->sanitizeInput($_POST['address'] ?? ''),
+                'city' => $this->sanitizeInput($_POST['city'] ?? ''),
+                'country' => $this->sanitizeInput($_POST['country'] ?? ''),
+                'emergency_contact_name' => $this->sanitizeInput($_POST['emergency_contact_name'] ?? ''),
+                'emergency_contact_phone' => $this->sanitizeInput($_POST['emergency_contact_phone'] ?? ''),
+                'qualifications' => $this->sanitizeInput($_POST['qualifications'] ?? ''),
+                'experience' => $this->sanitizeInput($_POST['experience'] ?? ''),
+                'reason_for_application' => $this->sanitizeInput($_POST['reason_for_application'] ?? ''),
+                'requested_by' => $this->getCurrentUserId(),
+                'registration_type' => 'system_admin',
+                'target_hierarchy_level' => 'global',
+                'target_position_id' => $this->getSystemAdminPositionId(),
+                'status' => 'email_verification_pending',
+                'created_at' => date('Y-m-d H:i:s')
+            ];
+            
+            // Validate data
+            $validation = $this->validateRegistrationData($data);
+            if (!$validation['valid']) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => $validation['message']
+                ]);
             }
             
-            // Start database transaction
+            // Check if email already exists
+            if ($this->isEmailInUse($data['personal_email'])) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Email address is already registered'
+                ]);
+            }
+            
+            // Generate verification code
+            $verificationCode = $this->generateVerificationCode();
+            $data['verification_code'] = $verificationCode;
+            $data['verification_code_expires_at'] = date('Y-m-d H:i:s', strtotime('+24 hours'));
+            
+            // Create registration record
+            $registrationId = $this->db->insert('pending_registrations', $data);
+            
+            if ($registrationId) {
+                // Send verification email
+                $emailSent = $this->notificationService->sendEmailVerificationCode(
+                    $data['personal_email'],
+                    $data['first_name'],
+                    $verificationCode
+                );
+                
+                if ($emailSent['success']) {
+                    return $this->jsonResponse([
+                        'success' => true,
+                        'message' => 'Registration submitted. Please check email for verification code.',
+                        'registration_id' => $registrationId
+                    ]);
+                } else {
+                    return $this->jsonResponse([
+                        'success' => false,
+                        'message' => 'Registration created but failed to send verification email'
+                    ]);
+                }
+            } else {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Failed to create registration record'
+                ]);
+            }
+            
+        } catch (Exception $e) {
+            error_log("System Admin Registration Error: " . $e->getMessage());
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Registration failed. Please try again.'
+            ]);
+        }
+    }
+    
+    /**
+     * Verify email with code
+     */
+    public function verifyEmail()
+    {
+        try {
+            $this->validateRequiredFields(['registration_id', 'verification_code']);
+            
+            $registrationId = (int) $_POST['registration_id'];
+            $code = $this->sanitizeInput($_POST['verification_code']);
+            
+            // Get registration
+            $registration = $this->db->fetch(
+                "SELECT * FROM pending_registrations WHERE id = ?",
+                [$registrationId]
+            );
+            
+            if (!$registration) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Registration not found'
+                ]);
+            }
+            
+            // Check if already verified
+            if ($registration['status'] === 'email_verified' || $registration['status'] === 'approval_pending') {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Email already verified'
+                ]);
+            }
+            
+            // Check if code matches
+            if ($registration['verification_code'] !== $code) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Invalid verification code'
+                ]);
+            }
+            
+            // Check if code expired
+            if (strtotime($registration['verification_code_expires_at']) < time()) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Verification code has expired. Please request a new one.'
+                ]);
+            }
+            
+            // Update registration status
+            $updated = $this->db->update('pending_registrations', [
+                'status' => 'email_verified',
+                'email_verified_at' => date('Y-m-d H:i:s')
+            ], ['id' => $registrationId]);
+            
+            if ($updated) {
+                // Start approval workflow
+                $workflowId = $this->approvalService->startApprovalWorkflow($registrationId);
+                
+                // Update status to approval pending
+                $this->db->update('pending_registrations', [
+                    'status' => 'approval_pending',
+                    'approval_workflow_id' => $workflowId
+                ], ['id' => $registrationId]);
+                
+                return $this->jsonResponse([
+                    'success' => true,
+                    'message' => 'Email verified successfully. Registration is now pending approval.',
+                    'workflow_id' => $workflowId
+                ]);
+            } else {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Failed to verify email'
+                ]);
+            }
+            
+        } catch (Exception $e) {
+            error_log("Email Verification Error: " . $e->getMessage());
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Verification failed. Please try again.'
+            ]);
+        }
+    }
+    
+    /**
+     * Resend verification code
+     */
+    public function resendVerificationCode()
+    {
+        try {
+            $this->validateRequiredFields(['registration_id']);
+            
+            $registrationId = (int) $_POST['registration_id'];
+            
+            $registration = $this->db->fetch(
+                "SELECT * FROM pending_registrations WHERE id = ?",
+                [$registrationId]
+            );
+            
+            if (!$registration) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Registration not found'
+                ]);
+            }
+            
+            if ($registration['status'] !== 'email_verification_pending') {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Email already verified or registration completed'
+                ]);
+            }
+            
+            // Generate new verification code
+            $newCode = $this->generateVerificationCode();
+            
+            $updated = $this->db->update('pending_registrations', [
+                'verification_code' => $newCode,
+                'verification_code_expires_at' => date('Y-m-d H:i:s', strtotime('+24 hours'))
+            ], ['id' => $registrationId]);
+            
+            if ($updated) {
+                // Send new code
+                $emailSent = $this->notificationService->sendEmailVerificationCode(
+                    $registration['personal_email'],
+                    $registration['first_name'],
+                    $newCode
+                );
+                
+                if ($emailSent['success']) {
+                    return $this->jsonResponse([
+                        'success' => true,
+                        'message' => 'Verification code resent successfully'
+                    ]);
+                } else {
+                    return $this->jsonResponse([
+                        'success' => false,
+                        'message' => 'Failed to send verification email'
+                    ]);
+                }
+            } else {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Failed to generate new code'
+                ]);
+            }
+            
+        } catch (Exception $e) {
+            error_log("Resend Verification Error: " . $e->getMessage());
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to resend code'
+            ]);
+        }
+    }
+    
+    /**
+     * View pending system admin registrations
+     */
+    public function pending()
+    {
+        $this->requirePermission('approve_system_admin');
+        
+        $page = $_GET['page'] ?? 1;
+        $limit = 20;
+        $offset = ($page - 1) * $limit;
+        
+        // Get pending registrations
+        $registrations = $this->db->fetchAll(
+            "SELECT pr.*, u.first_name as requested_by_name, u.last_name as requested_by_lastname
+             FROM pending_registrations pr
+             LEFT JOIN users u ON pr.requested_by = u.id
+             WHERE pr.registration_type = 'system_admin' 
+             AND pr.status IN ('approval_pending', 'email_verified')
+             ORDER BY pr.created_at DESC
+             LIMIT ? OFFSET ?",
+            [$limit, $offset]
+        );
+        
+        // Get total count
+        $totalCount = $this->db->fetch(
+            "SELECT COUNT(*) as count FROM pending_registrations 
+             WHERE registration_type = 'system_admin' 
+             AND status IN ('approval_pending', 'email_verified')"
+        );
+        
+        echo $this->render('admin/pending-system-admin-registrations', [
+            'title' => 'Pending System Admin Registrations',
+            'registrations' => $registrations,
+            'total_count' => $totalCount['count'],
+            'current_page' => $page,
+            'total_pages' => ceil($totalCount['count'] / $limit)
+        ]);
+    }
+    
+    /**
+     * View registration details
+     */
+    public function view($id)
+    {
+        $this->requirePermission('approve_system_admin');
+        
+        $registration = $this->db->fetch(
+            "SELECT pr.*, u.first_name as requested_by_name, u.last_name as requested_by_lastname, u.email as requested_by_email
+             FROM pending_registrations pr
+             LEFT JOIN users u ON pr.requested_by = u.id
+             WHERE pr.id = ? AND pr.registration_type = 'system_admin'",
+            [$id]
+        );
+        
+        if (!$registration) {
+            $this->redirect('/admin/system-admin-registration/pending?error=not_found');
+            return;
+        }
+        
+        // Get approval workflow if exists
+        $workflow = null;
+        $approvalSteps = [];
+        
+        if ($registration['approval_workflow_id']) {
+            $workflow = $this->db->fetch(
+                "SELECT * FROM approval_workflows WHERE id = ?",
+                [$registration['approval_workflow_id']]
+            );
+            
+            $approvalSteps = $this->db->fetchAll(
+                "SELECT aws.*, u.first_name, u.last_name, u.email, p.name as position_name
+                 FROM approval_workflow_steps aws
+                 LEFT JOIN users u ON aws.approver_id = u.id
+                 LEFT JOIN positions p ON u.position_id = p.id
+                 WHERE aws.workflow_id = ?
+                 ORDER BY aws.step_number",
+                [$registration['approval_workflow_id']]
+            );
+        }
+        
+        echo $this->render('admin/view-system-admin-registration', [
+            'title' => 'System Admin Registration Details',
+            'registration' => $registration,
+            'workflow' => $workflow,
+            'approval_steps' => $approvalSteps
+        ]);
+    }
+    
+    /**
+     * Approve system admin registration
+     */
+    public function approve()
+    {
+        try {
+            $this->requirePermission('approve_system_admin');
+            $this->validateCsrfToken();
+            $this->validateRequiredFields(['registration_id']);
+            
+            $registrationId = (int) $_POST['registration_id'];
+            $comments = $this->sanitizeInput($_POST['comments'] ?? '');
+            
+            $registration = $this->db->fetch(
+                "SELECT * FROM pending_registrations WHERE id = ? AND registration_type = 'system_admin'",
+                [$registrationId]
+            );
+            
+            if (!$registration) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Registration not found'
+                ]);
+            }
+            
             $this->db->beginTransaction();
             
             try {
-                // Create the new user
-                $userId = $this->createHierarchicalUser($data);
+                // Create user account
+                $userId = $this->createSystemAdminUser($registration);
                 
-                // Create position assignment if specified
-                if (!empty($data['position_id'])) {
-                    $this->createUserAssignment($userId, $data);
-                }
+                // Generate internal email
+                $internalEmail = $this->emailGenerator->generateInternalEmail(
+                    $registration,
+                    ['key_name' => 'system_admin'],
+                    ['level' => 'global']
+                );
                 
-                // Set up default module permissions
-                $this->setupUserModulePermissions($userId, $data);
+                // Create internal email record
+                $emailId = $this->emailGenerator->createInternalEmailRecord($userId, $internalEmail, [
+                    'email_type' => 'primary',
+                    'quota_mb' => 5120, // 5GB for system admins
+                    'created_by' => $this->getCurrentUserId(),
+                    'creation_method' => 'system_admin_registration'
+                ]);
                 
-                // Send welcome email
-                $this->sendWelcomeEmail($data);
+                // Generate temporary password
+                $tempPassword = $this->generateTemporaryPassword();
                 
-                // Log the registration
-                $this->logRegistrationActivity($userId, $data);
+                // Update user with internal email
+                $this->db->update('users', [
+                    'internal_email' => $internalEmail,
+                    'temp_password' => password_hash($tempPassword, PASSWORD_DEFAULT),
+                    'password_reset_required' => 1
+                ], ['id' => $userId]);
+                
+                // Update registration status
+                $this->db->update('pending_registrations', [
+                    'status' => 'approved',
+                    'approved_by' => $this->getCurrentUserId(),
+                    'approved_at' => date('Y-m-d H:i:s'),
+                    'approval_comments' => $comments,
+                    'user_id' => $userId,
+                    'internal_email' => $internalEmail
+                ], ['id' => $registrationId]);
+                
+                // Send welcome email with credentials
+                $this->notificationService->sendSystemAdminWelcomeEmail(
+                    $registration['personal_email'],
+                    $registration['first_name'],
+                    $internalEmail,
+                    $tempPassword
+                );
                 
                 $this->db->commit();
                 
                 return $this->jsonResponse([
                     'success' => true,
-                    'message' => 'User registered successfully with hierarchical assignment',
+                    'message' => 'System admin registration approved successfully',
                     'user_id' => $userId,
-                    'temp_password' => $data['temp_password']
+                    'internal_email' => $internalEmail
                 ]);
                 
             } catch (Exception $e) {
@@ -115,489 +491,231 @@ class SystemAdminRegistrationController extends Controller
             }
             
         } catch (Exception $e) {
+            error_log("Approval Error: " . $e->getMessage());
             return $this->jsonResponse([
                 'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+                'message' => 'Failed to approve registration: ' . $e->getMessage()
+            ]);
         }
     }
     
     /**
-     * Get hierarchy data for form dropdowns
+     * Reject system admin registration
      */
-    public function getHierarchyData()
+    public function reject()
     {
-        // Get Global organization
-        $global = $this->db->fetch("SELECT * FROM globals WHERE status = 'active' ORDER BY name LIMIT 1");
-        
-        // Get all Godinas
-        $godinas = $this->db->fetchAll("SELECT * FROM godinas WHERE status = 'active' ORDER BY name");
-        
-        // Get all Gamtas grouped by Godina
-        $gamtas = $this->db->fetchAll("
-            SELECT g.*, god.name as godina_name 
-            FROM gamtas g 
-            JOIN godinas god ON g.godina_id = god.id 
-            WHERE g.status = 'active' 
-            ORDER BY god.name, g.name
-        ");
-        
-        // Get all Gurmus grouped by Gamta
-        $gurmus = $this->db->fetchAll("
-            SELECT gu.*, gam.name as gamta_name, god.name as godina_name
-            FROM gurmus gu
-            JOIN gamtas gam ON gu.gamta_id = gam.id
-            JOIN godinas god ON gam.godina_id = god.id
-            WHERE gu.status = 'active'
-            ORDER BY god.name, gam.name, gu.name
-        ");
-        
-        return [
-            'global' => $global,
-            'godinas' => $godinas,
-            'gamtas' => $gamtas,
-            'gurmus' => $gurmus
-        ];
-    }
-    
-    /**
-     * Get available positions for assignment
-     */
-    public function getAvailablePositions()
-    {
-        return $this->db->fetchAll("
-            SELECT id, key_name, name, code, description, hierarchy_type, is_executive 
-            FROM positions 
-            WHERE status = 'active' 
-            ORDER BY hierarchy_type, name
-        ");
-    }
-    
-    /**
-     * API endpoint to get Gamtas by Godina
-     */
-    public function getGamtasByGodina($godinaId)
-    {
-        $gamtas = $this->db->fetchAll("
-            SELECT id, name, code, description 
-            FROM gamtas 
-            WHERE godina_id = ? AND status = 'active' 
-            ORDER BY name
-        ", [$godinaId]);
-        
-        return $this->jsonResponse([
-            'success' => true,
-            'data' => $gamtas
-        ]);
-    }
-    
-    /**
-     * API endpoint to get Gurmus by Gamta
-     */
-    public function getGurmusByGamta($gamtaId)
-    {
-        $gurmus = $this->db->fetchAll("
-            SELECT id, name, code, description 
-            FROM gurmus 
-            WHERE gamta_id = ? AND status = 'active' 
-            ORDER BY name
-        ", [$gamtaId]);
-        
-        return $this->jsonResponse([
-            'success' => true,
-            'data' => $gurmus
-        ]);
-    }
-    
-    /**
-     * HELPER METHODS
-     */
-    
-    /**
-     * Validate registration data
-     */
-    private function validateRegistrationData()
-    {
-        $rules = [
-            'first_name' => 'required|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'email' => 'required|email|max:255',
-            'phone' => 'nullable|string|max:50',
-            'role' => 'required|in:executive,member',
-            'level_scope' => 'required|in:global,godina,gamta,gurmu',
-            'global_id' => 'nullable|integer|exists:globals,id',
-            'godina_id' => 'nullable|integer|exists:godinas,id',
-            'gamta_id' => 'nullable|integer|exists:gamtas,id',
-            'gurmu_id' => 'nullable|integer|exists:gurmus,id',
-            'position_id' => 'nullable|integer|exists:positions,id',
-            'appointment_type' => 'nullable|in:elected,appointed,volunteer,permanent',
-            'start_date' => 'nullable|date',
-            'language_preference' => 'nullable|in:en,om',
-            'send_welcome_email' => 'nullable|boolean'
-        ];
-        
-        $data = $this->validate($rules);
-        
-        // Generate secure temporary password
-        $data['temp_password'] = $this->generateSecurePassword();
-        
-        // Validate hierarchy consistency
-        $this->validateHierarchyConsistency($data);
-        
-        return $data;
-    }
-    
-    /**
-     * Validate hierarchy consistency
-     */
-    private function validateHierarchyConsistency($data)
-    {
-        switch ($data['level_scope']) {
-            case 'global':
-                if (empty($data['global_id'])) {
-                    throw new Exception('Global ID is required for global level scope');
-                }
-                break;
-                
-            case 'godina':
-                if (empty($data['global_id']) || empty($data['godina_id'])) {
-                    throw new Exception('Global ID and Godina ID are required for godina level scope');
-                }
-                break;
-                
-            case 'gamta':
-                if (empty($data['global_id']) || empty($data['godina_id']) || empty($data['gamta_id'])) {
-                    throw new Exception('Global ID, Godina ID, and Gamta ID are required for gamta level scope');
-                }
-                break;
-                
-            case 'gurmu':
-                if (empty($data['global_id']) || empty($data['godina_id']) || empty($data['gamta_id']) || empty($data['gurmu_id'])) {
-                    throw new Exception('All hierarchy IDs are required for gurmu level scope');
-                }
-                break;
-        }
-        
-        // Validate that the hierarchy chain is correct
-        if ($data['level_scope'] !== 'global') {
-            $this->validateHierarchyChain($data);
-        }
-    }
-    
-    /**
-     * Validate hierarchy chain integrity
-     */
-    private function validateHierarchyChain($data)
-    {
-        if (!empty($data['gamta_id'])) {
-            $gamta = $this->db->fetch("SELECT godina_id FROM gamtas WHERE id = ?", [$data['gamta_id']]);
-            if (!$gamta || $gamta['godina_id'] != $data['godina_id']) {
-                throw new Exception('Selected Gamta does not belong to the selected Godina');
+        try {
+            $this->requirePermission('approve_system_admin');
+            $this->validateCsrfToken();
+            $this->validateRequiredFields(['registration_id', 'rejection_reason']);
+            
+            $registrationId = (int) $_POST['registration_id'];
+            $reason = $this->sanitizeInput($_POST['rejection_reason']);
+            
+            $registration = $this->db->fetch(
+                "SELECT * FROM pending_registrations WHERE id = ? AND registration_type = 'system_admin'",
+                [$registrationId]
+            );
+            
+            if (!$registration) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Registration not found'
+                ]);
             }
-        }
-        
-        if (!empty($data['gurmu_id'])) {
-            $gurmu = $this->db->fetch("SELECT gamta_id FROM gurmus WHERE id = ?", [$data['gurmu_id']]);
-            if (!$gurmu || $gurmu['gamta_id'] != $data['gamta_id']) {
-                throw new Exception('Selected Gurmu does not belong to the selected Gamta');
+            
+            // Update registration status
+            $updated = $this->db->update('pending_registrations', [
+                'status' => 'rejected',
+                'rejected_by' => $this->getCurrentUserId(),
+                'rejected_at' => date('Y-m-d H:i:s'),
+                'rejection_reason' => $reason
+            ], ['id' => $registrationId]);
+            
+            if ($updated) {
+                // Send rejection notification
+                $this->notificationService->sendRegistrationRejectionEmail(
+                    $registration['personal_email'],
+                    $registration['first_name'],
+                    $reason
+                );
+                
+                return $this->jsonResponse([
+                    'success' => true,
+                    'message' => 'Registration rejected successfully'
+                ]);
+            } else {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Failed to reject registration'
+                ]);
             }
+            
+        } catch (Exception $e) {
+            error_log("Rejection Error: " . $e->getMessage());
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to reject registration'
+            ]);
         }
     }
     
+    // ========================================
+    // HELPER METHODS
+    // ========================================
+    
     /**
-     * Create hierarchical user
+     * Create system admin user account
      */
-    private function createHierarchicalUser($data)
+    protected function createSystemAdminUser(array $registration): int
     {
         $userData = [
-            'first_name' => $data['first_name'],
-            'last_name' => $data['last_name'],
-            'email' => $data['email'],
-            'phone' => $data['phone'] ?? null,
-            'password_hash' => password_hash($data['temp_password'], PASSWORD_DEFAULT),
-            'role' => $data['role'],
+            'first_name' => $registration['first_name'],
+            'last_name' => $registration['last_name'],
+            'email' => $registration['personal_email'],
+            'phone' => $registration['phone'],
+            'date_of_birth' => $registration['date_of_birth'],
+            'gender' => $registration['gender'],
+            'role' => 'system_admin',
+            'user_type' => 'system_admin',
+            'position_id' => $this->getSystemAdminPositionId(),
             'status' => 'active',
-            'email_verified_at' => date('Y-m-d H:i:s'), // Auto-verify admin-created accounts
-            'language' => $data['language_preference'] ?? 'en',
-            'metadata' => json_encode([
-                'created_by_admin' => true,
-                'temp_password_sent' => !empty($data['send_welcome_email']),
-                'hierarchy_level' => $data['level_scope'],
-                'requires_password_change' => true
-            ]),
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s')
+            'address' => $registration['address'],
+            'city' => $registration['city'],
+            'country' => $registration['country'],
+            'emergency_contact_name' => $registration['emergency_contact_name'],
+            'emergency_contact_phone' => $registration['emergency_contact_phone'],
+            'created_by' => $this->getCurrentUserId(),
+            'created_at' => date('Y-m-d H:i:s')
         ];
         
         return $this->db->insert('users', $userData);
     }
     
     /**
-     * Create user assignment
+     * Get system admin position ID
      */
-    private function createUserAssignment($userId, $data)
+    protected function getSystemAdminPositionId(): int
     {
-        $assignmentData = [
-            'user_id' => $userId,
-            'position_id' => $data['position_id'],
-            'level_scope' => $data['level_scope'],
-            'global_id' => $data['global_id'] ?? null,
-            'godina_id' => $data['godina_id'] ?? null,
-            'gamta_id' => $data['gamta_id'] ?? null,
-            'gurmu_id' => $data['gurmu_id'] ?? null,
-            'status' => 'active',
-            'start_date' => $data['start_date'] ?? date('Y-m-d'),
-            'appointment_type' => $data['appointment_type'] ?? 'appointed',
-            'assigned_by' => auth_user()['id'],
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s')
-        ];
-        
-        return $this->db->insert('user_assignments', $assignmentData);
-    }
-    
-    /**
-     * Setup user module permissions based on position
-     */
-    private function setupUserModulePermissions($userId, $data)
-    {
-        if (empty($data['position_id'])) return;
-        
-        // Get position details
-        $position = $this->db->fetch("SELECT * FROM positions WHERE id = ?", [$data['position_id']]);
-        if (!$position) return;
-        
-        // Get default modules for this position
-        $defaultModules = $this->db->fetchAll("
-            SELECT module_name, access_level 
-            FROM position_modules 
-            WHERE position_name = ? AND is_default = 1
-        ", [$position['name']]);
-        
-        // Create user module overrides based on position defaults
-        foreach ($defaultModules as $module) {
-            $this->db->insert('user_module_overrides', [
-                'user_id' => $userId,
-                'module_name' => $module['module_name'],
-                'access_level' => $module['access_level'],
-                'enabled_by' => auth_user()['id'],
-                'reason' => 'Auto-assigned based on position: ' . $position['name']
-            ]);
-        }
-    }
-    
-    /**
-     * Generate secure password
-     */
-    private function generateSecurePassword($length = 12)
-    {
-        $uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        $lowercase = 'abcdefghijklmnopqrstuvwxyz';
-        $numbers = '0123456789';
-        $symbols = '!@#$%^&*';
-        
-        $password = '';
-        $password .= $uppercase[random_int(0, strlen($uppercase) - 1)];
-        $password .= $lowercase[random_int(0, strlen($lowercase) - 1)];
-        $password .= $numbers[random_int(0, strlen($numbers) - 1)];
-        $password .= $symbols[random_int(0, strlen($symbols) - 1)];
-        
-        $allChars = $uppercase . $lowercase . $numbers . $symbols;
-        for ($i = 4; $i < $length; $i++) {
-            $password .= $allChars[random_int(0, strlen($allChars) - 1)];
-        }
-        
-        return str_shuffle($password);
-    }
-    
-    /**
-     * Send welcome email
-     */
-    private function sendWelcomeEmail($data)
-    {
-        if (empty($data['send_welcome_email'])) return;
-        
-        // TODO: Implement comprehensive email system
-        // For now, log the credentials for admin reference
-        error_log("=== HIERARCHICAL USER REGISTRATION ===");
-        error_log("Name: {$data['first_name']} {$data['last_name']}");
-        error_log("Email: {$data['email']}");
-        error_log("Temporary Password: {$data['temp_password']}");
-        error_log("Role: {$data['role']}");
-        error_log("Level: {$data['level_scope']}");
-        error_log("======================================");
-    }
-    
-    /**
-     * Log registration activity
-     */
-    private function logRegistrationActivity($userId, $data)
-    {
-        $description = sprintf(
-            "Created hierarchical user: %s %s (%s) at %s level with role: %s",
-            $data['first_name'],
-            $data['last_name'],
-            $data['email'],
-            $data['level_scope'],
-            $data['role']
+        $position = $this->db->fetch(
+            "SELECT id FROM positions WHERE key_name = 'system_admin' LIMIT 1"
         );
         
-        // TODO: Use proper activity logging system
-        error_log("ADMIN ACTIVITY: " . $description);
+        return $position ? $position['id'] : 1; // Default to ID 1 if not found
     }
     
     /**
-     * Get recent registrations
+     * Validate registration data
      */
-    private function getRecentRegistrations()
+    protected function validateRegistrationData(array $data): array
     {
-        return $this->db->fetchAll("
-            SELECT 
-                u.id, u.first_name, u.last_name, u.email, u.role, u.created_at,
-                ua.level_scope,
-                p.name as position_name,
-                CASE 
-                    WHEN ua.level_scope = 'global' THEN 'Global Organization'
-                    WHEN ua.level_scope = 'godina' THEN CONCAT('Godina: ', god.name)
-                    WHEN ua.level_scope = 'gamta' THEN CONCAT('Gamta: ', gam.name)
-                    WHEN ua.level_scope = 'gurmu' THEN CONCAT('Gurmu: ', gur.name)
-                    ELSE 'Unassigned'
-                END as hierarchy_assignment
-            FROM users u
-            LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
-            LEFT JOIN positions p ON ua.position_id = p.id
-            LEFT JOIN godinas god ON ua.godina_id = god.id
-            LEFT JOIN gamtas gam ON ua.gamta_id = gam.id
-            LEFT JOIN gurmus gur ON ua.gurmu_id = gur.id
-            WHERE u.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                AND u.email LIKE '%@abo-wbo.org'
-            ORDER BY u.created_at DESC
-            LIMIT 20
-        ");
-    }
-    
-    /**
-     * Get registration statistics
-     */
-    private function getRegistrationStats()
-    {
-        $stats = [];
-        
-        // Total users by role
-        $roleStats = $this->db->fetchAll("
-            SELECT role, COUNT(*) as count 
-            FROM users 
-            WHERE status = 'active' 
-            GROUP BY role
-        ");
-        
-        $stats['by_role'] = [];
-        foreach ($roleStats as $stat) {
-            $stats['by_role'][$stat['role']] = $stat['count'];
+        // Email validation
+        if (!filter_var($data['personal_email'], FILTER_VALIDATE_EMAIL)) {
+            return ['valid' => false, 'message' => 'Invalid email format'];
         }
         
-        // Total users by hierarchy level
-        $levelStats = $this->db->fetchAll("
-            SELECT ua.level_scope, COUNT(DISTINCT ua.user_id) as count
-            FROM user_assignments ua
-            WHERE ua.status = 'active'
-            GROUP BY ua.level_scope
-        ");
-        
-        $stats['by_level'] = [];
-        foreach ($levelStats as $stat) {
-            $stats['by_level'][$stat['level_scope']] = $stat['count'];
+        // Name validation
+        if (strlen($data['first_name']) < 2 || strlen($data['last_name']) < 2) {
+            return ['valid' => false, 'message' => 'Names must be at least 2 characters'];
         }
         
-        // Recent registrations count
-        $stats['recent'] = [
-            'today' => $this->db->fetch("SELECT COUNT(*) as count FROM users WHERE DATE(created_at) = CURDATE()")['count'],
-            'this_week' => $this->db->fetch("SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 1 WEEK)")['count'],
-            'this_month' => $this->db->fetch("SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)")['count']
-        ];
+        // Phone validation
+        if (!preg_match('/^[\+]?[0-9\s\-\(\)]{10,}$/', $data['phone'])) {
+            return ['valid' => false, 'message' => 'Invalid phone number format'];
+        }
         
-        return $stats;
+        // Date of birth validation
+        $dob = strtotime($data['date_of_birth']);
+        if (!$dob || $dob > strtotime('-18 years')) {
+            return ['valid' => false, 'message' => 'Must be at least 18 years old'];
+        }
+        
+        // Gender validation
+        if (!in_array($data['gender'], ['male', 'female', 'other'])) {
+            return ['valid' => false, 'message' => 'Invalid gender selection'];
+        }
+        
+        return ['valid' => true];
     }
     
     /**
-     * Validate request data
+     * Check if email is already in use
      */
-    private function validate(array $rules)
+    protected function isEmailInUse(string $email): bool
     {
-        $data = $_POST;
-        $errors = [];
+        // Check in users table
+        $user = $this->db->fetch(
+            "SELECT id FROM users WHERE email = ? OR internal_email = ?",
+            [$email, $email]
+        );
         
-        foreach ($rules as $field => $rule) {
-            $rulesList = explode('|', $rule);
-            $value = $data[$field] ?? null;
-            
-            foreach ($rulesList as $singleRule) {
-                if ($singleRule === 'required' && empty($value)) {
-                    $errors[$field] = ucfirst($field) . ' is required';
-                    break;
-                }
-                
-                if (strpos($singleRule, 'max:') === 0 && !empty($value)) {
-                    $max = intval(substr($singleRule, 4));
-                    if (strlen($value) > $max) {
-                        $errors[$field] = ucfirst($field) . " cannot exceed {$max} characters";
-                    }
-                }
-                
-                if ($singleRule === 'email' && !empty($value) && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
-                    $errors[$field] = ucfirst($field) . ' must be a valid email address';
-                }
-                
-                if ($singleRule === 'date' && !empty($value) && !strtotime($value)) {
-                    $errors[$field] = ucfirst($field) . ' must be a valid date';
-                }
-                
-                if (strpos($singleRule, 'in:') === 0 && !empty($value)) {
-                    $allowedValues = explode(',', substr($singleRule, 3));
-                    if (!in_array($value, $allowedValues)) {
-                        $errors[$field] = ucfirst($field) . ' must be one of: ' . implode(', ', $allowedValues);
-                    }
-                }
-                
-                if (strpos($singleRule, 'exists:') === 0 && !empty($value)) {
-                    $parts = explode(',', substr($singleRule, 7));
-                    $table = $parts[0];
-                    $column = $parts[1] ?? 'id';
-                    
-                    $query = "SELECT COUNT(*) as count FROM {$table} WHERE {$column} = ?";
-                    $result = $this->db->fetch($query, [$value]);
-                    if ($result['count'] === 0) {
-                        $errors[$field] = ucfirst($field) . ' does not exist';
-                    }
-                }
+        if ($user) {
+            return true;
+        }
+        
+        // Check in pending registrations
+        $pending = $this->db->fetch(
+            "SELECT id FROM pending_registrations 
+             WHERE personal_email = ? 
+             AND status NOT IN ('rejected', 'expired')",
+            [$email]
+        );
+        
+        return $pending !== null;
+    }
+    
+    /**
+     * Generate 6-digit verification code
+     */
+    protected function generateVerificationCode(): string
+    {
+        return str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    }
+    
+    /**
+     * Generate temporary password
+     */
+    protected function generateTemporaryPassword(): string
+    {
+        return $this->emailGenerator->generateEmailPassword(12);
+    }
+    
+    /**
+     * Validate required fields
+     */
+    protected function validateRequiredFields(array $fields): void
+    {
+        foreach ($fields as $field) {
+            if (!isset($_POST[$field]) || empty($_POST[$field])) {
+                throw new Exception("Missing required field: {$field}");
             }
         }
-        
-        if (!empty($errors)) {
-            throw new Exception(implode(', ', $errors));
-        }
-        
-        return array_intersect_key($data, $rules);
+    }
+    
+    /**
+     * Sanitize input
+     */
+    protected function sanitizeInput(string $input): string
+    {
+        return htmlspecialchars(strip_tags(trim($input)), ENT_QUOTES, 'UTF-8');
+    }
+    
+    /**
+     * Get current user ID
+     */
+    protected function getCurrentUserId(): int
+    {
+        $user = auth_user();
+        return $user['id'] ?? 0;
     }
     
     /**
      * Validate CSRF token
      */
-    private function validateCSRF()
+    protected function validateCsrfToken(): void
     {
-        if (!isset($_POST['_token']) || !hash_equals($_SESSION['_token'], $_POST['_token'])) {
+        if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== ($_SESSION['csrf_token'] ?? '')) {
             throw new Exception('Invalid CSRF token');
         }
-    }
-    
-    /**
-     * JSON response helper
-     */
-    private function jsonResponse(array $data, int $statusCode = 200)
-    {
-        http_response_code($statusCode);
-        header('Content-Type: application/json');
-        echo json_encode($data);
-        exit;
     }
 }

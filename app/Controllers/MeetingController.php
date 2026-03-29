@@ -110,7 +110,7 @@ class MeetingController extends BaseController
                 'isEdit' => false
             ];
             
-            $this->render('meetings/create', $data);
+            echo $this->render('meetings/create', $data);
             
         } catch (Exception $e) {
             $this->setError('Failed to load create form: ' . $e->getMessage());
@@ -152,7 +152,7 @@ class MeetingController extends BaseController
             
         } catch (Exception $e) {
             $this->setError('Failed to create meeting: ' . $e->getMessage());
-            $this->render('meetings/create', ['meeting' => $_POST, 'isEdit' => false]);
+            echo $this->render('meetings/create', ['meeting' => $_POST, 'isEdit' => false]);
         }
     }
 
@@ -188,7 +188,7 @@ class MeetingController extends BaseController
                 'canDelete' => $this->canDeleteMeeting($meeting)
             ];
             
-            $this->render('meetings/show', $data);
+            echo $this->render('meetings/show', $data);
             
         } catch (Exception $e) {
             $this->setError('Failed to load meeting: ' . $e->getMessage());
@@ -221,7 +221,7 @@ class MeetingController extends BaseController
                 'isEdit' => true
             ];
             
-            $this->render('meetings/edit', $data);
+            echo $this->render('meetings/edit', $data);
             
         } catch (Exception $e) {
             $this->setError('Failed to load edit form: ' . $e->getMessage());
@@ -265,7 +265,7 @@ class MeetingController extends BaseController
             
         } catch (Exception $e) {
             $this->setError('Failed to update meeting: ' . $e->getMessage());
-            $this->render('meetings/edit', ['meeting' => array_merge($meeting, $_POST), 'isEdit' => true]);
+            echo $this->render('meetings/edit', ['meeting' => array_merge($meeting, $_POST), 'isEdit' => true]);
         }
     }
 

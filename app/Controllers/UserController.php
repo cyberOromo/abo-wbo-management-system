@@ -69,7 +69,7 @@ class UserController extends Controller
         $query = "SELECT * FROM users {$whereClause} ORDER BY created_at DESC LIMIT {$limit} OFFSET {$offset}";
         $users = $this->db->fetchAll($query, $params);
         
-        return $this->render('users.index', [
+        echo $this->render('users.index', [
             'title' => 'User Management',
             'users' => $users,
             'currentPage' => $page,
@@ -89,7 +89,7 @@ class UserController extends Controller
         $this->requireAuth();
         $this->requirePermission('user.create');
         
-        return $this->render('users.create', [
+        echo $this->render('users.create', [
             'title' => 'Create User',
             'positions' => $this->getAvailablePositions(),
             'hierarchy_data' => $this->getHierarchyData(),
@@ -261,7 +261,7 @@ class UserController extends Controller
             [$id]
         );
         
-        return $this->render('users.show', [
+        echo $this->render('users.show', [
             'title' => 'User Details',
             'user' => $user,
             'activities' => $activities,
@@ -283,7 +283,7 @@ class UserController extends Controller
             $this->redirectWithMessage('/users', 'User not found.', 'error');
         }
         
-        return $this->render('users.edit', [
+        echo $this->render('users.edit', [
             'title' => 'Edit User',
             'user' => $user,
             'positions' => $this->getAvailablePositions(),
@@ -400,7 +400,7 @@ class UserController extends Controller
         
         $user = $this->userModel->find(auth_user()['id']);
         
-        return $this->render('users.profile', [
+        echo $this->render('users.profile', [
             'title' => 'Edit Profile',
             'user' => $user
         ]);

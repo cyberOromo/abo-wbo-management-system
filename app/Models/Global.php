@@ -8,7 +8,7 @@ use App\Core\Model;
  * Represents the highest tier in the ABO-WBO hierarchy
  * Global → Godina → Gamta → Gurmu
  */
-class Global extends Model
+class GlobalModel extends Model
 {
     protected $table = 'globals';
     protected $primaryKey = 'id';
@@ -153,9 +153,10 @@ class Global extends Model
     {
         $sql = "SELECT 
                     p.name as position_name,
-                    p.level_scope,
-                    COUNT(ua.id) as filled_positions,
-                    p.max_holders
+                p.name as position_name,
+                p.level_scope,
+                COUNT(ua.id) as filled_positions,
+                p.max_holders
                 FROM positions p
                 LEFT JOIN user_assignments ua ON p.id = ua.position_id
                 LEFT JOIN users u ON ua.user_id = u.id AND u.status = 'active'

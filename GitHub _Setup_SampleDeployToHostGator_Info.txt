@@ -43,8 +43,8 @@ Professional workflow
 Recommended Setup
 
 ✔ GitHub repo: with main + develop branches
-✔ Staging site (testing.oromo.org) using cPanel Git Deployment
-✔ Production site (oromo.org/app) using GitHub auto-deploy
+✔ Staging site (testing.j-abo-wbo.org) using cPanel Git Deployment
+✔ Production site (j-abo-wbo.org/app) using GitHub auto-deploy
 ✔ Separate MySQL databases for staging and production
 ✔ Automated deployment via GitHub Actions or cPanel Git pull
 
@@ -143,9 +143,9 @@ Deployment configuration files
 
 5. Deployment Targets
 
-staging.oromo.org → staging branch
+staging.j-abo-wbo.org → staging branch
 
-oromo.org/app → production branch
+j-abo-wbo.org/app → production branch
 
 6. Final Behavior
 

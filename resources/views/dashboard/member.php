@@ -1,225 +1,305 @@
 <?php
 /**
  * Member Dashboard View
- * ABO-WBO Management System
+ * For regular members (non-executive users)
  */
+
+$pageTitle = 'Member Dashboard';
 ?>
 
-<div class="container-fluid">
-    <div class="row">
-        <!-- Welcome Header -->
+<div class="container-fluid mt-4">
+    <!-- Welcome Section -->
+    <div class="row mb-4">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h1 class="h3 mb-0">Welcome, <?= htmlspecialchars($user['first_name'] ?? 'Member') ?>!</h1>
-                    <p class="text-muted mb-0">
-                        <?= $hierarchy_scope['name'] ?? 'ABO-WBO Community' ?> • 
-                        Member Dashboard
+            <div class="card border-0 shadow-sm bg-gradient-primary text-white">
+                <div class="card-body p-4">
+                    <h2 class="mb-2">
+                        <i class="bi bi-person-circle me-2"></i>
+                        Welcome back, <?= htmlspecialchars($user['first_name'] ?? 'Member') ?>!
+                    </h2>
+                    <p class="mb-0">
+                        <i class="bi bi-geo-alt me-2"></i>
+                        <?php if (!empty($user['gurmu_name'])): ?>
+                            <?= htmlspecialchars($user['gurmu_name']) ?>
+                        <?php else: ?>
+                            Member Dashboard
+                        <?php endif; ?>
                     </p>
                 </div>
-                <div>
-                    <button class="btn btn-outline-primary">
-                        <i class="fas fa-bell"></i>
-                        Notifications
-                        <span class="badge bg-danger ms-1">3</span>
-                    </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3 col-sm-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="icon-circle bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-calendar-event fs-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h3 class="mb-0"><?= number_format($stats['upcoming_events'] ?? 0) ?></h3>
+                            <p class="text-muted mb-0 small">Upcoming Events</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="icon-circle bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-camera-video fs-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h3 class="mb-0"><?= number_format($stats['my_meetings'] ?? 0) ?></h3>
+                            <p class="text-muted mb-0 small">My Meetings</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="icon-circle bg-warning bg-opacity-10 text-warning">
+                                <i class="bi bi-check-square fs-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h3 class="mb-0"><?= number_format($stats['my_tasks'] ?? 0) ?></h3>
+                            <p class="text-muted mb-0 small">My Tasks</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="icon-circle bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-heart fs-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h3 class="mb-0"><?= number_format($stats['my_donations'] ?? 0) ?></h3>
+                            <p class="text-muted mb-0 small">My Donations</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row">
-        <!-- Quick Stats -->
-        <div class="col-md-3 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-primary mb-2">
-                        <i class="fas fa-tasks fa-2x"></i>
-                    </div>
-                    <h4 class="mb-1"><?= count($personal_tasks ?? []) ?></h4>
-                    <p class="text-muted mb-0">Active Tasks</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-success mb-2">
-                        <i class="fas fa-calendar-check fa-2x"></i>
-                    </div>
-                    <h4 class="mb-1"><?= count($personal_meetings ?? []) ?></h4>
-                    <p class="text-muted mb-0">Upcoming Meetings</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-warning mb-2">
-                        <i class="fas fa-star fa-2x"></i>
-                    </div>
-                    <h4 class="mb-1"><?= $engagement_score ?? 0 ?>%</h4>
-                    <p class="text-muted mb-0">Engagement Score</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-info mb-2">
-                        <i class="fas fa-heart fa-2x"></i>
-                    </div>
-                    <h4 class="mb-1"><?= count($donations ?? []) ?></h4>
-                    <p class="text-muted mb-0">Donations Made</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Recent Activities -->
-        <div class="col-md-8">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-history me-2"></i>
-                        Recent Activities
+    <div class="row g-4">
+        <!-- My Tasks Section -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-check-square me-2 text-primary"></i>
+                        My Tasks
                     </h5>
+                    <a href="/tasks" class="btn btn-sm btn-outline-primary">View All</a>
                 </div>
                 <div class="card-body">
-                    <?php if (!empty($member_activities)): ?>
+                    <?php if (!empty($myTasks) && count($myTasks) > 0): ?>
                         <div class="list-group list-group-flush">
-                            <?php foreach (array_slice($member_activities, 0, 5) as $activity): ?>
-                                <div class="list-group-item border-0 px-0">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div>
-                                            <h6 class="mb-1"><?= htmlspecialchars($activity['title'] ?? 'Activity') ?></h6>
-                                            <p class="mb-1 text-muted"><?= htmlspecialchars($activity['description'] ?? '') ?></p>
-                                            <small class="text-muted"><?= $activity['created_at'] ?? 'Recently' ?></small>
+                            <?php foreach (array_slice($myTasks, 0, 5) as $task): ?>
+                                <div class="list-group-item px-0">
+                                    <div class="d-flex w-100 justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">
+                                                <a href="/tasks/<?= $task['id'] ?>" class="text-decoration-none">
+                                                    <?= htmlspecialchars($task['title']) ?>
+                                                </a>
+                                            </h6>
+                                            <p class="mb-1 text-muted small"><?= htmlspecialchars(substr($task['description'] ?? '', 0, 100)) ?></p>
+                                            <small class="text-muted">
+                                                <i class="bi bi-calendar3 me-1"></i>
+                                                Due: <?= date('M d, Y', strtotime($task['due_date'])) ?>
+                                            </small>
                                         </div>
-                                        <span class="badge bg-primary"><?= ucfirst($activity['type'] ?? 'activity') ?></span>
+                                        <span class="badge bg-<?= $task['priority'] === 'high' ? 'danger' : ($task['priority'] === 'medium' ? 'warning' : 'info') ?>">
+                                            <?= ucfirst($task['priority'] ?? 'normal') ?>
+                                        </span>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-history fa-3x mb-3"></i>
-                            <p>No recent activities found.</p>
-                            <small>Start participating in community events to see your activities here.</small>
+                        <div class="text-center py-5">
+                            <i class="bi bi-check-circle text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-3">No tasks assigned yet</p>
                         </div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-bolt me-2"></i>
-                        Quick Actions
+        <!-- Upcoming Meetings Section -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-camera-video me-2 text-success"></i>
+                        Upcoming Meetings
                     </h5>
+                    <a href="/meetings" class="btn btn-sm btn-outline-success">View All</a>
                 </div>
                 <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="/tasks" class="btn btn-outline-primary">
-                            <i class="fas fa-tasks me-2"></i>
-                            View My Tasks
-                        </a>
-                        <a href="/meetings" class="btn btn-outline-success">
-                            <i class="fas fa-calendar me-2"></i>
-                            My Meetings
-                        </a>
-                        <a href="/events" class="btn btn-outline-info">
-                            <i class="fas fa-calendar-alt me-2"></i>
-                            Community Events
-                        </a>
-                        <a href="/donations" class="btn btn-outline-warning">
-                            <i class="fas fa-heart me-2"></i>
-                            Make Donation
-                        </a>
-                        <a href="/profile" class="btn btn-outline-secondary">
-                            <i class="fas fa-user me-2"></i>
-                            Update Profile
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mt-4">
-        <!-- Community Events -->
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-calendar-alt me-2"></i>
-                        Upcoming Community Events
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <?php if (!empty($community_events)): ?>
-                        <?php foreach (array_slice($community_events, 0, 3) as $event): ?>
-                            <div class="d-flex align-items-start mb-3">
-                                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                                    <i class="fas fa-calendar-day"></i>
+                    <?php if (!empty($upcomingMeetings) && count($upcomingMeetings) > 0): ?>
+                        <div class="list-group list-group-flush">
+                            <?php foreach (array_slice($upcomingMeetings, 0, 5) as $meeting): ?>
+                                <div class="list-group-item px-0">
+                                    <div class="d-flex w-100 justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">
+                                                <a href="/meetings/<?= $meeting['id'] ?>" class="text-decoration-none">
+                                                    <?= htmlspecialchars($meeting['title']) ?>
+                                                </a>
+                                            </h6>
+                                            <small class="text-muted">
+                                                <i class="bi bi-clock me-1"></i>
+                                                <?= date('M d, Y h:i A', strtotime($meeting['start_datetime'])) ?>
+                                            </small>
+                                            <?php if ($meeting['is_virtual']): ?>
+                                                <span class="badge bg-info ms-2">
+                                                    <i class="bi bi-camera-video me-1"></i>Virtual
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h6 class="mb-1"><?= htmlspecialchars($event['title'] ?? 'Community Event') ?></h6>
-                                    <p class="mb-1 text-muted small"><?= $event['date'] ?? 'TBD' ?></p>
-                                    <small class="text-muted"><?= htmlspecialchars($event['location'] ?? 'Community Center') ?></small>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                        <div class="text-center">
-                            <a href="/events" class="btn btn-sm btn-outline-primary">View All Events</a>
+                            <?php endforeach; ?>
                         </div>
                     <?php else: ?>
-                        <div class="text-center text-muted py-3">
-                            <i class="fas fa-calendar-alt fa-2x mb-2"></i>
-                            <p class="mb-0">No upcoming events.</p>
+                        <div class="text-center py-5">
+                            <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-3">No upcoming meetings</p>
                         </div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <!-- Community News -->
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-newspaper me-2"></i>
-                        Community News
+        <!-- Recent Events -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-calendar-event me-2 text-warning"></i>
+                        Community Events
+                    </h5>
+                    <a href="/events" class="btn btn-sm btn-outline-warning">View All</a>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($recentEvents) && count($recentEvents) > 0): ?>
+                        <div class="list-group list-group-flush">
+                            <?php foreach (array_slice($recentEvents, 0, 5) as $event): ?>
+                                <div class="list-group-item px-0">
+                                    <div class="d-flex w-100 justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">
+                                                <a href="/events/<?= $event['id'] ?>" class="text-decoration-none">
+                                                    <?= htmlspecialchars($event['title']) ?>
+                                                </a>
+                                            </h6>
+                                            <small class="text-muted">
+                                                <i class="bi bi-calendar3 me-1"></i>
+                                                <?= date('M d, Y', strtotime($event['start_datetime'])) ?>
+                                            </small>
+                                            <span class="badge bg-<?= $event['event_type'] === 'cultural' ? 'primary' : 'secondary' ?> ms-2">
+                                                <?= ucfirst($event['event_type'] ?? 'general') ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="text-center py-5">
+                            <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-3">No upcoming events</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- My Gurmu Information -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0">
+                    <h5 class="mb-0">
+                        <i class="bi bi-people me-2 text-info"></i>
+                        My Gurmu
                     </h5>
                 </div>
                 <div class="card-body">
-                    <?php if (!empty($community_news)): ?>
-                        <?php foreach (array_slice($community_news, 0, 3) as $news): ?>
-                            <div class="d-flex align-items-start mb-3">
-                                <div class="bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                                    <i class="fas fa-newspaper"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-1"><?= htmlspecialchars($news['title'] ?? 'Community News') ?></h6>
-                                    <p class="mb-1 text-muted small"><?= substr($news['content'] ?? 'Latest community updates...', 0, 80) ?>...</p>
-                                    <small class="text-muted"><?= $news['published_at'] ?? 'Recently' ?></small>
+                    <?php if (!empty($gurmuInfo)): ?>
+                        <div class="mb-3">
+                            <h6><?= htmlspecialchars($gurmuInfo['name'] ?? 'N/A') ?></h6>
+                            <?php if (!empty($gurmuInfo['description'])): ?>
+                                <p class="text-muted small"><?= htmlspecialchars($gurmuInfo['description']) ?></p>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="text-center p-3 bg-light rounded">
+                                    <h4 class="mb-0"><?= number_format($gurmuInfo['member_count'] ?? 0) ?></h4>
+                                    <small class="text-muted">Members</small>
                                 </div>
                             </div>
-                        <?php endforeach; ?>
-                        <div class="text-center">
-                            <a href="/news" class="btn btn-sm btn-outline-info">View All News</a>
+                            <div class="col-6">
+                                <div class="text-center p-3 bg-light rounded">
+                                    <h4 class="mb-0"><?= number_format($gurmuInfo['meeting_count'] ?? 0) ?></h4>
+                                    <small class="text-muted">Meetings</small>
+                                </div>
+                            </div>
                         </div>
+
+                        <?php if (!empty($gurmuInfo['contact_email']) || !empty($gurmuInfo['contact_phone'])): ?>
+                            <hr>
+                            <div class="mt-3">
+                                <h6 class="text-muted small mb-2">Contact Information</h6>
+                                <?php if (!empty($gurmuInfo['contact_email'])): ?>
+                                    <p class="mb-1">
+                                        <i class="bi bi-envelope me-2"></i>
+                                        <a href="mailto:<?= htmlspecialchars($gurmuInfo['contact_email']) ?>">
+                                            <?= htmlspecialchars($gurmuInfo['contact_email']) ?>
+                                        </a>
+                                    </p>
+                                <?php endif; ?>
+                                <?php if (!empty($gurmuInfo['contact_phone'])): ?>
+                                    <p class="mb-1">
+                                        <i class="bi bi-telephone me-2"></i>
+                                        <a href="tel:<?= htmlspecialchars($gurmuInfo['contact_phone']) ?>">
+                                            <?= htmlspecialchars($gurmuInfo['contact_phone']) ?>
+                                        </a>
+                                    </p>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     <?php else: ?>
-                        <div class="text-center text-muted py-3">
-                            <i class="fas fa-newspaper fa-2x mb-2"></i>
-                            <p class="mb-0">No recent news.</p>
+                        <div class="text-center py-5">
+                            <i class="bi bi-info-circle text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-3">No Gurmu information available</p>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -229,15 +309,25 @@
 </div>
 
 <style>
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.icon-circle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .card {
-    transition: transform 0.2s ease-in-out;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .card:hover {
-    transform: translateY(-2px);
-}
-
-.list-group-item:last-child {
-    border-bottom: none !important;
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
 }
 </style>

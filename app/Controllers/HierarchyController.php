@@ -6,6 +6,8 @@ use App\Models\Godina;
 use App\Models\Gamta;
 use App\Models\Gurmu;
 use App\Utils\Database;
+use App\Utils\HierarchyCodeGenerator;
+use PDO;
 
 /**
  * Hierarchy Controller
@@ -17,6 +19,7 @@ class HierarchyController extends Controller
     protected $gamtaModel;
     protected $gurmuModel;
     protected $db;
+    protected $codeGenerator;
     
     public function __construct()
     {
@@ -24,6 +27,7 @@ class HierarchyController extends Controller
         $this->godinaModel = new Godina();
         $this->gamtaModel = new Gamta();
         $this->gurmuModel = new Gurmu();
+        $this->codeGenerator = new HierarchyCodeGenerator();
     }
     
     /**
@@ -39,7 +43,7 @@ class HierarchyController extends Controller
         // Get recent activity
         $recentActivity = $this->getRecentHierarchyActivity();
         
-        return $this->render('hierarchy/index_modern', [
+        echo $this->render('hierarchy/index_modern', [
             'title' => 'Organizational Hierarchy',
             'stats' => $stats,
             'hierarchy_stats' => $stats,
@@ -64,7 +68,9 @@ class HierarchyController extends Controller
         
         try {
             // Get all hierarchy data with proper joins to avoid undefined key errors
-            $godinas = $this->db->fetchAll("
+            $pdo = $this->db->getPdo();
+            
+            $stmt = $pdo->query("
                 SELECT g.*, COUNT(ga.id) as gamta_count 
                 FROM godinas g 
                 LEFT JOIN gamtas ga ON g.id = ga.godina_id 
@@ -72,8 +78,9 @@ class HierarchyController extends Controller
                 GROUP BY g.id 
                 ORDER BY g.name
             ");
+            $godinas = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            $gamtas = $this->db->fetchAll("
+            $stmt = $pdo->query("
                 SELECT ga.*, g.name as godina_name, COUNT(gu.id) as gurmu_count 
                 FROM gamtas ga 
                 INNER JOIN godinas g ON ga.godina_id = g.id 
@@ -82,8 +89,9 @@ class HierarchyController extends Controller
                 GROUP BY ga.id 
                 ORDER BY g.name, ga.name
             ");
+            $gamtas = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            $gurmus = $this->db->fetchAll("
+            $stmt = $pdo->query("
                 SELECT gu.*, ga.name as gamta_name, g.name as godina_name,
                        COALESCE(gu.address, '') as location
                 FROM gurmus gu 
@@ -92,8 +100,9 @@ class HierarchyController extends Controller
                 WHERE gu.status = 'active' 
                 ORDER BY g.name, ga.name, gu.name
             ");
+            $gurmus = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            return $this->render('hierarchy.admin', [
+            echo $this->render('hierarchy.admin', [
                 'title' => 'System Admin - Hierarchy Management',
                 'godinas' => $godinas,
                 'gamtas' => $gamtas,
@@ -116,7 +125,7 @@ class HierarchyController extends Controller
         // Get complete hierarchy tree
         $hierarchyTree = $this->buildHierarchyTree();
         
-        return $this->render('hierarchy.tree', [
+        echo $this->render('hierarchy.tree', [
             'title' => 'Hierarchy Tree View',
             'hierarchyTree' => $hierarchyTree
         ]);
@@ -147,27 +156,29 @@ class HierarchyController extends Controller
             $gamtas = $this->gamtaModel->getActive();
             $godinaId = $_GET['gamta_id'] ?? null;
             
-            return $this->render('hierarchy.create', [
+            echo $this->render('hierarchy.create', [
                 'title' => 'Create Gurmu',
                 'type' => 'gurmu',
                 'gamtas' => $gamtas,
                 'gamta_id' => $godinaId
             ]);
+            return;
         }
         
         if ($type === 'gamta') {
             $godinas = $this->godinaModel->getActive();
             $godinaId = $_GET['godina_id'] ?? null;
             
-            return $this->render('hierarchy.create', [
+            echo $this->render('hierarchy.create', [
                 'title' => 'Create Gamta',
                 'type' => 'gamta',
                 'godinas' => $godinas,
                 'godina_id' => $godinaId
             ]);
+            return;
         }
         
-        return $this->render('hierarchy.create', [
+        echo $this->render('hierarchy.create', [
             'title' => 'Create Godina',
             'type' => 'godina'
         ]);
@@ -214,6 +225,7 @@ class HierarchyController extends Controller
             
             if (!$gurmu) {
                 $this->redirectWithMessage('/hierarchy', 'Gurmu not found.', 'error');
+                return;
             }
             
             // Get users in this gurmu
@@ -222,13 +234,14 @@ class HierarchyController extends Controller
             // Get statistics
             $stats = $this->getGurmuStats($id);
             
-            return $this->render('hierarchy.show', [
+            echo $this->render('hierarchy.show-modern', [
                 'title' => 'Gurmu Details - ' . $gurmu['name'],
                 'type' => 'gurmu',
                 'unit' => $gurmu,
                 'users' => $users,
                 'stats' => $stats
             ]);
+            return;
         }
         
         if ($type === 'gamta') {
@@ -236,21 +249,27 @@ class HierarchyController extends Controller
             
             if (!$gamta) {
                 $this->redirectWithMessage('/hierarchy', 'Gamta not found.', 'error');
+                return;
             }
             
             // Get gurmus in this gamta
             $gurmus = $this->getGurmusByGamta($id);
             
+            // Get users in this gamta
+            $users = $this->getUsersByGamta($id);
+            
             // Get statistics
             $stats = $this->getGamtaStats($id);
             
-            return $this->render('hierarchy.show', [
+            echo $this->render('hierarchy.show-modern', [
                 'title' => 'Gamta Details - ' . $gamta['name'],
                 'type' => 'gamta',
                 'unit' => $gamta,
                 'gurmus' => $gurmus,
+                'users' => $users,
                 'stats' => $stats
             ]);
+            return;
         }
         
         // Show Godina details
@@ -258,6 +277,7 @@ class HierarchyController extends Controller
         
         if (!$godina) {
             $this->redirectWithMessage('/hierarchy', 'Godina not found.', 'error');
+            return;
         }
         
         // Get gamtas in this godina
@@ -266,9 +286,10 @@ class HierarchyController extends Controller
         // Get statistics
         $stats = $this->getGodinaStats($id);
         
-        return $this->render('hierarchy.show-godina', [
+        echo $this->render('hierarchy.show-modern', [
             'title' => 'Godina Details - ' . $godina['name'],
-            'godina' => $godina,
+            'type' => 'godina',
+            'unit' => $godina,
             'gamtas' => $gamtas,
             'stats' => $stats
         ]);
@@ -293,12 +314,13 @@ class HierarchyController extends Controller
             
             $gamtas = $this->gamtaModel->getActive();
             
-            return $this->render('hierarchy.edit', [
+            echo $this->render('hierarchy.edit', [
                 'title' => 'Edit Gurmu',
                 'type' => 'gurmu',
                 'unit' => $gurmu,
                 'gamtas' => $gamtas
             ]);
+            return;
         }
         
         if ($type === 'gamta') {
@@ -310,12 +332,13 @@ class HierarchyController extends Controller
             
             $godinas = $this->godinaModel->getActive();
             
-            return $this->render('hierarchy.edit', [
+            echo $this->render('hierarchy.edit', [
                 'title' => 'Edit Gamta',
                 'type' => 'gamta',
                 'unit' => $gamta,
                 'godinas' => $godinas
             ]);
+            return;
         }
         
         $godina = $this->godinaModel->find($id);
@@ -324,7 +347,7 @@ class HierarchyController extends Controller
             $this->redirectWithMessage('/hierarchy', 'Godina not found.', 'error');
         }
         
-        return $this->render('hierarchy.edit', [
+        echo $this->render('hierarchy.edit', [
             'title' => 'Edit Godina',
             'type' => 'godina',
             'unit' => $godina
@@ -382,29 +405,94 @@ class HierarchyController extends Controller
     }
     
     /**
+     * Show form to create new Godina
+     */
+    public function createGodina()
+    {
+        $this->requireAuth();
+        
+        echo $this->render('hierarchy/create_godina', [
+            'title' => 'Create New Godina',
+            'page_title' => 'Create New Godina'
+        ]);
+    }
+    
+    /**
+     * Show form to create new Gamta
+     */
+    public function createGamta()
+    {
+        $this->requireAuth();
+        
+        // Get all godinas for dropdown
+        $godinas = $this->db->fetchAll("SELECT id, name, code FROM godinas WHERE status = 'active' ORDER BY name");
+        
+        echo $this->render('hierarchy/create_gamta', [
+            'title' => 'Create New Gamta',
+            'page_title' => 'Create New Gamta',
+            'godinas' => $godinas
+        ]);
+    }
+    
+    /**
+     * Show form to create new Gurmu
+     */
+    public function createGurmu()
+    {
+        $this->requireAuth();
+        
+        // Get all godinas and gamtas for dropdowns
+        $godinas = $this->db->fetchAll("SELECT id, name, code FROM godinas WHERE status = 'active' ORDER BY name");
+        $gamtas = $this->db->fetchAll("SELECT id, godina_id, name, code FROM gamtas WHERE status = 'active' ORDER BY name");
+        
+        echo $this->render('hierarchy/create_gurmu', [
+            'title' => 'Create New Gurmu',
+            'page_title' => 'Create New Gurmu',
+            'godinas' => $godinas,
+            'gamtas' => $gamtas
+        ]);
+    }
+    
+    /**
      * Store new Godina
      */
-    private function storeGodina()
+    public function storeGodina()
     {
         $data = $this->validate([
             'name' => 'required|min:2|max:100',
-            'code' => 'required|min:2|max:10|unique:godinas,code',
+            'code' => 'max:10', // Make code optional - will be auto-generated
             'description' => 'max:500',
-            'location' => 'max:255',
-            'contact_person' => 'max:100',
             'contact_email' => 'email',
             'contact_phone' => 'max:20',
-            'status' => 'required|in:active,inactive'
+            'address' => 'max:500',
+            'website' => 'url|max:255',
+            'status' => 'in:active,inactive'
         ]);
         
+        // Auto-generate code if not provided
+        if (empty($data['code'])) {
+            $data['code'] = $this->codeGenerator->generateGodinaCode($data['name']);
+        } else {
+            // Validate uniqueness if code is provided
+            $existing = $this->db->fetch("SELECT id FROM godinas WHERE code = ?", [$data['code']]);
+            if ($existing) {
+                $this->redirectBack(['code' => 'This code is already in use. Leave blank for auto-generation.']);
+                return;
+            }
+            $data['code'] = strtoupper($data['code']);
+        }
+        
+        // Set defaults
+        $data['status'] = $data['status'] ?? 'active';
         $data['created_by'] = auth_user()['id'];
         $data['created_at'] = date('Y-m-d H:i:s');
+        $data['global_id'] = 1; // Default global organization ID
         
         $godinaId = $this->godinaModel->create($data);
         
         if ($godinaId) {
-            log_activity('godina.created', "Created Godina: {$data['name']}", ['godina_id' => $godinaId]);
-            $this->redirectWithMessage('/hierarchy', 'Godina created successfully!', 'success');
+            log_activity('godina.created', "Created Godina: {$data['name']} ({$data['code']})", ['godina_id' => $godinaId]);
+            $this->redirectWithMessage('/hierarchy', 'Godina created successfully with code: ' . $data['code'], 'success');
         } else {
             $this->redirectBack(['general' => 'Failed to create Godina. Please try again.']);
         }
@@ -413,28 +501,43 @@ class HierarchyController extends Controller
     /**
      * Store new Gamta
      */
-    private function storeGamta()
+    public function storeGamta()
     {
         $data = $this->validate([
             'godina_id' => 'required|exists:godinas,id',
             'name' => 'required|min:2|max:100',
-            'code' => 'required|min:2|max:10|unique:gamtas,code',
+            'code' => 'max:10', // Make code optional - will be auto-generated
             'description' => 'max:500',
-            'location' => 'max:255',
-            'contact_person' => 'max:100',
             'contact_email' => 'email',
             'contact_phone' => 'max:20',
-            'status' => 'required|in:active,inactive'
+            'address' => 'max:500',
+            'website' => 'url|max:255',
+            'status' => 'in:active,inactive'
         ]);
         
+        // Auto-generate code if not provided
+        if (empty($data['code'])) {
+            $data['code'] = $this->codeGenerator->generateGamtaCode($data['godina_id'], $data['name']);
+        } else {
+            // Validate uniqueness if code is provided
+            $existing = $this->db->fetch("SELECT id FROM gamtas WHERE code = ?", [$data['code']]);
+            if ($existing) {
+                $this->redirectBack(['code' => 'This code is already in use. Leave blank for auto-generation.']);
+                return;
+            }
+            $data['code'] = strtoupper($data['code']);
+        }
+        
+        // Set defaults
+        $data['status'] = $data['status'] ?? 'active';
         $data['created_by'] = auth_user()['id'];
         $data['created_at'] = date('Y-m-d H:i:s');
         
         $gamtaId = $this->gamtaModel->create($data);
         
         if ($gamtaId) {
-            log_activity('gamta.created', "Created Gamta: {$data['name']}", ['gamta_id' => $gamtaId]);
-            $this->redirectWithMessage('/hierarchy', 'Gamta created successfully!', 'success');
+            log_activity('gamta.created', "Created Gamta: {$data['name']} ({$data['code']})", ['gamta_id' => $gamtaId]);
+            $this->redirectWithMessage('/hierarchy', 'Gamta created successfully with code: ' . $data['code'], 'success');
         } else {
             $this->redirectBack(['general' => 'Failed to create Gamta. Please try again.']);
         }
@@ -443,38 +546,205 @@ class HierarchyController extends Controller
     /**
      * Store new Gurmu
      */
-    private function storeGurmu()
+    public function storeGurmu()
     {
         $data = $this->validate([
             'gamta_id' => 'required|exists:gamtas,id',
             'name' => 'required|min:2|max:100',
-            'code' => 'required|min:2|max:10|unique:gurmus,code',
+            'code' => 'max:10', // Make code optional - will be auto-generated
             'description' => 'max:500',
             'contact_email' => 'email',
             'contact_phone' => 'max:20',
             'address' => 'max:500',
             'website' => 'url|max:255',
-            'meeting_schedule' => 'max:255',
-            'membership_fee' => 'numeric|min:0|max:999999.99',
-            'currency' => 'max:3',
-            'status' => 'required|in:active,inactive'
+            'status' => 'in:active,inactive'
         ]);
         
+        // Auto-generate code if not provided
+        if (empty($data['code'])) {
+            $data['code'] = $this->codeGenerator->generateGurmuCode($data['gamta_id'], $data['name']);
+        } else {
+            // Validate uniqueness if code is provided
+            $existing = $this->db->fetch("SELECT id FROM gurmus WHERE code = ?", [$data['code']]);
+            if ($existing) {
+                $this->redirectBack(['code' => 'This code is already in use. Leave blank for auto-generation.']);
+                return;
+            }
+            $data['code'] = strtoupper($data['code']);
+        }
+        
+        // Set defaults
+        $data['status'] = $data['status'] ?? 'active';
         $data['created_by'] = auth_user()['id'];
         $data['created_at'] = date('Y-m-d H:i:s');
         
-        // Set defaults
-        $data['membership_fee'] = $data['membership_fee'] ?? 0.00;
-        $data['currency'] = $data['currency'] ?? 'USD';
+        $gurmuId = $this->gurmuModel->create($data);
+        
+        if ($gurmuId) {
+            log_activity('gurmu.created', "Created Gurmu: {$data['name']} ({$data['code']})", ['gurmu_id' => $gurmuId]);
+            $this->redirectWithMessage('/hierarchy', 'Gurmu created successfully with code: ' . $data['code'], 'success');
+        } else {
+            $this->redirectBack(['general' => 'Failed to create Gurmu. Please try again.']);
+        }
+    }
+
+    /**
+     * Show interactive tree view
+     */
+    public function tree()
+    {
+        $this->requireAuth();
+        
+        echo $this->render('hierarchy/tree', [
+            'title' => 'Organizational Hierarchy Tree',
+            'pageTitle' => 'Organizational Hierarchy Tree'
+        ]);
+    }
+
+    /**
+     * Get tree data for visualization
+     */
+    public function getTreeData()
+    {
+        $this->requireAuth();
         
         try {
-            $gurmuId = Gurmu::createGurmu($data);
-            
-            log_activity('gurmu.created', "Created Gurmu: {$data['name']}", ['gurmu_id' => $gurmuId]);
-            $this->redirectWithMessage('/hierarchy', 'Gurmu created successfully!', 'success');
+            // Fetch all active hierarchy data
+            $godinas = $this->db->fetchAll(
+                "SELECT id, name, code, description, contact_email, contact_phone, address 
+                 FROM godinas WHERE status = 'active' ORDER BY name"
+            );
+
+            $gamtas = $this->db->fetchAll(
+                "SELECT id, godina_id, name, code, description, contact_email, contact_phone, address 
+                 FROM gamtas WHERE status = 'active' ORDER BY name"
+            );
+
+            $gurmus = $this->db->fetchAll(
+                "SELECT id, gamta_id, name, code, description, contact_email, contact_phone, address 
+                 FROM gurmus WHERE status = 'active' ORDER BY name"
+            );
+
+            // Get user counts for each level
+            $godinaUsers = $this->db->fetchAll(
+                "SELECT god.id as godina_id, COUNT(DISTINCT ua.user_id) as user_count 
+                 FROM godinas god
+                 LEFT JOIN user_assignments ua ON god.id = ua.godina_id AND ua.status = 'active'
+                 LEFT JOIN users u ON ua.user_id = u.id AND u.status = 'active'
+                 WHERE god.status = 'active'
+                 GROUP BY god.id"
+            );
+
+            $gamtaUsers = $this->db->fetchAll(
+                "SELECT gam.id as gamta_id, COUNT(DISTINCT ua.user_id) as user_count 
+                 FROM gamtas gam
+                 LEFT JOIN user_assignments ua ON gam.id = ua.gamta_id AND ua.status = 'active'
+                 LEFT JOIN users u ON ua.user_id = u.id AND u.status = 'active'
+                 WHERE gam.status = 'active'
+                 GROUP BY gam.id"
+            );
+
+            $gurmuUsers = $this->db->fetchAll(
+                "SELECT gur.id as gurmu_id, COUNT(DISTINCT ua.user_id) as user_count 
+                 FROM gurmus gur
+                 LEFT JOIN user_assignments ua ON gur.id = ua.gurmu_id AND ua.status = 'active'
+                 LEFT JOIN users u ON ua.user_id = u.id AND u.status = 'active'
+                 WHERE gur.status = 'active'
+                 GROUP BY gur.id"
+            );
+
+            // Index user counts by ID for quick lookup
+            $godinaUserCount = [];
+            foreach ($godinaUsers as $gu) {
+                $godinaUserCount[$gu['godina_id']] = $gu['user_count'];
+            }
+
+            $gamtaUserCount = [];
+            foreach ($gamtaUsers as $gu) {
+                $gamtaUserCount[$gu['gamta_id']] = $gu['user_count'];
+            }
+
+            $gurmuUserCount = [];
+            foreach ($gurmuUsers as $gu) {
+                $gurmuUserCount[$gu['gurmu_id']] = $gu['user_count'];
+            }
+
+            // Build tree structure
+            $tree = [
+                'name' => 'ABO-WBO Global',
+                'type' => 'global',
+                'id' => 'global',
+                'children' => []
+            ];
+
+            foreach ($godinas as $godina) {
+                $godinaNode = [
+                    'name' => $godina['name'],
+                    'code' => $godina['code'],
+                    'type' => 'godina',
+                    'id' => 'godina-' . $godina['id'],
+                    'dbId' => $godina['id'],
+                    'description' => $godina['description'],
+                    'contact_email' => $godina['contact_email'],
+                    'contact_phone' => $godina['contact_phone'],
+                    'address' => $godina['address'],
+                    'userCount' => $godinaUserCount[$godina['id']] ?? 0,
+                    'children' => []
+                ];
+
+                // Add gamtas for this godina
+                foreach ($gamtas as $gamta) {
+                    if ($gamta['godina_id'] == $godina['id']) {
+                        $gamtaNode = [
+                            'name' => $gamta['name'],
+                            'code' => $gamta['code'],
+                            'type' => 'gamta',
+                            'id' => 'gamta-' . $gamta['id'],
+                            'dbId' => $gamta['id'],
+                            'description' => $gamta['description'],
+                            'contact_email' => $gamta['contact_email'],
+                            'contact_phone' => $gamta['contact_phone'],
+                            'address' => $gamta['address'],
+                            'userCount' => $gamtaUserCount[$gamta['id']] ?? 0,
+                            'children' => []
+                        ];
+
+                        // Add gurmus for this gamta
+                        foreach ($gurmus as $gurmu) {
+                            if ($gurmu['gamta_id'] == $gamta['id']) {
+                                $gurmuNode = [
+                                    'name' => $gurmu['name'],
+                                    'code' => $gurmu['code'],
+                                    'type' => 'gurmu',
+                                    'id' => 'gurmu-' . $gurmu['id'],
+                                    'dbId' => $gurmu['id'],
+                                    'description' => $gurmu['description'],
+                                    'contact_email' => $gurmu['contact_email'],
+                                    'contact_phone' => $gurmu['contact_phone'],
+                                    'address' => $gurmu['address'],
+                                    'userCount' => $gurmuUserCount[$gurmu['id']] ?? 0
+                                ];
+
+                                $gamtaNode['children'][] = $gurmuNode;
+                            }
+                        }
+
+                        $godinaNode['children'][] = $gamtaNode;
+                    }
+                }
+
+                $tree['children'][] = $godinaNode;
+            }
+
+            header('Content-Type: application/json');
+            echo json_encode($tree);
+            exit;
+
         } catch (\Exception $e) {
-            log_error('Gurmu creation error: ' . $e->getMessage());
-            $this->redirectBack(['general' => $e->getMessage()]);
+            header('Content-Type: application/json');
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+            exit;
         }
     }
 
@@ -605,10 +875,10 @@ class HierarchyController extends Controller
         }
         
         // Check if Godina has Gamtas
-        $gamtaCount = $this->db->fetch(
-            "SELECT COUNT(*) as count FROM gamtas WHERE godina_id = ? AND status != 'deleted'",
-            [$id]
-        )['count'];
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM gamtas WHERE godina_id = ? AND status != 'deleted'");
+        $stmt->execute([$id]);
+        $gamtaCount = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
         
         if ($gamtaCount > 0) {
             $this->redirectWithMessage('/hierarchy', 
@@ -677,50 +947,43 @@ class HierarchyController extends Controller
     private function getHierarchyStats(): array
     {
         $stats = [];
+        $pdo = $this->db->getPdo();
         
         // Total Godinas
-        $stats['total_godinas'] = $this->db->fetch(
-            "SELECT COUNT(*) as count FROM godinas WHERE status != 'deleted'"
-        )['count'];
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM godinas WHERE status != 'deleted'");
+        $stats['total_godinas'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
         
         // Active Godinas
-        $stats['active_godinas'] = $this->db->fetch(
-            "SELECT COUNT(*) as count FROM godinas WHERE status = 'active'"
-        )['count'];
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM godinas WHERE status = 'active'");
+        $stats['active_godinas'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
         
         // Total Gamtas
-        $stats['total_gamtas'] = $this->db->fetch(
-            "SELECT COUNT(*) as count FROM gamtas WHERE status != 'deleted'"
-        )['count'];
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM gamtas WHERE status != 'deleted'");
+        $stats['total_gamtas'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
         
         // Active Gamtas
-        $stats['active_gamtas'] = $this->db->fetch(
-            "SELECT COUNT(*) as count FROM gamtas WHERE status = 'active'"
-        )['count'];
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM gamtas WHERE status = 'active'");
+        $stats['active_gamtas'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
         
         // Total Gurmus
-        $stats['total_gurmus'] = $this->db->fetch(
-            "SELECT COUNT(*) as count FROM gurmus WHERE status != 'deleted'"
-        )['count'];
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM gurmus WHERE status != 'deleted'");
+        $stats['total_gurmus'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
         
         // Active Gurmus
-        $stats['active_gurmus'] = $this->db->fetch(
-            "SELECT COUNT(*) as count FROM gurmus WHERE status = 'active'"
-        )['count'];
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM gurmus WHERE status = 'active'");
+        $stats['active_gurmus'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
         
         // Users assigned to hierarchy (members are managed at Gurmu level)
-        $stats['assigned_users'] = $this->db->fetch(
-            "SELECT COUNT(DISTINCT u.id) as count FROM users u 
+        $stmt = $pdo->query("SELECT COUNT(DISTINCT u.id) as count FROM users u 
              INNER JOIN user_assignments ua ON u.id = ua.user_id 
-             WHERE ua.status = 'active' AND u.status = 'active'"
-        )['count'];
+             WHERE ua.status = 'active' AND u.status = 'active'");
+        $stats['assigned_users'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
         
         // Unassigned users
-        $stats['unassigned_users'] = $this->db->fetch(
-            "SELECT COUNT(*) as count FROM users u 
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM users u 
              WHERE u.status = 'active' 
-             AND u.id NOT IN (SELECT DISTINCT user_id FROM user_assignments WHERE status = 'active')"
-        )['count'];
+             AND u.id NOT IN (SELECT DISTINCT user_id FROM user_assignments WHERE status = 'active')");
+        $stats['unassigned_users'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
         
         return $stats;
     }
@@ -811,11 +1074,14 @@ class HierarchyController extends Controller
         
         foreach ($godinas as $godina) {
             $gamtas = $this->db->fetchAll(
-                "SELECT gm.*, COUNT(DISTINCT u.id) as user_count,
-                        COUNT(DISTINCT gr.id) as gurmu_count
+                "SELECT gm.*, 
+                        COUNT(DISTINCT gr.id) as gurmu_count,
+                        (SELECT COUNT(DISTINCT ua.user_id) 
+                         FROM user_assignments ua 
+                         INNER JOIN users u ON ua.user_id = u.id 
+                         WHERE ua.gamta_id = gm.id AND ua.status = 'active' AND u.status = 'active') as user_count
                  FROM gamtas gm
                  LEFT JOIN gurmus gr ON gm.id = gr.gamta_id AND gr.status != 'deleted'
-                 LEFT JOIN users u ON gr.id = u.gurmu_id AND u.status = 'active'
                  WHERE gm.godina_id = ? AND gm.status != 'deleted'
                  GROUP BY gm.id
                  ORDER BY gm.name",
@@ -825,11 +1091,13 @@ class HierarchyController extends Controller
             $gamtaChildren = [];
             foreach ($gamtas as $gamta) {
                 $gurmus = $this->db->fetchAll(
-                    "SELECT gr.*, COUNT(u.id) as user_count
+                    "SELECT gr.*,
+                            (SELECT COUNT(DISTINCT ua.user_id) 
+                             FROM user_assignments ua 
+                             INNER JOIN users u ON ua.user_id = u.id 
+                             WHERE ua.gurmu_id = gr.id AND ua.status = 'active' AND u.status = 'active') as user_count
                      FROM gurmus gr
-                     LEFT JOIN users u ON gr.id = u.gurmu_id AND u.status = 'active'
                      WHERE gr.gamta_id = ? AND gr.status != 'deleted'
-                     GROUP BY gr.id
                      ORDER BY gr.name",
                     [$gamta['id']]
                 );
@@ -884,10 +1152,13 @@ class HierarchyController extends Controller
     private function getUsersByGamta($gamtaId): array
     {
         return $this->db->fetchAll(
-            "SELECT u.*, p.title as position_title
+            "SELECT u.*, GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as position_title
              FROM users u
-             LEFT JOIN positions p ON u.position_id = p.id
-             WHERE u.gamta_id = ? AND u.status = 'active'
+             JOIN gurmus gu ON u.gurmu_id = gu.id
+             LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
+             LEFT JOIN positions p ON ua.position_id = p.id
+             WHERE gu.gamta_id = ? AND u.status = 'active'
+             GROUP BY u.id
              ORDER BY u.first_name, u.last_name",
             [$gamtaId]
         );
@@ -899,9 +1170,9 @@ class HierarchyController extends Controller
     private function getGamtasByGodina($godinaId): array
     {
         return $this->db->fetchAll(
-            "SELECT g.*, COUNT(u.id) as user_count
+            "SELECT g.*, COUNT(gu.id) as gurmu_count
              FROM gamtas g
-             LEFT JOIN users u ON g.id = u.gamta_id AND u.status = 'active'
+             LEFT JOIN gurmus gu ON g.id = gu.gamta_id AND gu.status != 'deleted'
              WHERE g.godina_id = ? AND g.status != 'deleted'
              GROUP BY g.id
              ORDER BY g.name",
@@ -928,10 +1199,11 @@ class HierarchyController extends Controller
             [$godinaId]
         )['count'];
         
-        // Total users
+        // Total users - join through gurmus since users belong to gurmu
         $stats['total_users'] = $this->db->fetch(
-            "SELECT COUNT(*) as count FROM users u 
-             JOIN gamtas g ON u.gamta_id = g.id 
+            "SELECT COUNT(DISTINCT u.id) as count FROM users u 
+             JOIN gurmus gu ON u.gurmu_id = gu.id
+             JOIN gamtas g ON gu.gamta_id = g.id 
              WHERE g.godina_id = ? AND u.status = 'active'",
             [$godinaId]
         )['count'];
@@ -946,17 +1218,22 @@ class HierarchyController extends Controller
     {
         $stats = [];
         
-        // Total users
+        // Total users - join through gurmus
         $stats['total_users'] = $this->db->fetch(
-            "SELECT COUNT(*) as count FROM users WHERE gamta_id = ? AND status = 'active'",
+            "SELECT COUNT(DISTINCT u.id) as count 
+             FROM users u 
+             JOIN gurmus gu ON u.gurmu_id = gu.id
+             WHERE gu.gamta_id = ? AND u.status = 'active'",
             [$gamtaId]
         )['count'];
         
         // Users by role
         $roleStats = $this->db->fetchAll(
-            "SELECT role, COUNT(*) as count FROM users 
-             WHERE gamta_id = ? AND status = 'active' 
-             GROUP BY role",
+            "SELECT u.role, COUNT(DISTINCT u.id) as count 
+             FROM users u
+             JOIN gurmus gu ON u.gurmu_id = gu.id
+             WHERE gu.gamta_id = ? AND u.status = 'active' 
+             GROUP BY u.role",
             [$gamtaId]
         );
         
@@ -1012,10 +1289,12 @@ class HierarchyController extends Controller
     private function getUsersByGurmu($gurmuId): array
     {
         return $this->db->fetchAll(
-            "SELECT u.*, p.name_en as position_name
+            "SELECT u.*, GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as position_name
              FROM users u
-             LEFT JOIN positions p ON u.position_id = p.id
+             LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
+             LEFT JOIN positions p ON ua.position_id = p.id
              WHERE u.gurmu_id = ? AND u.status = 'active'
+             GROUP BY u.id
              ORDER BY u.first_name, u.last_name",
             [$gurmuId]
         );
@@ -1064,11 +1343,11 @@ class HierarchyController extends Controller
         
         // Users by position
         $positionStats = $this->db->fetchAll(
-            "SELECT COALESCE(p.name_en, 'Member') as position_name, COUNT(*) as count 
+            "SELECT COALESCE(p.name, 'Member') as position_name, COUNT(*) as count 
              FROM users u
              LEFT JOIN positions p ON u.position_id = p.id
              WHERE u.gurmu_id = ? AND u.status = 'active' 
-             GROUP BY u.position_id, p.name_en
+             GROUP BY u.position_id, p.name
              ORDER BY count DESC",
             [$gurmuId]
         );

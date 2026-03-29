@@ -316,46 +316,6 @@
                             </div>
                         </div>
                     </a>
-                    
-                    <?php if (in_array($user['role'] ?? '', ['system_admin', 'super_admin'])): ?>
-                    <a href="/user-email/dashboard" class="list-group-item list-group-item-action border-0 px-0">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <div class="icon icon-sm bg-danger text-white rounded-circle">
-                                    <i class="bi bi-envelope-at"></i>
-                                </div>
-                            </div>
-                            <div class="col ml-2">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="mb-0">Manage User Emails</h6>
-                                        <p class="text-sm text-muted mb-0">Generate internal email addresses</p>
-                                    </div>
-                                    <i class="bi bi-arrow-right text-muted"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </a>
-                    
-                    <a href="/hybrid-registration/admin/dashboard" class="list-group-item list-group-item-action border-0 px-0">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <div class="icon icon-sm bg-purple text-white rounded-circle">
-                                    <i class="bi bi-person-plus-fill"></i>
-                                </div>
-                            </div>
-                            <div class="col ml-2">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="mb-0">Hybrid Registration</h6>
-                                        <p class="text-sm text-muted mb-0">Manage hybrid registrations</p>
-                                    </div>
-                                    <i class="bi bi-arrow-right text-muted"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </a>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -374,10 +334,6 @@
     .icon-sm {
         width: 32px;
         height: 32px;
-    }
-    
-    .bg-purple {
-        background-color: #6f42c1 !important;
     }
     
     .timeline {

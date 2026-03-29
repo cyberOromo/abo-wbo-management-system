@@ -1,7 +1,7 @@
 <?php
 namespace App\Controllers;
 
-use App\Core\BaseController;
+use App\Core\Controller;
 use App\Models\User;
 use App\Models\Gurmu;
 use App\Models\Gamta;
@@ -15,7 +15,7 @@ use Exception;
  * - System Admin: Can register members for any Gurmu
  * - Gurmu Leaders: Can only register members for their own Gurmu
  */
-class MemberRegistrationController extends BaseController
+class MemberRegistrationController extends Controller
 {
     protected $userModel;
     protected $gurmuModel;
@@ -42,10 +42,10 @@ class MemberRegistrationController extends BaseController
         $allowedGurmus = $this->getAllowedGurmus($currentUser);
         $recentRegistrations = $this->getRecentRegistrations($currentUser);
         
-        return $this->render('member-registration/index_modern', [
+        return $this->render('members.registration', [
             'title' => 'Member Registration',
-            'registrations' => $recentRegistrations,
-            'registration_stats' => $this->getRegistrationStats($currentUser),
+            'allowed_gurmus' => $allowedGurmus,
+            'recent_registrations' => $recentRegistrations,
             'current_user' => $currentUser
         ]);
     }
@@ -387,7 +387,7 @@ class MemberRegistrationController extends BaseController
     /**
      * Validate request data
      */
-    protected function validate(array $rules, array $messages = []): array
+    private function validate(array $rules)
     {
         $data = $_POST;
         $errors = [];
@@ -458,7 +458,7 @@ class MemberRegistrationController extends BaseController
     /**
      * JSON response helper
      */
-    protected function jsonResponse($data, $statusCode = 200)
+    private function jsonResponse(array $data, int $statusCode = 200)
     {
         http_response_code($statusCode);
         header('Content-Type: application/json');

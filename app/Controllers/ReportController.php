@@ -28,7 +28,7 @@ class ReportController extends BaseController
             $quickStats = $this->getQuickStatistics($userScope);
             $recentReports = $this->getRecentReports($user['id']);
             
-            return $this->render('reports/index_modern', [
+            echo $this->render('reports/index_modern', [
                 'available_reports' => $availableReports,
                 'quick_stats' => $quickStats,
                 'recent_reports' => $recentReports,
@@ -66,7 +66,7 @@ class ReportController extends BaseController
             
             $userReport = $this->generateUserReport($userScope, $filters);
             
-            return $this->render('reports/users', [
+            echo $this->render('reports/users', [
                 'report_data' => $userReport,
                 'filters' => $filters,
                 'user_scope' => $userScope,
@@ -97,7 +97,7 @@ class ReportController extends BaseController
             $positionDistribution = $this->getPositionDistribution($userScope);
             $hierarchyHealth = $this->getHierarchyHealthMetrics($userScope);
             
-            return $this->render('reports/hierarchy', [
+            echo $this->render('reports/hierarchy', [
                 'hierarchy_data' => $hierarchyData,
                 'position_distribution' => $positionDistribution,
                 'hierarchy_health' => $hierarchyHealth,
@@ -131,7 +131,7 @@ class ReportController extends BaseController
             $taskMetrics = $this->getTaskMetrics($userScope, $filters);
             $productivityData = $this->getProductivityData($userScope, $filters);
             
-            return $this->render('reports/tasks', [
+            echo $this->render('reports/tasks', [
                 'task_report' => $taskReport,
                 'task_metrics' => $taskMetrics,
                 'productivity_data' => $productivityData,
@@ -165,7 +165,7 @@ class ReportController extends BaseController
             $attendanceData = $this->getMeetingAttendanceData($userScope, $filters);
             $meetingEffectiveness = $this->getMeetingEffectivenessMetrics($userScope, $filters);
             
-            return $this->render('reports/meetings', [
+            echo $this->render('reports/meetings', [
                 'meeting_report' => $meetingReport,
                 'attendance_data' => $attendanceData,
                 'effectiveness_metrics' => $meetingEffectiveness,
@@ -199,7 +199,7 @@ class ReportController extends BaseController
             $participationData = $this->getEventParticipationData($userScope, $filters);
             $eventImpact = $this->getEventImpactMetrics($userScope, $filters);
             
-            return $this->render('reports/events', [
+            echo $this->render('reports/events', [
                 'event_report' => $eventReport,
                 'participation_data' => $participationData,
                 'event_impact' => $eventImpact,
@@ -234,7 +234,7 @@ class ReportController extends BaseController
             $donationTrends = $this->getDonationTrends($userScope, $filters);
             $donorAnalysis = $this->getDonorAnalysis($userScope, $filters);
             
-            return $this->render('reports/donations', [
+            echo $this->render('reports/donations', [
                 'donation_report' => $donationReport,
                 'donation_trends' => $donationTrends,
                 'donor_analysis' => $donorAnalysis,
@@ -268,7 +268,7 @@ class ReportController extends BaseController
             $enrollmentData = $this->getCourseEnrollmentData($userScope, $filters);
             $completionRates = $this->getCourseCompletionRates($userScope, $filters);
             
-            return $this->render('reports/courses', [
+            echo $this->render('reports/courses', [
                 'course_report' => $courseReport,
                 'enrollment_data' => $enrollmentData,
                 'completion_rates' => $completionRates,

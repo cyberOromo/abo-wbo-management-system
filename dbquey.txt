@@ -1,0 +1,52 @@
+ Showing rows 0 - 0 (1 total, Query took 0.0004 seconds.)
+-- Check if system admin user exists SELECT id, email, user_type, created_at FROM users WHERE user_type = 'system_admin';
+[ Edit inline ] [ Edit ] [ Create PHP code ]
+ Show all	|			Number of rows: 
+25
+Filter rows: 
+Search this table
+Full texts
+id
+email
+user_type
+created_at
+
+Edit Edit
+Copy Copy
+Delete Delete
+1
+admin@abo-wbo.org
+system_admin
+2025-11-22 21:40:48
+With selected:  Check all With selected:    
+ Show all	|			Number of rows: 
+25
+Filter rows: 
+Search this table
+Query results operations
+    
+ Current selection does not contain a unique column. Grid edit, checkbox, Edit, Copy and Delete features are not available. Documentation
+Your SQL query has been executed successfully.
+-- Check total user count SELECT COUNT(*) as total_users FROM users;
+[ Edit inline ] [ Edit ] [ Create PHP code ]
+total_users
+1
+Query results operations
+    
+ Current selection does not contain a unique column. Grid edit, checkbox, Edit, Copy and Delete features are not available. Documentation
+Your SQL query has been executed successfully.
+-- Check if tables have data SELECT (SELECT COUNT(*) FROM globals) as globals_count, (SELECT COUNT(*) FROM godinas) as godinas_count, (SELECT COUNT(*) FROM gamtas) as gamtas_count, (SELECT COUNT(*) FROM gurmus) as gurmus_count, (SELECT COUNT(*) FROM positions) as positions_count, (SELECT COUNT(*) FROM responsibilities) as responsibilities_count;
+[ Edit inline ] [ Edit ] [ Create PHP code ]
+globals_count
+godinas_count
+gamtas_count
+gurmus_count
+positions_count
+responsibilities_count
+1
+6
+20
+48
+7
+5
+Query results operations

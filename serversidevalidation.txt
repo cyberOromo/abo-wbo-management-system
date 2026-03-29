@@ -1,0 +1,197 @@
+NOTE - to reiew if the debug scripts are up todate.
+
+we have executed below scr
+
+we runned - https://staging.j-abo-wbo.org/debug-login.php
+C:\xampp\htdocs\abo-wbo\public\debug-login.php 
+
+we got "🔍 Login Debug Information
+1. User Existence Check
+✅ User found!
+ID: 1
+Email: admin@abo-wbo.org
+User Type: system_admin
+Status: active
+Password Hash: $2y$10$Y4z57CH3wm1Yf...
+Hash Length: 60 characters
+Hash starts with $2y$: YES ✅
+2. Password Verification Test
+Test Password: 'admin123'
+Verification Result: ✅ MATCH
+3. Correct Password Hash for 'admin123'
+Newly Generated Hash: $2y$10$OX3GyjvfJzn.p4Fzt1h5P.Qn4h6QZ/XPVfZ8A1D5vwaCkKeNhD5LK
+This hash would work: YES ✅
+4. Session Functionality
+Session ID: 5527e6d49f861c548f9fcf75ceda7ad8
+Session Test Value: Session Working!
+Session Save Path: /var/cpanel/php/sessions/ea-php83
+Session File Writable: YES ✅
+5. CSRF Token Test
+CSRF Token: e453bfc2abe0b55ced9d...
+CSRF Token Length: 64 characters
+6. Fix Recommendation
+✅ PASSWORD IS CORRECT!
+
+Password verification works. The issue must be elsewhere (sessions, CSRF, redirect logic).
+⚠️ DELETE THIS FILE AFTER DEBUGGING!"
+
+
+----------------------------------
+
+
+
+we runned - https://staging.j-abo-wbo.org/test-database.php
+C:\xampp\htdocs\abo-wbo\public\test-database.php
+
+we got "=== DATABASE CHECK === Godinas found: 5 ID: 1, Name: Afrikaa, Code: AFR, Status: active ID: 2, Name: Asiyaa fi Gidduu Galeessa Bahaa, Code: AME, Status: active ID: 3, Name: Auwustraliyaa, Code: AUS, Status: active ID: 4, Name: Awuroopaa, Code: EUR, Status: active ID: 5, Name: Kaanadaa, Code: CAN, Status: active Gamtas found: 5 ID: 1, Name: Afrikaa Kibbaa, Code: ZAF, Godina: 1, Status: active ID: 11, Name: Awustraaliyaa, Code: AUS-AUS, Godina: 3, Status: active ID: 16, Name: Baha Kanaadaa, Code: CAN-E, Godina: 5, Status: active ID: 18, Name: Baha USA, Code: USA-E, Godina: 6, Status: active ID: 7, Name: Dambalii Qeerroo Bilisummaa Oromoo Sawudii Arabiyaa, Code: SAU-QBO, Godina: 2, Status: active Gurmus found: 5 ID: 28, Name: Awustraaliyaa, Code: AUS-001, Gamta: 11, Status: active ID: 36, Name: Baha Kanaadaa Unit 1, Code: CAN-001, Gamta: 16, Status: active ID: 37, Name: Baha Kanaadaa Unit 2, Code: CAN-002, Gamta: 16, Status: active ID: 40, Name: Baha USA Unit 1, Code: USA-001, Gamta: 18, Status: active ID: 41, Name: Baha USA Unit 2, Code: USA-002, Gamta: 18, Status: active === TESTING AJAX QUERY === Testing with Godina ID: 1 Gamtas for Godina 1: 6 - Afrikaa Kibbaa (ZAF) - Ejiipt (EGY) - Jibuutii (DJI) - Keenyaa (KEN) - Somaliyaa (SOM) - Ugaandaa (UGA)"
+
+
+----------------------------------
+
+
+we runned - https://staging.j-abo-wbo.org/check-errors.php
+C:\xampp\htdocs\abo-wbo\public\check-errors.php
+
+we got "🔍 Comprehensive Error Check
+
+Warning: session_start(): Session cannot be started after headers have already been sent in /home2/jabowbo/staging.j-abo-wbo.org/public/check-errors.php on line 15
+1. Session & Authentication Check
+Session ID:
+User ID in session: NOT SET
+User data exists: NO ❌
+2. Critical Files Check
+vendor/autoload.php: ✅ EXISTS | ✅ READABLE | Size: 748 bytes
+app/helpers.php: ✅ EXISTS | ✅ READABLE | Size: 20162 bytes
+app/Controllers/DashboardController.php: ✅ EXISTS | ✅ READABLE | Size: 31550 bytes
+app/Core/Controller.php: ✅ EXISTS | ✅ READABLE | Size: 14035 bytes
+config/app.php: ✅ EXISTS | ✅ READABLE | Size: 4915 bytes
+.env: ✅ EXISTS | ✅ READABLE | Size: 1627 bytes
+resources/views/layouts/app.php: ✅ EXISTS | ✅ READABLE | Size: 14914 bytes
+resources/views/dashboard/admin.php: ✅ EXISTS | ✅ READABLE | Size: 14921 bytes
+3. Autoloader & Helpers Test
+✅ Autoloader loaded
+✅ Helpers loaded
+✅ auth_user() function exists
+
+Warning: session_start(): Session cannot be started after headers have already been sent in /home2/jabowbo/staging.j-abo-wbo.org/app/helpers.php on line 445
+auth_user() result: NULL
+✅ csrf_token() function exists
+4. DashboardController Test
+✅ All controller files loaded
+❌ Controller instantiation failed: Database connection failed: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)
+Stack trace:
+#0 /home2/jabowbo/staging.j-abo-wbo.org/app/Utils/Database.php(20): App\Utils\Database->connect()
+#1 /home2/jabowbo/staging.j-abo-wbo.org/app/Utils/Database.php(26): App\Utils\Database->__construct()
+#2 /home2/jabowbo/staging.j-abo-wbo.org/app/Controllers/DashboardController.php(27): App\Utils\Database::getInstance()
+#3 /home2/jabowbo/staging.j-abo-wbo.org/public/check-errors.php(92): App\Controllers\DashboardController->__construct()
+#4 {main}
+5. Database Connection Test
+❌ Database connection failed: Database connection failed: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)
+6. PHP Configuration
+PHP Version: 8.3.27
+Error Reporting: 32767
+Display Errors: 1
+Memory Limit: 512M
+Max Execution Time: 60
+Upload Max Filesize: 512M
+7. Error Logs Check
+Logs directory exists: ✅
+Logs directory writable: ✅
+No log files found
+⚠️ DELETE THIS FILE AFTER DEBUGGING!"
+
+
+---------------------------------------
+
+we runned - https://staging.j-abo-wbo.org/diagnostic.php
+C:\xampp\htdocs\abo-wbo\public\diagnostic.php
+
+we got "ABO-WBO Diagnostic Test
+1. Testing basic includes...
+
+✅ Includes successful
+
+2. Testing constants...
+
+⚠️ APP_ROOT not defined, set to: /home2/jabowbo/staging.j-abo-wbo.org
+
+3. Testing database connection...
+
+❌ Database error: Database connection failed: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)
+
+4. Testing Application class...
+
+✅ Application class instantiated
+
+5. Testing Router...
+
+✅ Router class instantiated
+
+6. Testing BaseController...
+
+✅ BaseController instantiated
+
+7. Testing HierarchyController...
+
+❌ HierarchyController error: Database connection failed: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)
+
+8. Testing session...
+
+
+Warning: session_start(): Session cannot be started after headers have already been sent in /home2/jabowbo/staging.j-abo-wbo.org/public/diagnostic.php on line 72
+✅ Session started, ID:
+
+9. Testing auth functions...
+
+
+Warning: session_start(): Session cannot be started after headers have already been sent in /home2/jabowbo/staging.j-abo-wbo.org/app/helpers.php on line 433
+Auth check result: Not authenticated
+
+10. Testing route simulation...
+
+Simulated request: GET /hierarchy"
+
+
+--------------------------------------------------
+
+we runned - https://staging.j-abo-wbo.org/test-session-debug.php
+C:\xampp\htdocs\abo-wbo\public\test-session-debug.php
+
+we got "=== SESSION DEBUG === Session ID: 5527e6d49f861c548f9fcf75ceda7ad8 Session status: 2 === CURRENT SESSION DATA === Session contains: _session_started: 1764470097 test: Session Working! _csrf_token: e453bfc2abe0b55ced9dfef892f1f3cfd385976dceaa64d9698150862d3897bc === AUTH CHECK SIMULATION === isset($_SESSION['user_id']): FALSE !empty($_SESSION['user_id']): FALSE auth_check() result would be: FALSE === CLEARING SESSION === Session cleared! New session ID: New session empty: YES"
+
+
+-----------------------------
+
+chek if this script is outdated -  it returns user 'root'@'localhost' (using password: NO), not sure where this info is
+getting pulled.
+we runned - https://staging.j-abo-wbo.org/test-db-structure.php
+C:\xampp\htdocs\abo-wbo\public\test-db-structure.php
+
+we got "Error: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)"
+
+
+-----------------------------
+
+
+chek if this script is outdated -  it returns user 'root'@'localhost' (using password: NO), not sure where this info is
+getting pulled.
+we runned - https://staging.j-abo-wbo.org/test_controller.php
+C:\xampp\htdocs\abo-wbo\public\test_controller.php
+
+we got "Direct Controller Test
+
+Warning: session_start(): Session cannot be started after headers have already been sent in /home2/jabowbo/staging.j-abo-wbo.org/public/test_controller.php on line 14
+Testing HierarchyController directly...
+
+❌ ERROR: Database connection failed: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)
+
+Stack Trace
+Test /hierarchy route
+
+Back to main test"
+
+
+-----------------------------
+
+
+

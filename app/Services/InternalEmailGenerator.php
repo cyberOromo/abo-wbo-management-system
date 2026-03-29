@@ -8,7 +8,7 @@ use Exception;
  * Internal Email Generator Service
  * 
  * Generates and manages internal organizational email addresses
- * Format: {position}.{hierarchy}.{firstname}.{lastname}@abo-wbo.org
+ * Format: {position}.{hierarchy}.{firstname}.{lastname}@j-abo-wbo.org
  * 
  * Features:
  * - Hierarchical email generation
@@ -26,7 +26,7 @@ class InternalEmailGenerator
     public function __construct()
     {
         $this->db = Database::getInstance();
-        $this->domain = $this->getConfigValue('internal_email_domain', 'abo-wbo.org');
+        $this->domain = $this->getConfigValue('internal_email_domain', 'j-abo-wbo.org');
     }
     
     /**
@@ -333,27 +333,32 @@ class InternalEmailGenerator
      */
     protected function getConfigValue(string $key, $default = null)
     {
-        $config = $this->db->fetch(
-            "SELECT config_value, config_type FROM hybrid_system_config WHERE config_key = ?",
-            [$key]
-        );
-        
-        if (!$config) {
+        try {
+            $config = $this->db->fetch(
+                "SELECT config_value, config_type FROM hybrid_system_config WHERE config_key = ?",
+                [$key]
+            );
+            
+            if (!$config) {
+                return $default;
+            }
+            
+            $value = $config['config_value'];
+            
+            // Convert based on type
+            switch ($config['config_type']) {
+                case 'integer':
+                    return (int) $value;
+                case 'boolean':
+                    return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+                case 'json':
+                    return json_decode($value, true);
+                default:
+                    return $value;
+            }
+        } catch (\Exception $e) {
+            // If config table doesn't exist or query fails, return default
             return $default;
-        }
-        
-        $value = $config['config_value'];
-        
-        // Convert based on type
-        switch ($config['config_type']) {
-            case 'integer':
-                return (int) $value;
-            case 'boolean':
-                return filter_var($value, FILTER_VALIDATE_BOOLEAN);
-            case 'json':
-                return json_decode($value, true);
-            default:
-                return $value;
         }
     }
     

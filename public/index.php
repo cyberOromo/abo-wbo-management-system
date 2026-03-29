@@ -17,6 +17,9 @@ ini_set('display_errors', 1);
 require_once APP_ROOT . '/vendor/autoload.php';
 require_once APP_ROOT . '/app/helpers.php';
 
+// Load environment variables from .env file
+loadEnv(APP_ROOT . '/.env');
+
 try {
     // Initialize and run the MVC application
     $app = \App\Core\Application::getInstance();

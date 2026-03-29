@@ -16,7 +16,7 @@ class Godina extends Model
         'name', 'code', 'description', 'location', 'timezone',
         'contact_person', 'contact_email', 'contact_phone',
         'address', 'website', 'social_media', 'logo',
-        'status', 'metadata', 'created_by', 'updated_by', 'deleted_by'
+        'status', 'metadata', 'created_by', 'deleted_by'
     ];
     
     protected $casts = [
@@ -32,14 +32,12 @@ class Godina extends Model
         $query = "
             SELECT g.*,
                    creator.first_name as created_by_name,
-                   updater.first_name as updated_by_name,
-                   COUNT(ga.id) as gamta_count,
-                   COUNT(u.id) as user_count
+                   COUNT(DISTINCT ga.id) as gamta_count,
+                   COUNT(DISTINCT gu.id) as gurmu_count
             FROM godinas g
             LEFT JOIN users creator ON g.created_by = creator.id
-            LEFT JOIN users updater ON g.updated_by = updater.id
             LEFT JOIN gamtas ga ON g.id = ga.godina_id AND ga.status != 'deleted'
-            LEFT JOIN users u ON ga.id = u.gamta_id AND u.status = 'active'
+            LEFT JOIN gurmus gu ON ga.id = gu.gamta_id AND gu.status != 'deleted'
             WHERE g.id = ?
             GROUP BY g.id
         ";
@@ -215,8 +213,7 @@ class Godina extends Model
         
         return $this->update($id, [
             'status' => $status,
-            'updated_at' => date('Y-m-d H:i:s'),
-            'updated_by' => auth_user()['id'] ?? null
+            'updated_at' => date('Y-m-d H:i:s')
         ]);
     }
     
@@ -251,8 +248,7 @@ class Godina extends Model
             'status' => 'active',
             'deleted_at' => null,
             'deleted_by' => null,
-            'updated_at' => date('Y-m-d H:i:s'),
-            'updated_by' => auth_user()['id'] ?? null
+            'updated_at' => date('Y-m-d H:i:s')
         ]);
     }
     
