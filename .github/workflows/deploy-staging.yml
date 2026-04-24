@@ -47,15 +47,34 @@ jobs:
       # Step 3: Connect to HostGator and update the code
       - name: Deploy via Git pull
         run: |
-          ssh -p "$HOSTGATOR_PORT" "$HOSTGATOR_USER@$HOSTGATOR_HOST" 'bash -s' <<EOF
+          ssh -p "$HOSTGATOR_PORT" "$HOSTGATOR_USER@$HOSTGATOR_HOST" \
+            'bash -s' -- "$HOSTGATOR_PATH" "$DEPLOY_BRANCH" "$REPO_URL" <<'EOF'
           set -eu
 
-          TARGET_DIR="$HOSTGATOR_PATH"
-          DEPLOY_BRANCH="${{ env.DEPLOY_BRANCH }}"
-          REPO_URL="${{ env.REPO_URL }}"
+          TARGET_DIR_RAW="$1"
+          DEPLOY_BRANCH="$2"
+          REPO_URL="$3"
+
+          case "$TARGET_DIR_RAW" in
+            ~/*)
+              TARGET_DIR="$HOME/${TARGET_DIR_RAW#~/}"
+              ;;
+            /*)
+              TARGET_DIR="$TARGET_DIR_RAW"
+              ;;
+            *)
+              TARGET_DIR="$HOME/$TARGET_DIR_RAW"
+              ;;
+          esac
+
+          if [ ! -d "$TARGET_DIR" ] && [ -d "$HOME/staging.j-abo-wbo.org" ]; then
+            TARGET_DIR="$HOME/staging.j-abo-wbo.org"
+          fi
 
           if [ ! -d "$TARGET_DIR" ]; then
-            echo "HOSTGATOR_PATH does not exist: $TARGET_DIR" >&2
+            echo "Resolved deployment directory does not exist on remote host." >&2
+            echo "Checked path input: $TARGET_DIR_RAW" >&2
+            echo "Resolved path: $TARGET_DIR" >&2
             exit 1
           fi
 
