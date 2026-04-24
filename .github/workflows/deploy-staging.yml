@@ -78,6 +78,13 @@ jobs:
             exit 1
           fi
 
+          if [ -d "$TARGET_DIR/.git" ] && [ ! -x "$TARGET_DIR/.git" ]; then
+            echo "Fixing inaccessible .git directory permissions in $TARGET_DIR" >&2
+            chmod u+rwx "$TARGET_DIR/.git"
+            find "$TARGET_DIR/.git" -type d -exec chmod u+rwx {} +
+            find "$TARGET_DIR/.git" -type f -exec chmod u+rw {} +
+          fi
+
           if git -C "$TARGET_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
             GIT_DISCOVERY_ACROSS_FILESYSTEM=1 git -C "$TARGET_DIR" fetch origin "$DEPLOY_BRANCH"
             GIT_DISCOVERY_ACROSS_FILESYSTEM=1 git -C "$TARGET_DIR" reset --hard "origin/$DEPLOY_BRANCH"
