@@ -9,6 +9,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_BRANCH: ${{ github.ref_name }}
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
     steps:
       # Step 1: Checkout your code into the GitHub runner
       - name: Checkout code
@@ -26,18 +29,32 @@ jobs:
       # Step 3: Connect to HostGator and update the code
       - name: Deploy via Git pull
         run: |
-          ssh -p ${{ secrets.HOSTGATOR_PORT }} ${{ secrets.HOSTGATOR_USER }}@${{ secrets.HOSTGATOR_HOST }} "
-            cd ${{ secrets.HOSTGATOR_PATH }} &&
-            git fetch origin &&
-            git reset --hard origin/staging &&
-            # --- Add your custom PHP commands below (remove # to enable) ---
-            # If you use Composer:
-            # composer install --no-interaction --prefer-dist --optimize-autoloader
-            # If you use Laravel:
-            # php artisan cache:clear
-            # php artisan config:cache
-            # php artisan migrate --force
-            # If you use WordPress with WP-CLI:
-            # wp core update-db
-            echo 'Deployment finished at $(date)'
-          "
+          ssh -p ${{ secrets.HOSTGATOR_PORT }} ${{ secrets.HOSTGATOR_USER }}@${{ secrets.HOSTGATOR_HOST }} 'bash -s' <<EOF
+          set -eu
+
+          TARGET_DIR="${{ secrets.HOSTGATOR_PATH }}"
+          DEPLOY_BRANCH="${{ env.DEPLOY_BRANCH }}"
+          REPO_URL="${{ env.REPO_URL }}"
+
+          if [ ! -d "$TARGET_DIR" ]; then
+            echo "HOSTGATOR_PATH does not exist: $TARGET_DIR" >&2
+            exit 1
+          fi
+
+          cd "$TARGET_DIR"
+
+          if [ -d .git ]; then
+            git fetch origin "$DEPLOY_BRANCH"
+            git reset --hard "origin/$DEPLOY_BRANCH"
+          elif [ -z "$(find . -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+            git clone --branch "$DEPLOY_BRANCH" "$REPO_URL" .
+          else
+            echo "HOSTGATOR_PATH is not a git repository: $TARGET_DIR" >&2
+            echo "Point HOSTGATOR_PATH at an existing git clone or empty the directory for the initial clone." >&2
+            pwd >&2
+            ls -la >&2
+            exit 1
+          fi
+
+          echo "Deployment finished at $(date)"
+          EOF
