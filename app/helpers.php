@@ -213,12 +213,7 @@ if (!function_exists('old')) {
      * Get old input value
      */
     function old($key, $default = '') {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        // session_flash() stores old input in $_SESSION['_flash']['old_input']
-        $oldInput = $_SESSION['_flash']['old_input'] ?? [];
-        return $oldInput[$key] ?? $default;
+        return $_SESSION['_old_input'][$key] ?? $default;
     }
 }
 
@@ -416,11 +411,7 @@ if (!function_exists('old_input')) {
      * Get old input value from session
      */
     function old_input($key, $default = '') {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        // session_flash() stores old input in $_SESSION['_flash']['old_input']
-        $oldInput = $_SESSION['_flash']['old_input'] ?? [];
+        $oldInput = session_get('old_input', []);
         return $oldInput[$key] ?? $default;
     }
 }
@@ -430,11 +421,7 @@ if (!function_exists('session_has_error')) {
      * Check if session has error for specific field
      */
     function session_has_error($field) {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        // session_flash() stores errors in $_SESSION['_flash']['errors']
-        $errors = $_SESSION['_flash']['errors'] ?? [];
+        $errors = session_get('errors', []);
         return isset($errors[$field]);
     }
 }
@@ -444,13 +431,8 @@ if (!function_exists('session_get_error')) {
      * Get error message for specific field
      */
     function session_get_error($field) {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        // session_flash() stores errors in $_SESSION['_flash']['errors']
-        $errors = $_SESSION['_flash']['errors'] ?? [];
-        $error = $errors[$field] ?? '';
-        return is_array($error) ? $error[0] : $error;
+        $errors = session_get('errors', []);
+        return $errors[$field] ?? '';
     }
 }
 

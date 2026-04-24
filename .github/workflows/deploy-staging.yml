@@ -1,11 +1,11 @@
 ```yaml
 name: Deploy to HostGator Staging
 
-# Trigger: runs when you push to the 'staging' branch
-# (You can change 'staging' to 'develop' or 'main' as needed)
+# Trigger: runs when you push to the 'develop' branch
+# (You can change 'develop' to 'staging' or 'main' as needed)
 on:
   push:
-    branches: [ staging ]
+    branches: [ develop ]
 
 jobs:
   deploy:
