@@ -1,4 +1,3 @@
-```yaml
 name: Deploy to HostGator Staging
 
 # Trigger: runs when you push to the 'develop' branch
@@ -42,4 +41,3 @@ jobs:
             # wp core update-db
             echo 'Deployment finished at $(date)'
           "
-```
