@@ -1,0 +1,45 @@
+```yaml
+name: Deploy to HostGator Staging
+
+# Trigger: runs when you push to the 'staging' branch
+# (You can change 'staging' to 'develop' or 'main' as needed)
+on:
+  push:
+    branches: [ staging ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout your code into the GitHub runner
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Install the SSH private key (from your secret)
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOSTGATOR_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Add the server to known_hosts to avoid host key confirmation
+          ssh-keyscan -p ${{ secrets.HOSTGATOR_PORT }} ${{ secrets.HOSTGATOR_HOST }} >> ~/.ssh/known_hosts
+
+      # Step 3: Connect to HostGator and update the code
+      - name: Deploy via Git pull
+        run: |
+          ssh -p ${{ secrets.HOSTGATOR_PORT }} ${{ secrets.HOSTGATOR_USER }}@${{ secrets.HOSTGATOR_HOST }} "
+            cd ${{ secrets.HOSTGATOR_PATH }} &&
+            git fetch origin &&
+            git reset --hard origin/staging &&
+            # --- Add your custom PHP commands below (remove # to enable) ---
+            # If you use Composer:
+            # composer install --no-interaction --prefer-dist --optimize-autoloader
+            # If you use Laravel:
+            # php artisan cache:clear
+            # php artisan config:cache
+            # php artisan migrate --force
+            # If you use WordPress with WP-CLI:
+            # wp core update-db
+            echo 'Deployment finished at $(date)'
+          "
+```
