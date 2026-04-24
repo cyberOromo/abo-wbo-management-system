@@ -12,10 +12,28 @@ jobs:
     env:
       DEPLOY_BRANCH: ${{ github.ref_name }}
       REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+      HOSTGATOR_HOST: ${{ secrets.HOSTGATOR_HOST }}
+      HOSTGATOR_PORT: ${{ secrets.HOSTGATOR_PORT }}
+      HOSTGATOR_USER: ${{ secrets.HOSTGATOR_USER }}
+      HOSTGATOR_PATH: ${{ secrets.HOSTGATOR_PATH }}
     steps:
       # Step 1: Checkout your code into the GitHub runner
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Validate deployment secrets
+        run: |
+          set -eu
+
+          required_vars="HOSTGATOR_HOST HOSTGATOR_PORT HOSTGATOR_USER HOSTGATOR_PATH"
+
+          for var_name in $required_vars; do
+            eval "var_value=\${$var_name}"
+            if [ -z "$var_value" ]; then
+              echo "Missing required GitHub Actions secret: $var_name" >&2
+              exit 1
+            fi
+          done
 
       # Step 2: Install the SSH private key (from your secret)
       - name: Install SSH key
@@ -24,15 +42,15 @@ jobs:
           echo "${{ secrets.HOSTGATOR_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           # Add the server to known_hosts to avoid host key confirmation
-          ssh-keyscan -p ${{ secrets.HOSTGATOR_PORT }} ${{ secrets.HOSTGATOR_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p "$HOSTGATOR_PORT" "$HOSTGATOR_HOST" >> ~/.ssh/known_hosts
 
       # Step 3: Connect to HostGator and update the code
       - name: Deploy via Git pull
         run: |
-          ssh -p ${{ secrets.HOSTGATOR_PORT }} ${{ secrets.HOSTGATOR_USER }}@${{ secrets.HOSTGATOR_HOST }} 'bash -s' <<EOF
+          ssh -p "$HOSTGATOR_PORT" "$HOSTGATOR_USER@$HOSTGATOR_HOST" 'bash -s' <<EOF
           set -eu
 
-          TARGET_DIR="${{ secrets.HOSTGATOR_PATH }}"
+          TARGET_DIR="$HOSTGATOR_PATH"
           DEPLOY_BRANCH="${{ env.DEPLOY_BRANCH }}"
           REPO_URL="${{ env.REPO_URL }}"
 
