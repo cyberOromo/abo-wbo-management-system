@@ -729,46 +729,240 @@ class DonationController extends BaseController
 
     private function generateDonationSummary($userScope, $dateRange, $type)
     {
-        // Implementation for donation summary generation
+        $filters = [
+            'date_range' => $dateRange,
+            'type' => $type,
+        ];
+
+        $donations = $this->getFilteredDonationRows($userScope, $filters);
+        $normalized = $this->normalizeDonationRows($donations);
+
         return [
-            'total_amount' => 0,
-            'total_donations' => 0,
-            'by_type' => [],
-            'by_category' => [],
-            'trend_data' => []
+            'date_range' => $dateRange,
+            'type' => $type,
+            'total_amount' => array_sum(array_column($normalized, 'amount')),
+            'total_donations' => count($normalized),
+            'average_amount' => count($normalized) > 0 ? array_sum(array_column($normalized, 'amount')) / count($normalized) : 0,
+            'by_type' => $this->summarizeDonationGroups($normalized, 'type'),
+            'by_category' => $this->summarizeDonationGroups($normalized, 'category'),
+            'recent_donations' => array_slice($normalized, 0, 10)
         ];
     }
 
     private function generateDetailedDonationReport($userScope, $filters)
     {
-        // Implementation for detailed report generation
+        $normalized = $this->normalizeDonationRows($this->getFilteredDonationRows($userScope, $filters));
+
         return [
-            'donations' => [],
-            'summary' => [],
-            'charts' => []
+            'donations' => $normalized,
+            'summary' => [
+                'total_amount' => array_sum(array_column($normalized, 'amount')),
+                'total_donations' => count($normalized),
+                'average_amount' => count($normalized) > 0 ? array_sum(array_column($normalized, 'amount')) / count($normalized) : 0,
+            ],
+            'breakdowns' => [
+                'type' => $this->summarizeDonationGroups($normalized, 'type'),
+                'category' => $this->summarizeDonationGroups($normalized, 'category'),
+                'status' => $this->summarizeDonationGroups($normalized, 'status'),
+            ],
         ];
     }
 
     private function generateExportData($userScope, $type)
     {
-        // Implementation for export data generation
-        return [];
+        $filters = [
+            'date_range' => $_GET['date_range'] ?? '30_days',
+            'type' => $_GET['type'] ?? 'all',
+            'category' => $_GET['category'] ?? 'all',
+            'status' => $_GET['status'] ?? 'all',
+            'start_date' => $_GET['start_date'] ?? null,
+            'end_date' => $_GET['end_date'] ?? null,
+        ];
+
+        $normalized = $this->normalizeDonationRows($this->getFilteredDonationRows($userScope, $filters));
+
+        if ($type === 'summary') {
+            return [
+                [
+                    'Scope' => $userScope['scope_name'] ?? 'Current scope',
+                    'Level' => ucfirst($userScope['level_scope'] ?? 'all'),
+                    'Total Donations' => count($normalized),
+                    'Total Amount' => number_format(array_sum(array_column($normalized, 'amount')), 2, '.', ''),
+                    'Average Amount' => number_format(count($normalized) > 0 ? array_sum(array_column($normalized, 'amount')) / count($normalized) : 0, 2, '.', ''),
+                ],
+            ];
+        }
+
+        return array_map(static function ($row) {
+            return [
+                'Reference' => $row['reference'],
+                'Donor' => $row['donor'],
+                'Amount' => number_format($row['amount'], 2, '.', ''),
+                'Type' => $row['type'],
+                'Category' => $row['category'],
+                'Status' => $row['status'],
+                'Date' => $row['date'],
+                'Scope' => $row['scope'],
+            ];
+        }, $normalized);
     }
 
     private function exportAsCsv($data, $filename)
     {
-        // CSV export implementation
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="' . $filename . '.csv"');
         
         $output = fopen('php://output', 'w');
+        if (!empty($data)) {
+            fputcsv($output, array_keys($data[0]));
+            foreach ($data as $row) {
+                fputcsv($output, $row);
+            }
+        }
         fclose($output);
+        exit;
     }
 
     private function exportAsPdf($data, $filename)
     {
-        // PDF export implementation
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: attachment; filename="' . $filename . '.pdf"');
+        header('Content-Type: text/plain; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '.txt"');
+
+        foreach ($data as $row) {
+            echo implode(' | ', array_map('strval', $row)) . PHP_EOL;
+        }
+        exit;
+    }
+
+    private function getFilteredDonationRows(array $userScope, array $filters = []): array
+    {
+        $rows = $this->getDonationsForUserScope($userScope);
+
+        return array_values(array_filter($rows, function (array $row) use ($filters) {
+            $type = strtolower((string) ($this->resolveDonationField($row, ['type', 'donation_type', 'donor_type']) ?? ''));
+            $category = strtolower((string) ($this->resolveDonationField($row, ['category', 'donation_purpose']) ?? ''));
+            $status = strtolower((string) ($this->resolveDonationField($row, ['status', 'payment_status']) ?? ''));
+            $date = (string) ($this->resolveDonationField($row, ['donation_date', 'payment_date', 'created_at']) ?? '');
+
+            if (!empty($filters['type']) && $filters['type'] !== 'all' && $type !== strtolower((string) $filters['type'])) {
+                return false;
+            }
+
+            if (!empty($filters['category']) && $filters['category'] !== 'all' && $category !== strtolower((string) $filters['category'])) {
+                return false;
+            }
+
+            if (!empty($filters['status']) && $filters['status'] !== 'all' && $status !== strtolower((string) $filters['status'])) {
+                return false;
+            }
+
+            if (!$this->matchesDonationDateFilter($date, $filters)) {
+                return false;
+            }
+
+            return true;
+        }));
+    }
+
+    private function normalizeDonationRows(array $rows): array
+    {
+        return array_map(function (array $row) {
+            $donor = trim((string) (($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')));
+            if ($donor === '') {
+                $donor = (string) ($this->resolveDonationField($row, ['donor_name', 'group_name', 'organization_name', 'email']) ?? 'Unknown donor');
+            }
+
+            $reference = (string) ($this->resolveDonationField($row, ['reference_number', 'donation_number', 'receipt_number', 'uuid']) ?? 'No reference');
+            $type = (string) ($this->resolveDonationField($row, ['type', 'donation_type', 'donor_type']) ?? 'General');
+            $category = (string) ($this->resolveDonationField($row, ['category', 'donation_purpose']) ?? 'General');
+            $status = (string) ($this->resolveDonationField($row, ['status', 'payment_status']) ?? 'n/a');
+            $date = (string) ($this->resolveDonationField($row, ['donation_date', 'payment_date', 'created_at']) ?? date('Y-m-d'));
+            $scope = (string) ($this->resolveDonationField($row, ['gurmu_name', 'gamta_name', 'godina_name', 'level_scope']) ?? 'Current scope');
+
+            return [
+                'reference' => $reference,
+                'donor' => $donor,
+                'amount' => (float) ($row['amount'] ?? 0),
+                'type' => ucfirst($type),
+                'category' => ucfirst(str_replace('_', ' ', $category)),
+                'status' => ucfirst(str_replace('_', ' ', $status)),
+                'date' => date('Y-m-d', strtotime($date)),
+                'scope' => ucfirst((string) $scope),
+            ];
+        }, $rows);
+    }
+
+    private function summarizeDonationGroups(array $rows, string $field): array
+    {
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $key = (string) ($row[$field] ?? 'Unknown');
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'label' => $key,
+                    'count' => 0,
+                    'amount' => 0.0,
+                ];
+            }
+
+            $groups[$key]['count']++;
+            $groups[$key]['amount'] += (float) ($row['amount'] ?? 0);
+        }
+
+        return array_values($groups);
+    }
+
+    private function resolveDonationField(array $row, array $keys)
+    {
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $row) && $row[$key] !== null && $row[$key] !== '') {
+                return $row[$key];
+            }
+        }
+
+        return null;
+    }
+
+    private function matchesDonationDateFilter(string $date, array $filters): bool
+    {
+        $timestamp = strtotime($date);
+        if ($timestamp === false) {
+            return true;
+        }
+
+        if (!empty($filters['start_date']) && $timestamp < strtotime((string) $filters['start_date'] . ' 00:00:00')) {
+            return false;
+        }
+
+        if (!empty($filters['end_date']) && $timestamp > strtotime((string) $filters['end_date'] . ' 23:59:59')) {
+            return false;
+        }
+
+        $range = $filters['date_range'] ?? null;
+        if (empty($range) || $range === 'all') {
+            return true;
+        }
+
+        $start = null;
+        switch ($range) {
+            case '7_days':
+                $start = strtotime('-7 days');
+                break;
+            case '30_days':
+                $start = strtotime('-30 days');
+                break;
+            case '90_days':
+                $start = strtotime('-90 days');
+                break;
+            case 'this_month':
+                $start = strtotime(date('Y-m-01 00:00:00'));
+                break;
+            case 'this_year':
+                $start = strtotime(date('Y-01-01 00:00:00'));
+                break;
+        }
+
+        return $start === null || $timestamp >= $start;
     }
 }
