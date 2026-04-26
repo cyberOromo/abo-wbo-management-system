@@ -630,8 +630,15 @@ class ReportController extends BaseController
     private function generateMeetingReport($userScope, $filters)
     {
         $hasMeetingAttendees = $this->reportTableExists('meeting_attendees');
+        $hasCreatedBy = Database::getInstance()->columnExists('meetings', 'created_by');
 
-        $sql = "SELECT m.*, u.first_name, u.last_name";
+        $sql = "SELECT m.*";
+
+        if ($hasCreatedBy) {
+            $sql .= ", u.first_name, u.last_name";
+        } else {
+            $sql .= ", NULL as first_name, NULL as last_name";
+        }
 
         if ($hasMeetingAttendees) {
             $sql .= ", COUNT(ma.id) as attendee_count,
@@ -641,8 +648,12 @@ class ReportController extends BaseController
         }
 
         $sql .= "
-                FROM meetings m
-                LEFT JOIN users u ON m.created_by = u.id";
+        FROM meetings m";
+
+    if ($hasCreatedBy) {
+        $sql .= "
+        LEFT JOIN users u ON m.created_by = u.id";
+    }
 
         if ($hasMeetingAttendees) {
             $sql .= "
