@@ -30,12 +30,25 @@ class EventController extends BaseController
 
             // Get events from database directly
             $db = \App\Utils\Database::getInstance();
+            $hasCreatedBy = $db->columnExists('events', 'created_by');
+            $hasGodinaId = $db->columnExists('events', 'godina_id');
+            $hasScopeId = $db->columnExists('events', 'scope_id');
+            $hasLevelScope = $db->columnExists('events', 'level_scope');
             
             // Simple query for events with hierarchy filtering
-            $sql = "SELECT e.*, u.first_name, u.last_name,
-                           CONCAT(u.first_name, ' ', u.last_name) as created_by_name
-                    FROM events e
-                    LEFT JOIN users u ON e.created_by = u.id
+            $sql = "SELECT e.*";
+
+            if ($hasCreatedBy) {
+                $sql .= ", u.first_name, u.last_name,
+                           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as created_by_name
+                        FROM events e
+                        LEFT JOIN users u ON e.created_by = u.id";
+            } else {
+                $sql .= ", NULL as first_name, NULL as last_name, '' as created_by_name
+                        FROM events e";
+            }
+
+            $sql .= "
                     WHERE 1=1";
             
             $params = [];
@@ -45,8 +58,13 @@ class EventController extends BaseController
             
             if ($scope !== 'all') {
                 if (isset($scope['godina']) && $scope['godina']) {
-                    $sql .= " AND e.godina_id = ?";
-                    $params[] = $scope['godina'];
+                    if ($hasGodinaId) {
+                        $sql .= " AND e.godina_id = ?";
+                        $params[] = $scope['godina'];
+                    } elseif ($hasLevelScope && $hasScopeId) {
+                        $sql .= " AND e.level_scope = 'godina' AND e.scope_id = ?";
+                        $params[] = $scope['godina'];
+                    }
                 }
             }
             
@@ -65,8 +83,15 @@ class EventController extends BaseController
                         WHERE 1=1";
             
             if ($scope !== 'all' && isset($scope['godina']) && $scope['godina']) {
-                $statsSql .= " AND e.godina_id = ?";
-                $statsParams = [$scope['godina']];
+                if ($hasGodinaId) {
+                    $statsSql .= " AND e.godina_id = ?";
+                    $statsParams = [$scope['godina']];
+                } elseif ($hasLevelScope && $hasScopeId) {
+                    $statsSql .= " AND e.level_scope = 'godina' AND e.scope_id = ?";
+                    $statsParams = [$scope['godina']];
+                } else {
+                    $statsParams = [];
+                }
             } else {
                 $statsParams = [];
             }

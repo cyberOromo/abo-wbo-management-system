@@ -33,12 +33,25 @@ class MeetingController extends BaseController
 
             // Get meetings from database directly
             $db = \App\Utils\Database::getInstance();
+            $hasCreatedBy = $db->columnExists('meetings', 'created_by');
+            $hasGodinaId = $db->columnExists('meetings', 'godina_id');
+            $hasScopeId = $db->columnExists('meetings', 'scope_id');
+            $hasLevelScope = $db->columnExists('meetings', 'level_scope');
             
             // Simple query for meetings with hierarchy filtering  
-            $sql = "SELECT m.*, u.first_name, u.last_name,
-                           CONCAT(u.first_name, ' ', u.last_name) as created_by_name
-                    FROM meetings m
-                    LEFT JOIN users u ON m.created_by = u.id
+            $sql = "SELECT m.*";
+
+            if ($hasCreatedBy) {
+                $sql .= ", u.first_name, u.last_name,
+                           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as created_by_name
+                        FROM meetings m
+                        LEFT JOIN users u ON m.created_by = u.id";
+            } else {
+                $sql .= ", NULL as first_name, NULL as last_name, '' as created_by_name
+                        FROM meetings m";
+            }
+
+            $sql .= "
                     WHERE 1=1";
             
             $params = [];
@@ -48,8 +61,13 @@ class MeetingController extends BaseController
             
             if ($scope !== 'all') {
                 if (isset($scope['godina']) && $scope['godina']) {
-                    $sql .= " AND m.godina_id = ?";
-                    $params[] = $scope['godina'];
+                    if ($hasGodinaId) {
+                        $sql .= " AND m.godina_id = ?";
+                        $params[] = $scope['godina'];
+                    } elseif ($hasLevelScope && $hasScopeId) {
+                        $sql .= " AND m.level_scope = 'godina' AND m.scope_id = ?";
+                        $params[] = $scope['godina'];
+                    }
                 }
             }
             
@@ -68,8 +86,15 @@ class MeetingController extends BaseController
                         WHERE 1=1";
             
             if ($scope !== 'all' && isset($scope['godina']) && $scope['godina']) {
-                $statsSql .= " AND m.godina_id = ?";
-                $statsParams = [$scope['godina']];
+                if ($hasGodinaId) {
+                    $statsSql .= " AND m.godina_id = ?";
+                    $statsParams = [$scope['godina']];
+                } elseif ($hasLevelScope && $hasScopeId) {
+                    $statsSql .= " AND m.level_scope = 'godina' AND m.scope_id = ?";
+                    $statsParams = [$scope['godina']];
+                } else {
+                    $statsParams = [];
+                }
             } else {
                 $statsParams = [];
             }
