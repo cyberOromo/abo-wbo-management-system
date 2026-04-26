@@ -64,7 +64,7 @@ class ResponsibilityController extends Controller
             // Get overdue assignments
             $overdueAssignments = $this->assignmentModel->getOverdueAssignments(['limit' => 5]);
             
-            $this->render('responsibilities/index', [
+            echo $this->render('responsibilities/index', [
                 'title' => 'Shared Responsibilities & Tasks Management',
                 'section' => 'responsibilities',
                 'stats' => $stats,
@@ -109,7 +109,7 @@ class ResponsibilityController extends Controller
                 'responsibility_id' => $responsibilityId
             ]);
             
-            $this->render('responsibilities/view', [
+            echo $this->render('responsibilities/view', [
                 'title' => 'Responsibility Details',
                 'section' => 'responsibilities',
                 'responsibility' => $responsibility,
@@ -142,7 +142,7 @@ class ResponsibilityController extends Controller
             // Get organizational units for assignment context
             $organizationalUnits = $this->getOrganizationalUnits();
             
-            $this->render('responsibilities/assign', [
+            echo $this->render('responsibilities/assign', [
                 'title' => 'Assign Responsibilities',
                 'section' => 'responsibilities',
                 'positions' => $positions,
@@ -240,7 +240,7 @@ class ResponsibilityController extends Controller
             // Get filter options
             $filterOptions = $this->getAssignmentFilterOptions();
             
-            $this->render('responsibilities/assignments', [
+            echo $this->render('responsibilities/assignments', [
                 'title' => 'Responsibility Assignments',
                 'section' => 'responsibilities',
                 'assignments' => $assignments,
@@ -271,7 +271,7 @@ class ResponsibilityController extends Controller
             // Get assignment history/activities
             $activities = $this->getAssignmentActivities($assignmentId);
             
-            $this->render('responsibilities/assignment-view', [
+            echo $this->render('responsibilities/assignment-view', [
                 'title' => 'Assignment Details',
                 'section' => 'responsibilities',
                 'assignment' => $assignment,
