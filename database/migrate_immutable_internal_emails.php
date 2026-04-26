@@ -8,6 +8,7 @@ use App\Utils\Database;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/helpers.php';
+require_once __DIR__ . '/InternalEmailSchemaBootstrap.php';
 
 define('APP_ROOT', dirname(__DIR__));
 define('PUBLIC_ROOT', APP_ROOT . '/public');
@@ -19,6 +20,7 @@ final class ImmutableInternalEmailMigration
 {
     private Database $db;
     private InternalEmailGenerator $generator;
+    private InternalEmailSchemaBootstrap $schema;
     private bool $apply;
     private ?int $userId;
     private ?int $limit;
@@ -26,6 +28,8 @@ final class ImmutableInternalEmailMigration
     public function __construct(array $options)
     {
         $this->db = Database::getInstance();
+        $this->schema = new InternalEmailSchemaBootstrap($this->db);
+        $this->schema->ensureInternalEmailSchema();
         $this->generator = new InternalEmailGenerator();
         $this->apply = isset($options['apply']);
         $this->userId = isset($options['user-id']) ? (int) $options['user-id'] : null;

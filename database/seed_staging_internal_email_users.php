@@ -8,6 +8,7 @@ use App\Utils\Database;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/helpers.php';
+require_once __DIR__ . '/InternalEmailSchemaBootstrap.php';
 
 define('APP_ROOT', dirname(__DIR__));
 define('PUBLIC_ROOT', APP_ROOT . '/public');
@@ -22,11 +23,14 @@ final class StagingInternalEmailSeeder
 
     private Database $db;
     private InternalEmailGenerator $generator;
+    private InternalEmailSchemaBootstrap $schema;
     private bool $apply;
 
     public function __construct(array $options)
     {
         $this->db = Database::getInstance();
+        $this->schema = new InternalEmailSchemaBootstrap($this->db);
+        $this->schema->ensureInternalEmailSchema();
         $this->generator = new InternalEmailGenerator();
         $this->apply = isset($options['apply']);
     }
@@ -119,7 +123,7 @@ final class StagingInternalEmailSeeder
     private function ensurePositions(array $fixtures): array
     {
         return [
-            'global_admin' => $this->findOrCreate('positions', ['code' => 'STGIMM-GADM'], [
+            'global_admin' => $this->findOrCreatePosition([
                 'key_name' => 'staging_global_admin',
                 'name' => 'Staging Global Admin',
                 'code' => 'STGIMM-GADM',
@@ -133,7 +137,7 @@ final class StagingInternalEmailSeeder
                 'status' => 'active',
                 'metadata' => json_encode(['seed_tag' => self::SEED_TAG]),
             ]),
-            'godina_exec' => $this->findOrCreate('positions', ['code' => 'STGIMM-GODX'], [
+            'godina_exec' => $this->findOrCreatePosition([
                 'key_name' => 'staging_godina_leader',
                 'name' => 'Staging Godina Leader',
                 'code' => 'STGIMM-GODX',
@@ -147,7 +151,7 @@ final class StagingInternalEmailSeeder
                 'status' => 'active',
                 'metadata' => json_encode(['seed_tag' => self::SEED_TAG]),
             ]),
-            'gamta_exec' => $this->findOrCreate('positions', ['code' => 'STGIMM-GAMX'], [
+            'gamta_exec' => $this->findOrCreatePosition([
                 'key_name' => 'staging_gamta_leader',
                 'name' => 'Staging Gamta Leader',
                 'code' => 'STGIMM-GAMX',
@@ -161,7 +165,7 @@ final class StagingInternalEmailSeeder
                 'status' => 'active',
                 'metadata' => json_encode(['seed_tag' => self::SEED_TAG]),
             ]),
-            'gurmu_exec' => $this->findOrCreate('positions', ['code' => 'STGIMM-GURX'], [
+            'gurmu_exec' => $this->findOrCreatePosition([
                 'key_name' => 'staging_gurmu_leader',
                 'name' => 'Staging Gurmu Leader',
                 'code' => 'STGIMM-GURX',
@@ -175,7 +179,7 @@ final class StagingInternalEmailSeeder
                 'status' => 'active',
                 'metadata' => json_encode(['seed_tag' => self::SEED_TAG]),
             ]),
-            'gurmu_member' => $this->findOrCreate('positions', ['code' => 'STGIMM-GURM'], [
+            'gurmu_member' => $this->findOrCreatePosition([
                 'key_name' => 'staging_gurmu_member',
                 'name' => 'Staging Gurmu Member',
                 'code' => 'STGIMM-GURM',
@@ -243,25 +247,11 @@ final class StagingInternalEmailSeeder
         $user = $this->db->fetch('SELECT * FROM users WHERE email = ?', [$plan['email']]);
 
         if (!$user) {
-            $userId = $this->db->insert('users', [
-                'first_name' => $plan['first_name'],
-                'last_name' => $plan['last_name'],
-                'email' => $plan['email'],
-                'personal_email' => $plan['email'],
-                'phone' => '555-0199',
-                'personal_phone' => '555-0199',
-                'password_hash' => password_hash(self::DEFAULT_PASSWORD, PASSWORD_DEFAULT),
-                'role' => $plan['role'],
-                'status' => 'active',
-                'language' => 'en',
-                'registration_source' => 'admin_created',
-                'account_type' => 'internal_only',
-                'email_verified_at' => date('Y-m-d H:i:s'),
-                'personal_email_verified' => 1,
-                'metadata' => json_encode(['seed_tag' => self::SEED_TAG]),
-            ]);
-
+            $userId = $this->db->insert('users', $this->buildUserInsertPayload($plan));
             $user = $this->db->fetch('SELECT * FROM users WHERE id = ?', [$userId]);
+        } else {
+            $this->db->update('users', $this->buildUserUpdatePayload($plan), ['id' => $user['id']]);
+            $user = $this->db->fetch('SELECT * FROM users WHERE id = ?', [$user['id']]);
         }
 
         $assignment = $this->db->fetch(
@@ -270,20 +260,7 @@ final class StagingInternalEmailSeeder
         );
 
         if (!$assignment) {
-            $this->db->insert('user_assignments', [
-                'user_id' => $user['id'],
-                'position_id' => $plan['position']['id'],
-                'level_scope' => $plan['scope']['level'],
-                'global_id' => $plan['scope']['global_id'] ?? null,
-                'godina_id' => $plan['scope']['godina_id'] ?? null,
-                'gamta_id' => $plan['scope']['gamta_id'] ?? null,
-                'gurmu_id' => $plan['scope']['gurmu_id'] ?? null,
-                'status' => 'active',
-                'start_date' => date('Y-m-d'),
-                'appointment_type' => 'appointed',
-                'assignment_reason' => 'Staging internal email validation fixture',
-                'metadata' => json_encode(['seed_tag' => self::SEED_TAG]),
-            ]);
+            $this->db->insert('user_assignments', $this->buildAssignmentPayload($plan, (int) $user['id']));
         }
 
         $userData = [
@@ -312,6 +289,8 @@ final class StagingInternalEmailSeeder
                 'internal_account_created_at' => date('Y-m-d H:i:s'),
                 'internal_credentials_sent_at' => date('Y-m-d H:i:s'),
             ], ['id' => $user['id']]);
+
+            $user['internal_email'] = $primaryEmail;
         }
 
         if (in_array($plan['role'], ['admin', 'executive'], true)) {
@@ -335,6 +314,130 @@ final class StagingInternalEmailSeeder
                 ]);
             }
         }
+    }
+
+    private function buildUserInsertPayload(array $plan): array
+    {
+        $passwordHash = password_hash(self::DEFAULT_PASSWORD, PASSWORD_DEFAULT);
+        $scope = $plan['scope'];
+        $userType = $this->mapRoleToUserType($plan['role']);
+        $payload = [
+                'first_name' => $plan['first_name'],
+                'last_name' => $plan['last_name'],
+                'email' => $plan['email'],
+            'phone' => '555-0199',
+            'password' => $passwordHash,
+            'password_hash' => $passwordHash,
+            'user_type' => $userType,
+            'role' => $plan['role'],
+            'gurmu_id' => $scope['gurmu_id'] ?? $scope['gamta_id'] ?? $scope['godina_id'] ?? $scope['global_id'],
+            'level_scope' => $scope['level'],
+            'language_preference' => 'en',
+            'language' => 'en',
+            'status' => 'active',
+            'approval_status' => 'approved',
+            'approved_by' => 1,
+            'approved_at' => date('Y-m-d H:i:s'),
+            'email_verified_at' => date('Y-m-d H:i:s'),
+            'registration_source' => 'admin_created',
+            'account_type' => 'internal_only',
+            'metadata' => json_encode(['seed_tag' => self::SEED_TAG]),
+        ];
+
+        return $this->schema->filterPayload('users', $payload);
+    }
+
+    private function buildUserUpdatePayload(array $plan): array
+    {
+        return $this->schema->filterPayload('users', [
+            'status' => 'active',
+            'approval_status' => 'approved',
+            'approved_by' => 1,
+            'approved_at' => date('Y-m-d H:i:s'),
+            'level_scope' => $plan['scope']['level'],
+            'gurmu_id' => $plan['scope']['gurmu_id'] ?? $plan['scope']['gamta_id'] ?? $plan['scope']['godina_id'] ?? $plan['scope']['global_id'],
+            'user_type' => $this->mapRoleToUserType($plan['role']),
+            'metadata' => json_encode(['seed_tag' => self::SEED_TAG]),
+        ]);
+    }
+
+    private function buildAssignmentPayload(array $plan, int $userId): array
+    {
+        return $this->schema->filterPayload('user_assignments', [
+            'user_id' => $userId,
+            'position_id' => $plan['position']['id'],
+            'organizational_unit_id' => $this->schema->buildAssignmentUnitId($plan['scope']),
+            'level_scope' => $plan['scope']['level'],
+            'assigned_by' => 1,
+            'approved_by' => 1,
+            'status' => 'active',
+            'approval_status' => 'approved',
+            'term_start' => date('Y-m-d'),
+            'start_date' => date('Y-m-d'),
+            'appointment_type' => 'appointment',
+            'approval_notes' => 'Staging internal email validation fixture',
+            'assignment_reason' => 'Staging internal email validation fixture',
+            'global_id' => $plan['scope']['global_id'] ?? null,
+            'godina_id' => $plan['scope']['godina_id'] ?? null,
+            'gamta_id' => $plan['scope']['gamta_id'] ?? null,
+            'gurmu_id' => $plan['scope']['gurmu_id'] ?? null,
+            'metadata' => json_encode(['seed_tag' => self::SEED_TAG]),
+        ]);
+    }
+
+    private function findOrCreatePosition(array $payload): array
+    {
+        $identity = [];
+
+        if ($this->schema->hasColumn('positions', 'code')) {
+            $identity['code'] = $payload['code'];
+        } else {
+            $identity['key_name'] = $payload['key_name'];
+        }
+
+        $position = $this->findOrCreate('positions', $identity, $this->buildPositionPayload($payload));
+        return $this->schema->normalizePositionRecord($position, $payload);
+    }
+
+    private function buildPositionPayload(array $payload): array
+    {
+        $filtered = $this->schema->filterPayload('positions', [
+            'key_name' => $payload['key_name'],
+            'code' => $payload['code'],
+            'name' => $payload['name'],
+            'name_en' => $payload['name'],
+            'name_om' => $payload['name'],
+            'description' => $payload['description'],
+            'description_en' => $payload['description'],
+            'description_om' => $payload['description'],
+            'hierarchy_type' => $payload['hierarchy_type'],
+            'hierarchy_id' => $payload['hierarchy_id'],
+            'level_scope' => $payload['hierarchy_type'],
+            'level' => $payload['level'],
+            'sort_order' => $payload['level'],
+            'is_executive' => $payload['is_executive'],
+            'is_elected' => $payload['is_elected'],
+            'max_holders' => $payload['max_holders'],
+            'election_cycle' => !empty($payload['is_elected']) ? 'elected' : 'appointed',
+            'status' => $payload['status'],
+            'metadata' => $payload['metadata'],
+            'permissions' => json_encode([]),
+        ]);
+
+        if (array_key_exists('permissions', $filtered) && $filtered['permissions'] === false) {
+            $filtered['permissions'] = json_encode([]);
+        }
+
+        return $filtered;
+    }
+
+    private function mapRoleToUserType(string $role): string
+    {
+        return match ($role) {
+            'admin' => 'system_admin',
+            'executive' => 'executive',
+            default => 'member',
+        };
     }
 
     private function resolveScopeCode(string $level): string
