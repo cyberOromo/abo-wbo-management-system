@@ -55,8 +55,7 @@ class SystemAdminController extends Controller
      */
     public function globalSettings()
     {
-        $globalModel = new GlobalModel();
-        $global = $globalModel->getDefault();
+        $global = GlobalModel::getDefault();
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             return $this->updateGlobalSettings();
@@ -78,7 +77,7 @@ class SystemAdminController extends Controller
             
             $data = $_POST;
             $globalModel = new GlobalModel();
-            $global = $globalModel->getDefault();
+            $global = GlobalModel::getDefault();
             
             $updateData = [
                 'name' => $data['name'],

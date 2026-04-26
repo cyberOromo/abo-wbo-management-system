@@ -42,32 +42,44 @@ class UserController extends Controller
         $params = [];
         
         if (!empty($search)) {
-            $conditions[] = "(first_name LIKE ? OR last_name LIKE ? OR email LIKE ?)";
+            $conditions[] = "(u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR u.internal_email LIKE ?)";
+            $params[] = "%{$search}%";
             $params[] = "%{$search}%";
             $params[] = "%{$search}%";
             $params[] = "%{$search}%";
         }
         
         if (!empty($status)) {
-            $conditions[] = "status = ?";
+            $conditions[] = "u.status = ?";
             $params[] = $status;
         }
         
         if (!empty($role)) {
-            $conditions[] = "role = ?";
+            $conditions[] = "u.user_type = ?";
             $params[] = $role;
         }
         
         $whereClause = !empty($conditions) ? 'WHERE ' . implode(' AND ', $conditions) : '';
         
         // Get total count for pagination
-        $countQuery = "SELECT COUNT(*) as total FROM users {$whereClause}";
+        $countQuery = "SELECT COUNT(*) as total FROM users u {$whereClause}";
         $totalUsers = $this->db->fetch($countQuery, $params)['total'];
         $totalPages = ceil($totalUsers / $limit);
         
         // Get users with pagination
-        $query = "SELECT * FROM users {$whereClause} ORDER BY created_at DESC LIMIT {$limit} OFFSET {$offset}";
+        $query = "SELECT u.*
+                  FROM users u
+                  {$whereClause}
+                  ORDER BY u.created_at DESC
+                  LIMIT {$limit} OFFSET {$offset}";
         $users = $this->db->fetchAll($query, $params);
+
+        foreach ($users as &$user) {
+            $roleKey = $user['user_type'] ?? 'member';
+            $user['role_key'] = $roleKey;
+            $user['role_label'] = ucwords(str_replace('_', ' ', $roleKey));
+        }
+        unset($user);
         
         echo $this->render('users.index', [
             'title' => 'User Management',

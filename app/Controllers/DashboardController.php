@@ -10,8 +10,12 @@ use App\Models\Gurmu;
 use App\Models\User;
 use App\Models\Donation;
 use App\Models\DonationCampaign;
+use App\Models\Event;
+use App\Models\Meeting;
 use App\Models\Position;
+use App\Models\Task;
 use App\Models\UserAssignment;
+use App\Models\Course;
 use PDO;
 
 /**
@@ -263,14 +267,35 @@ class DashboardController extends Controller
      */
     private function memberDashboard($userScope)
     {
+        $memberTasks = $this->getMemberTasks($userScope);
+        $upcomingMeetings = $this->getMemberMeetings($userScope);
+        $communityEvents = $this->getCommunityEvents($userScope);
+        $memberDonations = $this->getMemberDonations($userScope);
+        $memberCourses = $this->getMemberCourses($userScope);
+        $trainingSessions = $this->getTrainingSessions($upcomingMeetings);
+        $gurmuInfo = $this->getMemberGurmuInfo($userScope);
+
         $data = [
-            'user' => auth_user(),
+            'user' => array_merge(auth_user() ?? [], [
+                'gurmu_name' => $userScope['gurmu_name'] ?? null,
+            ]),
             'user_scope' => $userScope,
             'page_title' => 'Member Dashboard - ' . ($userScope['gurmu_name'] ?? 'Community'),
-            'my_tasks' => $this->getMemberTasks($userScope),
-            'upcoming_meetings' => $this->getMemberMeetings($userScope),
-            'community_events' => $this->getCommunityEvents($userScope),
-            'my_donations' => $this->getMemberDonations($userScope),
+            'stats' => [
+                'upcoming_events' => count($communityEvents),
+                'my_meetings' => count($upcomingMeetings),
+                'my_tasks' => count($memberTasks),
+                'my_donations' => count($memberDonations),
+                'active_courses' => count($memberCourses),
+                'training_sessions' => count($trainingSessions),
+            ],
+            'myTasks' => $memberTasks,
+            'upcomingMeetings' => $upcomingMeetings,
+            'recentEvents' => $communityEvents,
+            'myDonations' => $memberDonations,
+            'memberCourses' => $memberCourses,
+            'trainingSessions' => $trainingSessions,
+            'gurmuInfo' => $gurmuInfo,
             'recent_announcements' => $this->getCommunityAnnouncements($userScope, 5),
             'community_stats' => $this->getCommunityStatistics($userScope)
         ];
@@ -773,11 +798,35 @@ class DashboardController extends Controller
     private function getMemberProfile($userId) { return []; }
     private function getMemberStatistics($userId) { return []; }
     private function getMemberActivities($userId, $limit) { return []; }
-    private function getUpcomingCommunityEvents($scope, $limit) { return []; }
+    private function getUpcomingCommunityEvents($scope, $limit)
+    {
+        try {
+            return (new Event())->getUpcomingEventsForUser((int) ($scope['user_id'] ?? 0), (int) $limit);
+        } catch (\Throwable $e) {
+            error_log('DashboardController::getUpcomingCommunityEvents error: ' . $e->getMessage());
+            return [];
+        }
+    }
     private function getCommunityNews($scope, $limit) { return []; }
     private function getRecentMembers($scope, $limit) { return []; }
-    private function getPersonalTasks($userId, $limit) { return []; }
-    private function getPersonalMeetings($userId, $limit) { return []; }
+    private function getPersonalTasks($userId, $limit)
+    {
+        try {
+            return array_slice((new Task())->getTasksAssignedToUser((int) $userId), 0, (int) $limit);
+        } catch (\Throwable $e) {
+            error_log('DashboardController::getPersonalTasks error: ' . $e->getMessage());
+            return [];
+        }
+    }
+    private function getPersonalMeetings($userId, $limit)
+    {
+        try {
+            return (new Meeting())->getUpcomingMeetingsForUser((int) $userId, (int) $limit);
+        } catch (\Throwable $e) {
+            error_log('DashboardController::getPersonalMeetings error: ' . $e->getMessage());
+            return [];
+        }
+    }
     private function getMemberEngagementScore($userId) { return 75; }
     private function getMemberAchievements($userId) { return []; }
     private function getMemberRecommendations($userId) { return []; }
@@ -792,7 +841,73 @@ class DashboardController extends Controller
     }
     private function getMemberDonationsInternal($userId, $limit) { return []; }
     private function getCommunityAnnouncements($userScope, $limit) { return $this->getCommunityNews($userScope, $limit); }
-    private function getCommunityStatistics($userScope) { return []; }
+    private function getCommunityStatistics($userScope)
+    {
+        $gurmuInfo = $this->getMemberGurmuInfo($userScope);
+
+        return [
+            'member_count' => (int) ($gurmuInfo['member_count'] ?? 0),
+            'meeting_count' => (int) ($gurmuInfo['meeting_count'] ?? 0),
+            'course_count' => count($this->getMemberCourses($userScope)),
+        ];
+    }
+
+    private function getTrainingSessions(array $meetings): array
+    {
+        return array_values(array_filter($meetings, static function ($meeting) {
+            return ($meeting['meeting_type'] ?? '') === 'training';
+        }));
+    }
+
+    private function getMemberCourses($userScope): array
+    {
+        $userId = (int) ($userScope['user_id'] ?? 0);
+        if ($userId <= 0 || !$this->db->tableExists('courses') || !$this->db->tableExists('course_enrollments')) {
+            return [];
+        }
+
+        try {
+            return $this->db->fetchAll(
+                "SELECT c.*, ce.status as enrollment_status, ce.enrolled_at,
+                        CONCAT_WS(' ', instructor.first_name, instructor.last_name) as instructor_name
+                 FROM course_enrollments ce
+                 INNER JOIN courses c ON c.id = ce.course_id
+                 LEFT JOIN users instructor ON c.instructor_id = instructor.id
+                 WHERE ce.user_id = ?
+                   AND ce.status IN ('pending', 'active', 'completed')
+                 ORDER BY FIELD(ce.status, 'active', 'pending', 'completed'),
+                          COALESCE(c.start_date, ce.enrolled_at) DESC
+                 LIMIT 5",
+                [$userId]
+            );
+        } catch (\Throwable $e) {
+            error_log('DashboardController::getMemberCourses error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    private function getMemberGurmuInfo($userScope): array
+    {
+        $gurmuId = (int) ($userScope['gurmu_id'] ?? 0);
+        if ($gurmuId <= 0 || !$this->db->tableExists('gurmus')) {
+            return [];
+        }
+
+        try {
+            return $this->db->fetch(
+                "SELECT g.*, 
+                        (SELECT COUNT(*) FROM users u WHERE u.gurmu_id = g.id) as member_count,
+                        (SELECT COUNT(*) FROM meetings m WHERE m.gurmu_id = g.id) as meeting_count
+                 FROM gurmus g
+                 WHERE g.id = ?
+                 LIMIT 1",
+                [$gurmuId]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            error_log('DashboardController::getMemberGurmuInfo error: ' . $e->getMessage());
+            return [];
+        }
+    }
     
     private function getUserPosition($user) { return null; }
     private function getActiveSessions() { return 0; }

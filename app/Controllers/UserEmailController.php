@@ -49,16 +49,19 @@ class UserEmailController extends Controller
         ];
         
         $offset = ($filters['page'] - 1) * $filters['limit'];
+
+        $selectSql = "SELECT ie.*, 
+                      u.first_name, u.last_name, u.email as personal_email, u.user_type as role_key,
+                      GROUP_CONCAT(DISTINCT COALESCE(p.name_en, p.name) SEPARATOR ', ') as position_name";
+
+        $fromSql = " FROM internal_emails ie
+            LEFT JOIN users u ON ie.user_id = u.id
+            LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
+            LEFT JOIN positions p ON ua.position_id = p.id
+            WHERE 1=1";
         
         // Build query
-        $sql = "SELECT ie.*, 
-                       u.first_name, u.last_name, u.email as personal_email, u.role,
-                      GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as position_name
-                FROM internal_emails ie
-                LEFT JOIN users u ON ie.user_id = u.id
-                LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
-                LEFT JOIN positions p ON ua.position_id = p.id
-                WHERE 1=1";
+        $sql = $selectSql . $fromSql;
         
         $params = [];
         
@@ -81,17 +84,14 @@ class UserEmailController extends Controller
             $params[] = $searchTerm;
         }
         
-        $sql .= " ORDER BY ie.created_at DESC LIMIT ? OFFSET ?";
-        // Add GROUP BY before ORDER BY
-        $sql = str_replace(" ORDER BY", " GROUP BY ie.id ORDER BY", $sql);
+        $sql .= " GROUP BY ie.id ORDER BY ie.created_at DESC LIMIT ? OFFSET ?";
         $params[] = (int) $filters['limit'];
         $params[] = $offset;
         
         $emails = $this->db->fetchAll($sql, $params);
         
         // Get total count for pagination
-        $countSql = str_replace("SELECT ie.*, u.first_name, u.last_name, u.email as personal_email, u.role, p.name as position_name", "SELECT COUNT(*) as total", $sql);
-        $countSql = preg_replace('/ORDER BY .* LIMIT .* OFFSET .*/', '', $countSql);
+        $countSql = "SELECT COUNT(DISTINCT ie.id) as total" . $fromSql;
         $countParams = array_slice($params, 0, -2); // Remove limit and offset
         $totalCount = $this->db->fetch($countSql, $countParams);
         
@@ -118,12 +118,13 @@ class UserEmailController extends Controller
         
         $email = $this->db->fetch(
             "SELECT ie.*, 
-                    u.first_name, u.last_name, u.email as personal_email, u.role, u.phone,
-                    p.name as position_name,
+                    u.first_name, u.last_name, u.email as personal_email, u.user_type as role_key, u.phone,
+                    COALESCE(p.name_en, p.name) as position_name,
                     creator.first_name as created_by_name, creator.last_name as created_by_lastname
              FROM internal_emails ie
              LEFT JOIN users u ON ie.user_id = u.id
-             LEFT JOIN positions p ON u.position_id = p.id
+             LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
+             LEFT JOIN positions p ON ua.position_id = p.id
              LEFT JOIN users creator ON CAST(JSON_EXTRACT(ie.creation_metadata, '$.created_by') AS UNSIGNED) = creator.id
              WHERE ie.id = ?",
             [$id]

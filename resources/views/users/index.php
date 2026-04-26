@@ -114,7 +114,7 @@ $breadcrumbs = [
         <div class="card text-center">
             <div class="card-body">
                 <i class="bi bi-shield-shaded text-info mb-2" style="font-size: 2rem;"></i>
-                <h4 class="card-title"><?= number_format(array_filter($users ?? [], fn($u) => $u['role'] === 'admin')) ?></h4>
+                <h4 class="card-title"><?= number_format(count(array_filter($users ?? [], fn($u) => in_array($u['role_key'] ?? '', ['admin', 'system_admin'], true)))) ?></h4>
                 <p class="card-text text-muted">Administrators</p>
             </div>
         </div>
@@ -193,13 +193,14 @@ $breadcrumbs = [
                                     <?php
                                     $roleColors = [
                                         'admin' => 'danger',
-                                        'moderator' => 'warning',
-                                        'user' => 'primary'
+                                        'system_admin' => 'danger',
+                                        'executive' => 'warning',
+                                        'member' => 'primary'
                                     ];
-                                    $roleColor = $roleColors[$user['role']] ?? 'secondary';
+                                    $roleColor = $roleColors[$user['role_key'] ?? ''] ?? 'secondary';
                                     ?>
                                     <span class="badge bg-<?= $roleColor ?>">
-                                        <?= ucfirst($user['role']) ?>
+                                        <?= htmlspecialchars($user['role_label'] ?? 'Member') ?>
                                     </span>
                                 </td>
                                 <td>

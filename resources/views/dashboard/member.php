@@ -103,6 +103,42 @@ $pageTitle = 'Member Dashboard';
                 </div>
             </div>
         </div>
+
+        <div class="col-md-3 col-sm-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="icon-circle bg-info bg-opacity-10 text-info">
+                                <i class="bi bi-mortarboard fs-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h3 class="mb-0"><?= number_format($stats['active_courses'] ?? 0) ?></h3>
+                            <p class="text-muted mb-0 small">My Courses</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="icon-circle bg-secondary bg-opacity-10 text-secondary">
+                                <i class="bi bi-easel fs-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h3 class="mb-0"><?= number_format($stats['training_sessions'] ?? 0) ?></h3>
+                            <p class="text-muted mb-0 small">Training Sessions</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="row g-4">
@@ -235,6 +271,66 @@ $pageTitle = 'Member Dashboard';
                         <div class="text-center py-5">
                             <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
                             <p class="text-muted mt-3">No upcoming events</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-mortarboard me-2 text-info"></i>
+                        Courses and Training
+                    </h5>
+                    <a href="/courses" class="btn btn-sm btn-outline-info">View Learning</a>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($memberCourses) || !empty($trainingSessions)): ?>
+                        <?php if (!empty($memberCourses)): ?>
+                            <h6 class="text-muted text-uppercase small mb-3">My Courses</h6>
+                            <div class="list-group list-group-flush mb-4">
+                                <?php foreach ($memberCourses as $course): ?>
+                                    <div class="list-group-item px-0">
+                                        <div class="d-flex w-100 justify-content-between align-items-start gap-3">
+                                            <div class="flex-grow-1">
+                                                <div class="fw-semibold"><?= htmlspecialchars($course['title'] ?? 'Course') ?></div>
+                                                <?php if (!empty($course['instructor_name'])): ?>
+                                                    <div class="small text-muted"><?= htmlspecialchars($course['instructor_name']) ?></div>
+                                                <?php endif; ?>
+                                            </div>
+                                            <span class="badge bg-info-subtle text-info-emphasis border">
+                                                <?= htmlspecialchars(ucfirst($course['enrollment_status'] ?? 'active')) ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if (!empty($trainingSessions)): ?>
+                            <h6 class="text-muted text-uppercase small mb-3">Upcoming Training Sessions</h6>
+                            <div class="list-group list-group-flush">
+                                <?php foreach ($trainingSessions as $session): ?>
+                                    <div class="list-group-item px-0">
+                                        <div class="d-flex w-100 justify-content-between align-items-start gap-3">
+                                            <div class="flex-grow-1">
+                                                <div class="fw-semibold"><?= htmlspecialchars($session['title'] ?? 'Training Session') ?></div>
+                                                <div class="small text-muted">
+                                                    <?= date('M d, Y h:i A', strtotime($session['start_datetime'])) ?>
+                                                </div>
+                                            </div>
+                                            <a href="/meetings/<?= $session['id'] ?>" class="btn btn-sm btn-outline-secondary">Open</a>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <div class="text-center py-5">
+                            <i class="bi bi-mortarboard text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-3 mb-0">No courses or training sessions are assigned yet</p>
                         </div>
                     <?php endif; ?>
                 </div>

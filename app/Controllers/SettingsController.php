@@ -9,6 +9,7 @@ use App\Utils\Validator;
 class SettingsController extends BaseController
 {
     private $db;
+    private $settingsSchema;
 
     public function __construct()
     {
@@ -441,12 +442,27 @@ class SettingsController extends BaseController
 
     private function userIsAdmin($user)
     {
-        return $user['role'] === 'admin';
+        $role = $user['role'] ?? $user['user_type'] ?? null;
+
+        return in_array($role, ['admin', 'system_admin'], true);
     }
 
     private function getSystemSettings()
     {
-        $sql = "SELECT setting_key, setting_value FROM system_settings WHERE is_active = 1";
+        if (!$this->db->tableExists('system_settings')) {
+            return [];
+        }
+
+        $schema = $this->resolveSettingsSchema();
+        if (!$schema['key'] || !$schema['value']) {
+            return [];
+        }
+
+        $sql = "SELECT {$schema['key']} AS setting_key, {$schema['value']} AS setting_value FROM system_settings";
+        if ($schema['active']) {
+            $sql .= " WHERE {$schema['active']} = 1";
+        }
+
         $settings = $this->db->fetchAll($sql);
         
         $result = [];
@@ -459,27 +475,71 @@ class SettingsController extends BaseController
 
     private function getSystemSetting($key, $default = '')
     {
-        $sql = "SELECT setting_value FROM system_settings WHERE setting_key = ? AND is_active = 1";
-        $result = $this->db->fetchRow($sql, [$key]);
+        if (!$this->db->tableExists('system_settings')) {
+            return $default;
+        }
+
+        $schema = $this->resolveSettingsSchema();
+        if (!$schema['key'] || !$schema['value']) {
+            return $default;
+        }
+
+        $sql = "SELECT {$schema['value']} AS setting_value FROM system_settings WHERE {$schema['key']} = ?";
+        if ($schema['active']) {
+            $sql .= " AND {$schema['active']} = 1";
+        }
+
+        $result = $this->db->fetch($sql, [$key]);
         
         return $result ? $result['setting_value'] : $default;
     }
 
     private function updateSystemSetting($key, $value, $userId)
     {
+        if (!$this->db->tableExists('system_settings')) {
+            return 0;
+        }
+
+        $schema = $this->resolveSettingsSchema();
+        if (!$schema['key'] || !$schema['value']) {
+            return 0;
+        }
+
         // Check if setting exists
-        $sql = "SELECT id FROM system_settings WHERE setting_key = ?";
-        $existing = $this->db->fetchRow($sql, [$key]);
+        $sql = "SELECT id FROM system_settings WHERE {$schema['key']} = ?";
+        $existing = $this->db->fetch($sql, [$key]);
         
         if ($existing) {
-            // Update existing setting
-            $sql = "UPDATE system_settings SET setting_value = ?, updated_by = ?, updated_at = ? WHERE setting_key = ?";
-            return $this->db->query($sql, [$value, $userId, date('Y-m-d H:i:s'), $key]);
-        } else {
-            // Create new setting
-            $sql = "INSERT INTO system_settings (setting_key, setting_value, created_by, created_at, is_active) VALUES (?, ?, ?, ?, 1)";
-            return $this->db->query($sql, [$key, $value, $userId, date('Y-m-d H:i:s')]);
+            $updateData = [
+                $schema['value'] => $value,
+            ];
+
+            if ($schema['updated_by']) {
+                $updateData[$schema['updated_by']] = $userId;
+            }
+            if ($schema['updated_at']) {
+                $updateData[$schema['updated_at']] = date('Y-m-d H:i:s');
+            }
+
+            return $this->db->update('system_settings', $updateData, [$schema['key'] => $key]);
         }
+
+        $insertData = [
+            $schema['key'] => $key,
+            $schema['value'] => $value,
+        ];
+
+        if ($schema['created_by']) {
+            $insertData[$schema['created_by']] = $userId;
+        }
+        if ($schema['created_at']) {
+            $insertData[$schema['created_at']] = date('Y-m-d H:i:s');
+        }
+        if ($schema['active']) {
+            $insertData[$schema['active']] = 1;
+        }
+
+        return $this->db->insert('system_settings', $insertData);
     }
 
     private function getGeneralSettings()
@@ -618,13 +678,23 @@ class SettingsController extends BaseController
 
     private function getRecentSystemActivities()
     {
+        $activityTable = $this->resolveActivityTable();
+        if ($activityTable === null) {
+            return [];
+        }
+
         $sql = "SELECT sa.*, u.first_name, u.last_name
-                FROM system_activities sa
-                JOIN users u ON sa.user_id = u.id
+                FROM {$activityTable} sa
+                LEFT JOIN users u ON sa.user_id = u.id
                 ORDER BY sa.created_at DESC
                 LIMIT 20";
-        
-        return $this->db->fetchAll($sql);
+
+        try {
+            return $this->db->fetchAll($sql);
+        } catch (\Throwable $e) {
+            error_log('SettingsController::getRecentSystemActivities error: ' . $e->getMessage());
+            return [];
+        }
     }
 
     // Additional helper methods for system status checks
@@ -648,33 +718,44 @@ class SettingsController extends BaseController
     private function getSettingsStats()
     {
         try {
-            $stats = [];
-            
-            // Count of configured settings
-            $stmt = $this->db->prepare("SELECT COUNT(*) FROM system_settings WHERE value IS NOT NULL AND value != ''");
-            $stmt->execute();
-            $stats['configured_settings'] = $stmt->fetchColumn();
-            
-            // Total settings available
-            $stats['total_settings'] = 25; // Approximate number of settings
-            
-            // Configuration completeness
-            $stats['completion_percentage'] = $stats['total_settings'] > 0 ? 
-                round(($stats['configured_settings'] / $stats['total_settings']) * 100, 1) : 0;
-            
-            // Recent changes count (last 7 days)
-            $stmt = $this->db->prepare("SELECT COUNT(*) FROM system_activity 
-                                      WHERE action LIKE '%settings%' 
-                                      AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
-            $stmt->execute();
-            $stats['recent_changes'] = $stmt->fetchColumn();
-            
+            $stats = [
+                'configured_settings' => 0,
+                'total_settings' => 0,
+                'completion_percentage' => 0,
+                'recent_changes' => 0,
+            ];
+
+            if ($this->db->tableExists('system_settings')) {
+                $schema = $this->resolveSettingsSchema();
+                if ($schema['value']) {
+                    $stats['configured_settings'] = (int) $this->db->fetchColumn(
+                        "SELECT COUNT(*) FROM system_settings WHERE {$schema['value']} IS NOT NULL AND {$schema['value']} != ''"
+                    );
+                }
+
+                $stats['total_settings'] = (int) $this->db->fetchColumn('SELECT COUNT(*) FROM system_settings');
+            }
+
+            if ($stats['total_settings'] > 0) {
+                $stats['completion_percentage'] = round(($stats['configured_settings'] / $stats['total_settings']) * 100, 1);
+            }
+
+            $activityTable = $this->resolveActivityTable();
+            if ($activityTable !== null) {
+                $stats['recent_changes'] = (int) $this->db->fetchColumn(
+                    "SELECT COUNT(*) FROM {$activityTable}
+                     WHERE action LIKE ?
+                     AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+                    ['%settings%']
+                );
+            }
+
             return $stats;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             error_log("Error getting settings stats: " . $e->getMessage());
             return [
                 'configured_settings' => 0,
-                'total_settings' => 25,
+                'total_settings' => 0,
                 'completion_percentage' => 0,
                 'recent_changes' => 0
             ];
@@ -690,9 +771,10 @@ class SettingsController extends BaseController
             $alerts = [];
             
             // Check for weak passwords
-            $stmt = $this->db->prepare("SELECT COUNT(*) FROM users WHERE password_strength < 3");
-            $stmt->execute();
-            $weakPasswords = $stmt->fetchColumn();
+            $weakPasswords = 0;
+            if ($this->db->tableExists('users') && $this->db->columnExists('users', 'password_strength')) {
+                $weakPasswords = (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE password_strength < 3");
+            }
             
             if ($weakPasswords > 0) {
                 $alerts[] = [
@@ -704,11 +786,14 @@ class SettingsController extends BaseController
             }
             
             // Check for failed login attempts
-            $stmt = $this->db->prepare("SELECT COUNT(*) FROM login_attempts 
-                                      WHERE success = 0 
-                                      AND attempted_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)");
-            $stmt->execute();
-            $failedLogins = $stmt->fetchColumn();
+            $failedLogins = 0;
+            if ($this->db->tableExists('login_attempts')) {
+                $failedLogins = (int) $this->db->fetchColumn(
+                    "SELECT COUNT(*) FROM login_attempts 
+                     WHERE success = 0 
+                     AND attempted_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)"
+                );
+            }
             
             if ($failedLogins > 10) {
                 $alerts[] = [
@@ -720,11 +805,16 @@ class SettingsController extends BaseController
             }
             
             // Check for inactive sessions
-            $stmt = $this->db->prepare("SELECT COUNT(*) FROM user_sessions 
-                                      WHERE last_activity < DATE_SUB(NOW(), INTERVAL 24 HOUR) 
-                                      AND active = 1");
-            $stmt->execute();
-            $staleSessions = $stmt->fetchColumn();
+            $staleSessions = 0;
+            if ($this->db->tableExists('user_sessions')
+                && $this->db->columnExists('user_sessions', 'last_activity')
+                && $this->db->columnExists('user_sessions', 'active')) {
+                $staleSessions = (int) $this->db->fetchColumn(
+                    "SELECT COUNT(*) FROM user_sessions 
+                     WHERE last_activity < DATE_SUB(NOW(), INTERVAL 24 HOUR) 
+                     AND active = 1"
+                );
+            }
             
             if ($staleSessions > 0) {
                 $alerts[] = [
@@ -736,9 +826,59 @@ class SettingsController extends BaseController
             }
             
             return $alerts;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             error_log("Error getting security alerts: " . $e->getMessage());
             return [];
         }
+    }
+
+    private function resolveSettingsSchema(): array
+    {
+        if ($this->settingsSchema !== null) {
+            return $this->settingsSchema;
+        }
+
+        $keyColumn = $this->firstExistingColumn('system_settings', ['setting_key', 'key_name', 'name', 'config_key', 'key']);
+        $valueColumn = $this->firstExistingColumn('system_settings', ['setting_value', 'value', 'config_value']);
+
+        $this->settingsSchema = [
+            'key' => $keyColumn,
+            'value' => $valueColumn,
+            'active' => $this->firstExistingColumn('system_settings', ['is_active', 'active']),
+            'created_by' => $this->firstExistingColumn('system_settings', ['created_by']),
+            'created_at' => $this->firstExistingColumn('system_settings', ['created_at']),
+            'updated_by' => $this->firstExistingColumn('system_settings', ['updated_by']),
+            'updated_at' => $this->firstExistingColumn('system_settings', ['updated_at']),
+        ];
+
+        return $this->settingsSchema;
+    }
+
+    private function firstExistingColumn(string $table, array $columns): ?string
+    {
+        if (!$this->db->tableExists($table)) {
+            return null;
+        }
+
+        foreach ($columns as $column) {
+            if ($this->db->columnExists($table, $column)) {
+                return $column;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveActivityTable(): ?string
+    {
+        if ($this->db->tableExists('system_activities')) {
+            return 'system_activities';
+        }
+
+        if ($this->db->tableExists('system_activity')) {
+            return 'system_activity';
+        }
+
+        return null;
     }
 }
