@@ -5,14 +5,14 @@
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary">
+            <a href="/reports" class="btn btn-sm btn-outline-secondary">
                 <i class="bi bi-download me-1"></i>Export Reports
-            </button>
+            </a>
         </div>
-        <button type="button" class="btn btn-sm btn-primary">
+        <a href="/tasks" class="btn btn-sm btn-primary">
             <i class="bi bi-plus-circle me-1"></i>
-            New Task
-        </button>
+            View Tasks
+        </a>
     </div>
 </div>
 
@@ -263,17 +263,17 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
-                    <a href="/tasks/create" class="btn btn-primary btn-sm">
+                    <a href="/tasks" class="btn btn-primary btn-sm">
                         <i class="bi bi-plus-circle me-1"></i>
-                        Create New Task
+                        View Tasks
                     </a>
-                    <a href="/meetings/create" class="btn btn-success btn-sm">
+                    <a href="/meetings" class="btn btn-success btn-sm">
                         <i class="bi bi-calendar-plus me-1"></i>
-                        Schedule Meeting
+                        View Meetings
                     </a>
-                    <a href="/events/create" class="btn btn-info btn-sm">
+                    <a href="/events" class="btn btn-info btn-sm">
                         <i class="bi bi-megaphone me-1"></i>
-                        Create Event
+                        View Events
                     </a>
                     <a href="/reports" class="btn btn-warning btn-sm">
                         <i class="bi bi-file-earmark-text me-1"></i>

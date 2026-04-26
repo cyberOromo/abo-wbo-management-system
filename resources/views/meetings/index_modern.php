@@ -274,108 +274,84 @@ $canCreateMeeting = $can_create_meeting ?? false;
     
     <!-- Meeting Sidebar -->
     <div class="col-lg-4">
-        <!-- Today's Schedule -->
+        <!-- Scope Summary -->
         <div class="card mb-4">
             <div class="card-header">
                 <h6 class="card-title mb-0">
-                    <i class="bi bi-calendar-day me-2"></i>
-                    Today's Schedule
+                    <i class="bi bi-bullseye me-2"></i>
+                    Scope Summary
                 </h6>
             </div>
             <div class="card-body">
                 <div class="schedule-item d-flex align-items-center p-2 rounded mb-2 bg-primary bg-opacity-10">
-                    <div class="time-badge bg-primary text-white me-3">2:00 PM</div>
+                    <div class="time-badge bg-primary text-white me-3"><?= strtoupper(substr((string) ($scope['level_scope'] ?? 'all'), 0, 3)) ?></div>
                     <div>
-                        <h6 class="mb-0 small">Executive Board Meeting</h6>
-                        <small class="text-muted">Virtual - 8 attendees</small>
+                        <h6 class="mb-0 small"><?= htmlspecialchars($scope['scope_name'] ?? 'Current executive scope') ?></h6>
+                        <small class="text-muted"><?= number_format($stats['total'] ?? 0) ?> meeting records visible</small>
                     </div>
                 </div>
                 
                 <div class="text-center py-3">
-                    <i class="bi bi-calendar-check text-muted" style="font-size: 2rem;"></i>
-                    <p class="text-muted mt-2 small">No other meetings scheduled for today</p>
+                    <i class="bi bi-eye text-muted" style="font-size: 2rem;"></i>
+                    <p class="text-muted mt-2 small">This panel reflects only records reachable in your current hierarchy scope.</p>
                 </div>
             </div>
         </div>
         
-        <!-- Meeting Types -->
+        <!-- Status Breakdown -->
         <div class="card mb-4">
             <div class="card-header">
                 <h6 class="card-title mb-0">
-                    <i class="bi bi-collection me-2"></i>
-                    Meeting Types
+                    <i class="bi bi-pie-chart me-2"></i>
+                    Status Breakdown
                 </h6>
             </div>
             <div class="card-body">
                 <div class="meeting-type-item d-flex justify-content-between align-items-center mb-2">
                     <div class="d-flex align-items-center">
-                        <div class="badge bg-primary me-2"></div>
-                        <span class="small">Board Meetings</span>
+                        <div class="badge bg-warning me-2"></div>
+                        <span class="small">Scheduled</span>
                     </div>
-                    <span class="badge bg-secondary">3</span>
+                    <span class="badge bg-secondary"><?= number_format($stats['scheduled'] ?? 0) ?></span>
                 </div>
                 <div class="meeting-type-item d-flex justify-content-between align-items-center mb-2">
                     <div class="d-flex align-items-center">
                         <div class="badge bg-info me-2"></div>
-                        <span class="small">Planning Sessions</span>
+                        <span class="small">In Progress</span>
                     </div>
-                    <span class="badge bg-secondary">2</span>
+                    <span class="badge bg-secondary"><?= number_format($stats['in_progress'] ?? 0) ?></span>
                 </div>
                 <div class="meeting-type-item d-flex justify-content-between align-items-center mb-2">
                     <div class="d-flex align-items-center">
                         <div class="badge bg-success me-2"></div>
-                        <span class="small">Committee Meetings</span>
+                        <span class="small">Completed</span>
                     </div>
-                    <span class="badge bg-secondary">4</span>
+                    <span class="badge bg-secondary"><?= number_format($stats['completed'] ?? 0) ?></span>
                 </div>
                 <div class="meeting-type-item d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center">
-                        <div class="badge bg-warning me-2"></div>
-                        <span class="small">General Assembly</span>
+                        <div class="badge bg-primary me-2"></div>
+                        <span class="small">Recent Records</span>
                     </div>
-                    <span class="badge bg-secondary">1</span>
+                    <span class="badge bg-secondary"><?= number_format($stats['recent'] ?? 0) ?></span>
                 </div>
             </div>
         </div>
         
-        <!-- Recent Activity -->
+        <!-- Build Notes -->
         <div class="card">
             <div class="card-header">
                 <h6 class="card-title mb-0">
-                    <i class="bi bi-clock-history me-2"></i>
-                    Recent Activity
+                    <i class="bi bi-tools me-2"></i>
+                    Build Notes
                 </h6>
             </div>
             <div class="card-body">
-                <div class="timeline">
-                    <div class="timeline-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <h6 class="mb-1">Meeting Scheduled</h6>
-                                <p class="text-muted mb-0 small">Executive Board Meeting set for Nov 18</p>
-                            </div>
-                            <small class="text-muted">1h ago</small>
-                        </div>
-                    </div>
-                    <div class="timeline-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <h6 class="mb-1">Meeting Completed</h6>
-                                <p class="text-muted mb-0 small">Community Outreach completed with 12 attendees</p>
-                            </div>
-                            <small class="text-muted">2d ago</small>
-                        </div>
-                    </div>
-                    <div class="timeline-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <h6 class="mb-1">Agenda Updated</h6>
-                                <p class="text-muted mb-0 small">Financial Review agenda modified</p>
-                            </div>
-                            <small class="text-muted">3d ago</small>
-                        </div>
-                    </div>
-                </div>
+                <p class="text-muted small mb-2">The staging build currently exposes read-only meeting visibility for this executive scope.</p>
+                <ul class="small text-muted mb-0 ps-3">
+                    <li>Scheduling, editing, and template flows are intentionally hidden until their backing views and handlers are complete.</li>
+                    <li>Meeting reports remain available through the reports module.</li>
+                </ul>
             </div>
         </div>
     </div>

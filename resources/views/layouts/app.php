@@ -304,7 +304,7 @@
                 <?php if (session_has('success')): ?>
                     <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
                         <i class="bi bi-check-circle me-2"></i>
-                        <?= session_get('success') ?>
+                        <?= htmlspecialchars(session_flash('success')) ?>
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                 <?php endif; ?>
@@ -312,7 +312,7 @@
                 <?php if (session_has('error')): ?>
                     <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
                         <i class="bi bi-exclamation-triangle me-2"></i>
-                        <?= session_get('error') ?>
+                        <?= htmlspecialchars(session_flash('error')) ?>
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                 <?php endif; ?>
@@ -320,7 +320,7 @@
                 <?php if (session_has('info')): ?>
                     <div class="alert alert-info alert-dismissible fade show mt-3" role="alert">
                         <i class="bi bi-info-circle me-2"></i>
-                        <?= session_get('info') ?>
+                        <?= htmlspecialchars(session_flash('info')) ?>
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                 <?php endif; ?>
