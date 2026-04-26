@@ -43,7 +43,7 @@ $router->group(['prefix' => 'auth'], function() use ($router) {
 });
 
 // User management routes
-$router->group(['prefix' => 'users', 'middleware' => 'auth'], function() use ($router) {
+$router->group(['prefix' => 'users', 'middleware' => ['auth', 'module_access']], function() use ($router) {
     $router->get('/', 'UserController@index')->name('users.index');
     $router->get('/create', 'UserController@create')->name('users.create');
     $router->post('/', 'UserController@store')->name('users.store');
@@ -63,7 +63,7 @@ $router->group(['prefix' => 'users', 'middleware' => 'auth'], function() use ($r
 });
 
 // Comprehensive Hierarchy management routes
-$router->group(['prefix' => 'hierarchy', 'middleware' => 'auth'], function() use ($router) {
+$router->group(['prefix' => 'hierarchy', 'middleware' => ['auth', 'module_access']], function() use ($router) {
     // Dashboard and overview
     $router->get('/', 'HierarchyController@index')->name('hierarchy.index');
     $router->get('/dashboard', 'HierarchyController@dashboard')->name('hierarchy.dashboard');
@@ -127,7 +127,7 @@ $router->group(['prefix' => 'hierarchy', 'middleware' => 'auth'], function() use
 });
 
 // Position management routes
-$router->group(['prefix' => 'positions', 'middleware' => 'auth'], function() use ($router) {
+$router->group(['prefix' => 'positions', 'middleware' => ['auth', 'module_access']], function() use ($router) {
     $router->get('/', 'PositionController@index')->name('positions.index');
     $router->get('/create', 'PositionController@create')->name('positions.create');
     $router->post('/', 'PositionController@store')->name('positions.store');
@@ -149,7 +149,7 @@ $router->group(['prefix' => 'positions', 'middleware' => 'auth'], function() use
 });
 
 // Responsibility management routes - Shared Responsibilities & Tasks (5 Core Areas)
-$router->group(['prefix' => 'responsibilities', 'middleware' => 'auth'], function() use ($router) {
+$router->group(['prefix' => 'responsibilities', 'middleware' => ['auth', 'module_access']], function() use ($router) {
     // Main responsibility management
     $router->get('/', 'ResponsibilityController@index')->name('responsibilities.index');
     $router->get('/{id}', 'ResponsibilityController@view')->name('responsibilities.view');
@@ -231,7 +231,7 @@ $router->group(['prefix' => 'events', 'middleware' => 'auth'], function() use ($
 });
 
 // Internal Email Management routes
-$router->group(['prefix' => 'user-emails', 'middleware' => 'auth'], function() use ($router) {
+$router->group(['prefix' => 'user-emails', 'middleware' => ['auth', 'module_access']], function() use ($router) {
     // Main email management
     $router->get('/', 'UserEmailController@index')->name('user_emails.index');
     $router->get('/create', 'UserEmailController@create')->name('user_emails.create');
@@ -295,7 +295,7 @@ $router->group(['prefix' => 'courses', 'middleware' => 'auth'], function() use (
 });
 
 // Notification routes
-$router->group(['prefix' => 'notifications', 'middleware' => 'auth'], function() use ($router) {
+$router->group(['prefix' => 'notifications', 'middleware' => ['auth', 'module_access']], function() use ($router) {
     $router->get('/', 'NotificationController@index')->name('notifications.index');
     $router->get('/unread', 'NotificationController@unread')->name('notifications.unread');
     $router->put('/{id}/read', 'NotificationController@markRead')->name('notifications.read');
@@ -304,7 +304,7 @@ $router->group(['prefix' => 'notifications', 'middleware' => 'auth'], function()
 });
 
 // Report routes
-$router->group(['prefix' => 'reports', 'middleware' => 'auth'], function() use ($router) {
+$router->group(['prefix' => 'reports', 'middleware' => ['auth', 'module_access']], function() use ($router) {
     $router->get('/', 'ReportController@index')->name('reports.index');
     $router->get('/users', 'ReportController@users')->name('reports.users');
     $router->get('/hierarchy', 'ReportController@hierarchy')->name('reports.hierarchy');

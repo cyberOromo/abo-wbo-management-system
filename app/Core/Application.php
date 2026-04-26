@@ -146,6 +146,7 @@ class Application
         // Register core middleware
         $this->router->registerMiddleware('auth', \App\Middleware\AuthMiddleware::class);
         $this->router->registerMiddleware('admin', \App\Middleware\AdminMiddleware::class);
+        $this->router->registerMiddleware('module_access', \App\Middleware\ModuleAccessMiddleware::class);
         $this->router->registerMiddleware('role', \App\Middleware\RoleMiddleware::class);
         $this->router->registerMiddleware('csrf', \App\Middleware\CsrfMiddleware::class);
         $this->router->registerMiddleware('language', \App\Middleware\LanguageMiddleware::class);

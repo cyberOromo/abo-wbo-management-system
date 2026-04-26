@@ -20,7 +20,10 @@ class AdminMiddleware
         
         // Check if user has admin role
         $user = auth_user();
-        if (!$user || !$user->hasRole('admin')) {
+        $role = $user['role'] ?? null;
+        $userType = $user['user_type'] ?? null;
+
+        if (!$user || ($role !== 'admin' && $userType !== 'system_admin')) {
             http_response_code(403);
             echo "<h1>403 - Access Denied</h1>";
             echo "<p>You don't have permission to access this resource.</p>";
