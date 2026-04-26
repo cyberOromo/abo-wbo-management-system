@@ -29,7 +29,7 @@ class ModuleAccessMiddleware
             exit;
         }
 
-        session_set('error', 'You do not have permission to access that module.');
+        session_flash('error', 'You do not have permission to access that module.');
         header('Location: /dashboard');
         exit;
     }
