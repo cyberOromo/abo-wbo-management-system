@@ -1173,8 +1173,11 @@ class ReportController extends BaseController
     {
         $sql = "SELECT COALESCE(SUM(amount), 0) as total FROM donations d 
                 WHERE YEAR(d.created_at) = YEAR(NOW()) 
-                AND MONTH(d.created_at) = MONTH(NOW()) 
-                AND d.status != 'deleted'";
+                AND MONTH(d.created_at) = MONTH(NOW())";
+
+        if (Database::getInstance()->columnExists('donations', 'status')) {
+            $sql .= " AND d.status != 'deleted'";
+        }
         
         $result = Database::getInstance()->fetch($sql);
         return $result ? $result['total'] : 0;
