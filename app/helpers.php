@@ -501,6 +501,92 @@ if (!function_exists('is_system_admin')) {
     }
 }
 
+if (!function_exists('current_user_role')) {
+    /**
+     * Get the current authenticated role label used by the UI.
+     */
+    function current_user_role(): string {
+        if (is_system_admin()) {
+            return 'admin';
+        }
+
+        if (is_executive()) {
+            return 'executive';
+        }
+
+        if (is_member()) {
+            return 'member';
+        }
+
+        return auth_check() ? 'member' : 'guest';
+    }
+}
+
+if (!function_exists('module_access_map')) {
+    /**
+     * Role-based module visibility for shared navigation and dashboards.
+     * Server-side route hardening can build on the same role grouping later.
+     */
+    function module_access_map(): array {
+        return [
+            'guest' => [],
+            'member' => [
+                'dashboard',
+                'tasks',
+                'meetings',
+                'events',
+                'donations',
+                'profile',
+            ],
+            'executive' => [
+                'dashboard',
+                'users',
+                'hierarchy',
+                'tasks',
+                'meetings',
+                'events',
+                'donations',
+                'reports',
+                'responsibilities',
+                'profile',
+            ],
+            'admin' => [
+                'dashboard',
+                'users',
+                'hierarchy',
+                'positions',
+                'tasks',
+                'meetings',
+                'events',
+                'donations',
+                'reports',
+                'responsibilities',
+                'settings',
+                'notifications',
+                'profile',
+                'user_emails',
+                'system_maintenance',
+            ],
+        ];
+    }
+}
+
+if (!function_exists('can_access_module')) {
+    /**
+     * Check whether the authenticated user should see a module link/action.
+     */
+    function can_access_module(string $module): bool {
+        if (!auth_check()) {
+            return false;
+        }
+
+        $role = current_user_role();
+        $map = module_access_map();
+
+        return in_array($module, $map[$role] ?? [], true);
+    }
+}
+
 if (!function_exists('has_position')) {
     /**
      * Check if user has any active position assignments

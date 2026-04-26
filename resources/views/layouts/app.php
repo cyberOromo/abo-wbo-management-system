@@ -88,66 +88,96 @@
                                 <i class="bi bi-speedometer2 me-1"></i>Dashboard
                             </a>
                         </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-diagram-3 me-1"></i>Organization
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="/hierarchy">Hierarchy</a></li>
-                                <li><a class="dropdown-item" href="/positions">Positions</a></li>
-                                <li><a class="dropdown-item" href="/users">Users</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="/responsibilities">
-                                    <i class="bi bi-diagram-3 me-2 text-primary"></i>
-                                    Shared Responsibilities
-                                    <small class="d-block text-muted">5 Core Areas</small>
-                                </a></li>
-                            </ul>
-                        </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-calendar-event me-1"></i>Activities
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="/tasks">Tasks</a></li>
-                                <li><a class="dropdown-item" href="/meetings">Meetings</a></li>
-                                <li><a class="dropdown-item" href="/events">Events</a></li>
-                            </ul>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/donations">
-                                <i class="bi bi-heart me-1"></i>Donations
-                            </a>
-                        </li>
+                        <?php $showOrganization = can_access_module('users') || can_access_module('hierarchy') || can_access_module('positions') || can_access_module('responsibilities'); ?>
+                        <?php if ($showOrganization): ?>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-diagram-3 me-1"></i>Organization
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <?php if (can_access_module('hierarchy')): ?>
+                                        <li><a class="dropdown-item" href="/hierarchy">Hierarchy</a></li>
+                                    <?php endif; ?>
+                                    <?php if (can_access_module('positions')): ?>
+                                        <li><a class="dropdown-item" href="/positions">Positions</a></li>
+                                    <?php endif; ?>
+                                    <?php if (can_access_module('users')): ?>
+                                        <li><a class="dropdown-item" href="/users">Users</a></li>
+                                    <?php endif; ?>
+                                    <?php if (can_access_module('responsibilities')): ?>
+                                        <?php if (can_access_module('hierarchy') || can_access_module('positions') || can_access_module('users')): ?>
+                                            <li><hr class="dropdown-divider"></li>
+                                        <?php endif; ?>
+                                        <li><a class="dropdown-item" href="/responsibilities">
+                                            <i class="bi bi-diagram-3 me-2 text-primary"></i>
+                                            Shared Responsibilities
+                                            <small class="d-block text-muted">5 Core Areas</small>
+                                        </a></li>
+                                    <?php endif; ?>
+                                </ul>
+                            </li>
+                        <?php endif; ?>
+                        <?php $showActivities = can_access_module('tasks') || can_access_module('meetings') || can_access_module('events'); ?>
+                        <?php if ($showActivities): ?>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-calendar-event me-1"></i>Activities
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <?php if (can_access_module('tasks')): ?>
+                                        <li><a class="dropdown-item" href="/tasks">Tasks</a></li>
+                                    <?php endif; ?>
+                                    <?php if (can_access_module('meetings')): ?>
+                                        <li><a class="dropdown-item" href="/meetings">Meetings</a></li>
+                                    <?php endif; ?>
+                                    <?php if (can_access_module('events')): ?>
+                                        <li><a class="dropdown-item" href="/events">Events</a></li>
+                                    <?php endif; ?>
+                                </ul>
+                            </li>
+                        <?php endif; ?>
+                        <?php if (can_access_module('donations')): ?>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/donations">
+                                    <i class="bi bi-heart me-1"></i>Donations
+                                </a>
+                            </li>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </ul>
                 
                 <ul class="navbar-nav">
                     <?php if (auth_check()): ?>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-bell me-1"></i>
-                                <span class="badge bg-danger">0</span>
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><h6 class="dropdown-header">Notifications</h6></li>
-                                <li><a class="dropdown-item text-muted">No new notifications</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="/notifications">View All</a></li>
-                            </ul>
-                        </li>
+                        <?php if (can_access_module('notifications')): ?>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-bell me-1"></i>
+                                    <span class="badge bg-danger">0</span>
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><h6 class="dropdown-header">Notifications</h6></li>
+                                    <li><a class="dropdown-item text-muted">No new notifications</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="/notifications">View All</a></li>
+                                </ul>
+                            </li>
+                        <?php endif; ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-person-circle me-1"></i>
                                 <?= auth_user()['first_name'] ?? 'User' ?>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="/users/profile/edit">
-                                    <i class="bi bi-person me-2"></i>Profile
-                                </a></li>
-                                <li><a class="dropdown-item" href="/settings">
-                                    <i class="bi bi-gear me-2"></i>Settings
-                                </a></li>
+                                <?php if (can_access_module('profile')): ?>
+                                    <li><a class="dropdown-item" href="/users/profile/edit">
+                                        <i class="bi bi-person me-2"></i>Profile
+                                    </a></li>
+                                <?php endif; ?>
+                                <?php if (can_access_module('settings')): ?>
+                                    <li><a class="dropdown-item" href="/settings">
+                                        <i class="bi bi-gear me-2"></i>Settings
+                                    </a></li>
+                                <?php endif; ?>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
                                     <form method="POST" action="/auth/logout" class="m-0">
@@ -189,47 +219,70 @@
                                     <i class="bi bi-speedometer2 me-2"></i>Dashboard
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/users">
-                                    <i class="bi bi-people me-2"></i>Users
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/hierarchy">
-                                    <i class="bi bi-diagram-3 me-2"></i>Hierarchy
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/positions">
-                                    <i class="bi bi-briefcase me-2"></i>Positions
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/tasks">
-                                    <i class="bi bi-check-square me-2"></i>Tasks
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/meetings">
-                                    <i class="bi bi-camera-video me-2"></i>Meetings
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/events">
-                                    <i class="bi bi-calendar-event me-2"></i>Events
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/donations">
-                                    <i class="bi bi-heart me-2"></i>Donations
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/reports">
-                                    <i class="bi bi-graph-up me-2"></i>Reports
-                                </a>
-                            </li>
-                            <?php if (auth_user()['role'] === 'admin'): ?>
+                            <?php if (can_access_module('users')): ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/users">
+                                        <i class="bi bi-people me-2"></i>Users
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if (can_access_module('hierarchy')): ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/hierarchy">
+                                        <i class="bi bi-diagram-3 me-2"></i>Hierarchy
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if (can_access_module('positions')): ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/positions">
+                                        <i class="bi bi-briefcase me-2"></i>Positions
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if (can_access_module('responsibilities')): ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/responsibilities">
+                                        <i class="bi bi-list-check me-2"></i>Responsibilities
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if (can_access_module('tasks')): ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/tasks">
+                                        <i class="bi bi-check-square me-2"></i>Tasks
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if (can_access_module('meetings')): ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/meetings">
+                                        <i class="bi bi-camera-video me-2"></i>Meetings
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if (can_access_module('events')): ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/events">
+                                        <i class="bi bi-calendar-event me-2"></i>Events
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if (can_access_module('donations')): ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/donations">
+                                        <i class="bi bi-heart me-2"></i>Donations
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if (can_access_module('reports')): ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/reports">
+                                        <i class="bi bi-graph-up me-2"></i>Reports
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if (can_access_module('settings')): ?>
                                 <li class="nav-item">
                                     <a class="nav-link" href="/settings">
                                         <i class="bi bi-gear me-2"></i>Settings
