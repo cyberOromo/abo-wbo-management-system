@@ -1,6 +1,9 @@
 <?php
 $pageTitle = $title ?? 'Meeting Management';
 $layout = 'modern';
+$meetings = $meetings ?? [];
+$stats = $stats ?? [];
+$canCreateMeeting = $can_create_meeting ?? false;
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -12,20 +15,21 @@ $layout = 'modern';
         <p class="text-muted mb-0">Schedule, organize, and track organizational meetings</p>
     </div>
     <div class="btn-toolbar">
-        <div class="btn-group me-2">
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createMeetingModal">
-                <i class="bi bi-calendar-plus me-1"></i>
-                Schedule Meeting
-            </button>
-        </div>
         <div class="btn-group">
-            <a href="/meetings/calendar" class="btn btn-outline-secondary">
-                <i class="bi bi-calendar3 me-1"></i>
-                Calendar View
+            <a href="/reports/meetings" class="btn btn-outline-secondary">
+                <i class="bi bi-graph-up me-1"></i>
+                Meeting Reports
             </a>
         </div>
     </div>
 </div>
+
+<?php if (!$canCreateMeeting): ?>
+<div class="alert alert-info mb-4" role="alert">
+    <i class="bi bi-info-circle me-2"></i>
+    Scheduling and editing flows are not enabled for the current executive scope in this staging build. This page is currently limited to scoped meeting visibility and reporting.
+</div>
+<?php endif; ?>
 
 <!-- Meeting Statistics -->
 <div class="row mb-4">
@@ -36,11 +40,11 @@ $layout = 'modern';
                     <i class="bi bi-calendar-event"></i>
                 </div>
                 <div class="flex-grow-1">
-                    <h3 class="mb-0"><?= number_format($stats['total_meetings'] ?? 24) ?></h3>
+                    <h3 class="mb-0"><?= number_format($stats['total'] ?? 0) ?></h3>
                     <p class="text-muted mb-0">Total Meetings</p>
-                    <small class="text-success">
-                        <i class="bi bi-arrow-up"></i>
-                        <?= $stats['this_month'] ?? 6 ?> This Month
+                    <small class="text-info">
+                        <i class="bi bi-clock-history"></i>
+                        <?= number_format($stats['recent'] ?? 0) ?> Recent
                     </small>
                 </div>
             </div>
@@ -54,11 +58,11 @@ $layout = 'modern';
                     <i class="bi bi-clock"></i>
                 </div>
                 <div class="flex-grow-1">
-                    <h3 class="mb-0"><?= number_format($stats['upcoming'] ?? 5) ?></h3>
-                    <p class="text-muted mb-0">Upcoming</p>
+                    <h3 class="mb-0"><?= number_format($stats['scheduled'] ?? 0) ?></h3>
+                    <p class="text-muted mb-0">Scheduled</p>
                     <small class="text-info">
-                        <i class="bi bi-calendar"></i>
-                        Next 7 Days
+                        <i class="bi bi-calendar-check"></i>
+                        Awaiting execution
                     </small>
                 </div>
             </div>
@@ -72,11 +76,11 @@ $layout = 'modern';
                     <i class="bi bi-people"></i>
                 </div>
                 <div class="flex-grow-1">
-                    <h3 class="mb-0"><?= number_format($stats['avg_attendance'] ?? 87) ?>%</h3>
-                    <p class="text-muted mb-0">Avg Attendance</p>
+                    <h3 class="mb-0"><?= number_format($stats['in_progress'] ?? 0) ?></h3>
+                    <p class="text-muted mb-0">In Progress</p>
                     <small class="text-success">
-                        <i class="bi bi-arrow-up"></i>
-                        +5% This Month
+                        <i class="bi bi-play-circle"></i>
+                        Active right now
                     </small>
                 </div>
             </div>
@@ -90,11 +94,11 @@ $layout = 'modern';
                     <i class="bi bi-camera-video"></i>
                 </div>
                 <div class="flex-grow-1">
-                    <h3 class="mb-0"><?= number_format($stats['virtual_meetings'] ?? 18) ?></h3>
-                    <p class="text-muted mb-0">Virtual Meetings</p>
-                    <small class="text-info">
-                        <i class="bi bi-globe"></i>
-                        75% Online
+                    <h3 class="mb-0"><?= number_format($stats['completed'] ?? 0) ?></h3>
+                    <p class="text-muted mb-0">Completed</p>
+                    <small class="text-muted">
+                        <i class="bi bi-check-circle"></i>
+                        Closed records
                     </small>
                 </div>
             </div>
@@ -115,43 +119,43 @@ $layout = 'modern';
             <div class="card-body">
                 <div class="row g-3">
                     <div class="col-lg-3 col-md-6">
-                        <button class="btn btn-outline-primary w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" data-bs-toggle="modal" data-bs-target="#createMeetingModal">
+                        <a class="btn btn-outline-primary w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" href="/meetings">
                             <div class="action-icon bg-primary text-white mb-2">
-                                <i class="bi bi-calendar-plus"></i>
+                                <i class="bi bi-arrow-clockwise"></i>
                             </div>
-                            <span class="fw-bold">Schedule Meeting</span>
-                            <small class="text-muted">Create new meeting</small>
-                        </button>
+                            <span class="fw-bold">Refresh Meetings</span>
+                            <small class="text-muted">Reload scoped meeting data</small>
+                        </a>
                     </div>
                     
                     <div class="col-lg-3 col-md-6">
-                        <button class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" onclick="window.location.href='?filter=today'">
+                        <button class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" type="button" data-view="list">
                             <div class="action-icon bg-success text-white mb-2">
-                                <i class="bi bi-calendar-check"></i>
+                                <i class="bi bi-list-ul"></i>
                             </div>
-                            <span class="fw-bold">Today's Meetings</span>
-                            <small class="text-muted">View today's agenda</small>
+                            <span class="fw-bold">List View</span>
+                            <small class="text-muted">Current scoped records</small>
                         </button>
                     </div>
                     
                     <div class="col-lg-3 col-md-6">
-                        <button class="btn btn-outline-info w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" onclick="window.location.href='/meetings/templates'">
+                        <button class="btn btn-outline-info w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" type="button" data-view="calendar">
                             <div class="action-icon bg-info text-white mb-2">
-                                <i class="bi bi-file-earmark-text"></i>
+                                <i class="bi bi-calendar3"></i>
                             </div>
-                            <span class="fw-bold">Meeting Templates</span>
-                            <small class="text-muted">Predefined agendas</small>
+                            <span class="fw-bold">Agenda View</span>
+                            <small class="text-muted">Grouped by upcoming date</small>
                         </button>
                     </div>
                     
                     <div class="col-lg-3 col-md-6">
-                        <button class="btn btn-outline-warning w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" onclick="window.location.href='/reports/meetings'">
+                        <a class="btn btn-outline-warning w-100 h-100 d-flex flex-column align-items-center justify-content-center py-3" href="/reports/meetings">
                             <div class="action-icon bg-warning text-white mb-2">
                                 <i class="bi bi-graph-up"></i>
                             </div>
                             <span class="fw-bold">Meeting Reports</span>
                             <small class="text-muted">Analytics & insights</small>
-                        </button>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -166,7 +170,7 @@ $layout = 'modern';
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">
                     <i class="bi bi-list me-2"></i>
-                    Upcoming Meetings
+                    Meeting Records
                 </h5>
                 <div class="btn-group btn-group-sm">
                     <button type="button" class="btn btn-outline-secondary active" data-view="list">
@@ -179,144 +183,89 @@ $layout = 'modern';
             </div>
             <div class="card-body">
                 <div id="meetings-list-view">
-                    <?php 
-                    $sampleMeetings = [
-                        ['id' => 1, 'title' => 'Executive Board Meeting', 'type' => 'board', 'date' => '2025-11-18', 'time' => '14:00', 'location' => 'Virtual', 'attendees' => 8, 'status' => 'confirmed'],
-                        ['id' => 2, 'title' => 'Community Outreach Planning', 'type' => 'planning', 'date' => '2025-11-20', 'time' => '10:00', 'location' => 'Conference Room A', 'attendees' => 15, 'status' => 'pending'],
-                        ['id' => 3, 'title' => 'Financial Review Committee', 'type' => 'committee', 'date' => '2025-11-22', 'time' => '16:30', 'location' => 'Virtual', 'attendees' => 6, 'status' => 'confirmed'],
-                        ['id' => 4, 'title' => 'Monthly General Assembly', 'type' => 'assembly', 'date' => '2025-11-25', 'time' => '19:00', 'location' => 'Main Hall', 'attendees' => 45, 'status' => 'confirmed'],
-                        ['id' => 5, 'title' => 'Project Team Sync', 'type' => 'team', 'date' => '2025-11-27', 'time' => '13:00', 'location' => 'Virtual', 'attendees' => 12, 'status' => 'draft']
-                    ];
-                    
-                    foreach ($sampleMeetings as $meeting): 
-                        $typeClass = [
-                            'board' => 'primary',
-                            'planning' => 'info',
-                            'committee' => 'success',
-                            'assembly' => 'warning',
-                            'team' => 'secondary'
-                        ][$meeting['type']] ?? 'secondary';
-                        
+                    <?php if (!empty($meetings)): ?>
+                    <?php foreach ($meetings as $meeting): ?>
+                    <?php
+                        $status = $meeting['status'] ?? 'scheduled';
                         $statusClass = [
-                            'confirmed' => 'success',
-                            'pending' => 'warning',
+                            'scheduled' => 'warning',
+                            'in_progress' => 'info',
+                            'completed' => 'success',
                             'cancelled' => 'danger',
-                            'draft' => 'secondary'
-                        ][$meeting['status']] ?? 'secondary';
-                        
-                        $isVirtual = $meeting['location'] === 'Virtual';
-                        $isPast = strtotime($meeting['date']) < time();
+                            'postponed' => 'secondary'
+                        ][$status] ?? 'secondary';
+                        $platform = $meeting['platform'] ?? 'in_person';
+                        $isVirtual = $platform === 'zoom' || $platform === 'hybrid';
+                        $startAt = !empty($meeting['start_datetime']) ? strtotime($meeting['start_datetime']) : false;
+                        $location = trim((string) ($meeting['location'] ?? ''));
+                        $locationLabel = $location !== '' ? $location : ucfirst(str_replace('_', ' ', $platform));
                     ?>
                         <div class="meeting-item border rounded p-3 mb-3">
                             <div class="row align-items-center">
                                 <div class="col-md-6">
                                     <div class="d-flex align-items-center">
-                                        <div class="meeting-icon bg-<?= $typeClass ?> bg-opacity-10 text-<?= $typeClass ?> me-3">
+                                        <div class="meeting-icon bg-<?= $statusClass ?> bg-opacity-10 text-<?= $statusClass ?> me-3">
                                             <i class="bi bi-<?= $isVirtual ? 'camera-video' : 'building' ?>"></i>
                                         </div>
                                         <div>
-                                            <h6 class="mb-1"><?= htmlspecialchars($meeting['title']) ?></h6>
+                                            <h6 class="mb-1"><?= htmlspecialchars($meeting['title'] ?? 'Untitled Meeting') ?></h6>
                                             <small class="text-muted">
                                                 <i class="bi bi-geo-alt me-1"></i>
-                                                <?= htmlspecialchars($meeting['location']) ?>
+                                                <?= htmlspecialchars($locationLabel) ?>
                                             </small>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-2">
                                     <div class="text-center">
-                                        <div class="fw-bold"><?= date('M j', strtotime($meeting['date'])) ?></div>
-                                        <small class="text-muted"><?= date('g:i A', strtotime($meeting['time'])) ?></small>
+                                        <div class="fw-bold"><?= $startAt ? date('M j', $startAt) : 'TBD' ?></div>
+                                        <small class="text-muted"><?= $startAt ? date('g:i A', $startAt) : 'Pending time' ?></small>
                                     </div>
                                 </div>
                                 <div class="col-md-2">
                                     <div class="text-center">
-                                        <span class="badge bg-<?= $statusClass ?>"><?= ucfirst($meeting['status']) ?></span>
+                                        <span class="badge bg-<?= $statusClass ?>"><?= ucwords(str_replace('_', ' ', $status)) ?></span>
                                         <div class="mt-1">
                                             <small class="text-muted">
-                                                <i class="bi bi-people me-1"></i>
-                                                <?= $meeting['attendees'] ?> attendees
+                                                <i class="bi bi-tag me-1"></i>
+                                                <?= htmlspecialchars($meeting['created_by_name'] ?: ucfirst(str_replace('_', ' ', $platform))) ?>
                                             </small>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-2">
-                                    <div class="dropdown">
-                                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                            Actions
-                                        </button>
-                                        <ul class="dropdown-menu">
-                                            <li><a class="dropdown-item" href="/meetings/<?= $meeting['id'] ?>">
-                                                <i class="bi bi-eye me-2"></i>View Details
-                                            </a></li>
-                                            <li><a class="dropdown-item" href="/meetings/<?= $meeting['id'] ?>/edit">
-                                                <i class="bi bi-pencil me-2"></i>Edit Meeting
-                                            </a></li>
-                                            <?php if ($meeting['status'] === 'confirmed' && !$isPast): ?>
-                                                <li><a class="dropdown-item" href="/meetings/<?= $meeting['id'] ?>/join">
-                                                    <i class="bi bi-box-arrow-in-right me-2"></i>Join Meeting
-                                                </a></li>
-                                            <?php endif; ?>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li><a class="dropdown-item text-danger" href="#" onclick="cancelMeeting(<?= $meeting['id'] ?>)">
-                                                <i class="bi bi-x-circle me-2"></i>Cancel
-                                            </a></li>
-                                        </ul>
+                                    <div class="text-end">
+                                        <span class="badge text-bg-light border">Read-only in current build</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-calendar-x" style="font-size: 2rem;"></i>
+                            <p class="mt-3 mb-0">No meetings are available in your current scope.</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 
                 <div id="meetings-calendar-view" style="display: none;">
                     <div class="calendar-view">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6>November 2025</h6>
-                            <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-secondary" onclick="previousMonth()">
-                                    <i class="bi bi-chevron-left"></i>
-                                </button>
-                                <button class="btn btn-outline-secondary" onclick="nextMonth()">
-                                    <i class="bi bi-chevron-right"></i>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="calendar-grid">
-                            <div class="row text-center small text-muted fw-bold">
-                                <div class="col">Sun</div>
-                                <div class="col">Mon</div>
-                                <div class="col">Tue</div>
-                                <div class="col">Wed</div>
-                                <div class="col">Thu</div>
-                                <div class="col">Fri</div>
-                                <div class="col">Sat</div>
-                            </div>
-                            
-                            <?php for ($week = 0; $week < 5; $week++): ?>
-                                <div class="row">
-                                    <?php for ($day = 0; $day < 7; $day++): 
-                                        $date = $week * 7 + $day - 2; // Adjust for calendar start
-                                        if ($date > 0 && $date <= 30):
-                                            $hasMeeting = in_array($date, [18, 20, 22, 25, 27]);
-                                    ?>
-                                        <div class="col p-1">
-                                            <div class="calendar-day-full <?= $hasMeeting ? 'has-meeting' : '' ?>">
-                                                <div class="day-number"><?= $date ?></div>
-                                                <?php if ($hasMeeting): ?>
-                                                    <div class="meeting-dot"></div>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="col p-1">
-                                            <div class="calendar-day-full empty"></div>
-                                        </div>
-                                    <?php endif; endfor; ?>
+                        <h6 class="mb-3">Upcoming Agenda</h6>
+                        <?php if (!empty($meetings)): ?>
+                            <?php foreach ($meetings as $meeting): ?>
+                                <?php $startAt = !empty($meeting['start_datetime']) ? strtotime($meeting['start_datetime']) : false; ?>
+                                <div class="schedule-item d-flex align-items-center p-2 rounded mb-2 bg-light">
+                                    <div class="time-badge bg-primary text-white me-3"><?= $startAt ? date('M j', $startAt) : 'TBD' ?></div>
+                                    <div>
+                                        <h6 class="mb-0 small"><?= htmlspecialchars($meeting['title'] ?? 'Untitled Meeting') ?></h6>
+                                        <small class="text-muted"><?= $startAt ? date('g:i A', $startAt) : 'Pending schedule' ?> · <?= htmlspecialchars(trim((string) ($meeting['location'] ?? '')) ?: ucfirst(str_replace('_', ' ', $meeting['platform'] ?? 'in_person'))) ?></small>
+                                    </div>
                                 </div>
-                            <?php endfor; ?>
-                        </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <p class="text-muted mb-0">No upcoming agenda items are available in your current scope.</p>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -427,107 +376,6 @@ $layout = 'modern';
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Create Meeting Modal -->
-<div class="modal fade" id="createMeetingModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-calendar-plus me-2"></i>
-                    Schedule New Meeting
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="createMeetingForm">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <div class="mb-3">
-                                <label for="meetingTitle" class="form-label">Meeting Title</label>
-                                <input type="text" class="form-control" id="meetingTitle" name="title" required>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="meetingType" class="form-label">Meeting Type</label>
-                                <select class="form-select" id="meetingType" name="type" required>
-                                    <option value="">Select Type</option>
-                                    <option value="board">Board Meeting</option>
-                                    <option value="planning">Planning Session</option>
-                                    <option value="committee">Committee Meeting</option>
-                                    <option value="assembly">General Assembly</option>
-                                    <option value="team">Team Meeting</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="meetingAgenda" class="form-label">Agenda</label>
-                        <textarea class="form-control" id="meetingAgenda" name="agenda" rows="3"></textarea>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="meetingDate" class="form-label">Date</label>
-                                <input type="date" class="form-control" id="meetingDate" name="date" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="meetingTime" class="form-label">Time</label>
-                                <input type="time" class="form-control" id="meetingTime" name="time" required>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="meetingLocation" class="form-label">Location</label>
-                                <select class="form-select" id="meetingLocation" name="location_type" onchange="toggleLocationInput()">
-                                    <option value="virtual">Virtual Meeting</option>
-                                    <option value="physical">Physical Location</option>
-                                    <option value="hybrid">Hybrid Meeting</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="meetingRoom" class="form-label">Room/Link</label>
-                                <input type="text" class="form-control" id="meetingRoom" name="location_details" placeholder="Meeting room or video link">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="meetingAttendees" class="form-label">Attendees</label>
-                        <select class="form-select" id="meetingAttendees" name="attendees[]" multiple>
-                            <option value="1">John Doe - Executive</option>
-                            <option value="2">Jane Smith - Secretary</option>
-                            <option value="3">Mike Johnson - Treasurer</option>
-                            <option value="4">Sarah Wilson - Community Rep</option>
-                            <option value="5">David Lee - IT Manager</option>
-                            <option value="board">All Board Members</option>
-                            <option value="executives">All Executives</option>
-                            <option value="members">All Members</option>
-                        </select>
-                        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple attendees</small>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="scheduleMeeting()">
-                    <i class="bi bi-calendar-check me-1"></i>
-                    Schedule Meeting
-                </button>
             </div>
         </div>
     </div>
@@ -646,59 +494,5 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-    
-    // Set minimum date to today
-    document.getElementById('meetingDate').min = new Date().toISOString().split('T')[0];
 });
-
-function scheduleMeeting() {
-    const form = document.getElementById('createMeetingForm');
-    const formData = new FormData(form);
-    
-    // Here you would normally send the data to the server
-    console.log('Scheduling meeting with data:', Object.fromEntries(formData));
-    
-    // Simulate success
-    alert('Meeting scheduled successfully!');
-    
-    // Close modal and reset form
-    const modal = bootstrap.Modal.getInstance(document.getElementById('createMeetingModal'));
-    modal.hide();
-    form.reset();
-    
-    // Refresh page (in real app, you'd add the meeting to the DOM)
-    window.location.reload();
-}
-
-function cancelMeeting(meetingId) {
-    if (confirm('Are you sure you want to cancel this meeting?')) {
-        // Here you would send a request to cancel the meeting
-        console.log('Canceling meeting:', meetingId);
-        alert('Meeting cancelled successfully!');
-        window.location.reload();
-    }
-}
-
-function toggleLocationInput() {
-    const locationType = document.getElementById('meetingLocation').value;
-    const locationInput = document.getElementById('meetingRoom');
-    
-    if (locationType === 'virtual') {
-        locationInput.placeholder = 'Zoom/Teams meeting link';
-    } else if (locationType === 'physical') {
-        locationInput.placeholder = 'Conference room or address';
-    } else {
-        locationInput.placeholder = 'Room + virtual link';
-    }
-}
-
-function previousMonth() {
-    // Implementation for calendar navigation
-    console.log('Previous month');
-}
-
-function nextMonth() {
-    // Implementation for calendar navigation
-    console.log('Next month');
-}
 </script>

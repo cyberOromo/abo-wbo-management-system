@@ -1,5 +1,17 @@
 <?php
 $currentPage = 'reports';
+$quick_stats = $quick_stats ?? [];
+$available_reports = $available_reports ?? [];
+$report_ui = [
+    'tasks' => ['icon' => 'bi-list-task', 'badge' => 'category-activities', 'label' => 'Activities'],
+    'meetings' => ['icon' => 'bi-calendar-event', 'badge' => 'category-activities', 'label' => 'Activities'],
+    'events' => ['icon' => 'bi-calendar2-week', 'badge' => 'category-activities', 'label' => 'Activities'],
+    'donations' => ['icon' => 'bi-cash-coin', 'badge' => 'category-financial', 'label' => 'Financial'],
+    'users' => ['icon' => 'bi-people', 'badge' => 'category-membership', 'label' => 'Membership'],
+    'hierarchy' => ['icon' => 'bi-diagram-3', 'badge' => 'category-performance', 'label' => 'Hierarchy'],
+    'courses' => ['icon' => 'bi-mortarboard', 'badge' => 'category-compliance', 'label' => 'Education'],
+];
+$quick_export_types = array_values(array_intersect(['donations', 'users', 'tasks'], array_keys($available_reports)));
 ?>
 
 <!-- Modern Reports Management Interface -->
@@ -291,37 +303,37 @@ $currentPage = 'reports';
     <div class="row g-4">
         <div class="col-lg-3 col-md-6">
             <div class="kpi-metric">
-                <div class="kpi-value" style="color: var(--primary-green);"><?= $kpi_data['total_members'] ?? 0 ?></div>
+                <div class="kpi-value" style="color: var(--primary-green);"><?= number_format($quick_stats['total_members'] ?? 0) ?></div>
                 <div class="kpi-label">Total Members</div>
-                <div class="kpi-trend positive">
-                    <i class="bi bi-trend-up"></i> +12% this month
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6">
-            <div class="kpi-metric">
-                <div class="kpi-value" style="color: var(--primary-red);">ETB <?= number_format($kpi_data['total_revenue'] ?? 0) ?></div>
-                <div class="kpi-label">Total Revenue</div>
-                <div class="kpi-trend positive">
-                    <i class="bi bi-trend-up"></i> +8% this month
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6">
-            <div class="kpi-metric">
-                <div class="kpi-value" style="color: #3b82f6;"><?= $kpi_data['active_projects'] ?? 0 ?></div>
-                <div class="kpi-label">Active Projects</div>
                 <div class="kpi-trend neutral">
-                    <i class="bi bi-dash"></i> No change
+                    <i class="bi bi-people"></i> In current access scope
                 </div>
             </div>
         </div>
         <div class="col-lg-3 col-md-6">
             <div class="kpi-metric">
-                <div class="kpi-value" style="color: #8b5cf6;"><?= $kpi_data['completion_rate'] ?? 0 ?>%</div>
-                <div class="kpi-label">Task Completion</div>
-                <div class="kpi-trend positive">
-                    <i class="bi bi-trend-up"></i> +5% this month
+                <div class="kpi-value" style="color: var(--primary-red);">ETB <?= number_format($quick_stats['monthly_donations'] ?? 0) ?></div>
+                <div class="kpi-label">Monthly Donations</div>
+                <div class="kpi-trend neutral">
+                    <i class="bi bi-cash-coin"></i> Current month total
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="kpi-metric">
+                <div class="kpi-value" style="color: #3b82f6;"><?= number_format($quick_stats['active_tasks'] ?? 0) ?></div>
+                <div class="kpi-label">Active Tasks</div>
+                <div class="kpi-trend neutral">
+                    <i class="bi bi-list-task"></i> Open work items
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="kpi-metric">
+                <div class="kpi-value" style="color: #8b5cf6;"><?= number_format($quick_stats['upcoming_meetings'] ?? 0) ?></div>
+                <div class="kpi-label">Upcoming Meetings</div>
+                <div class="kpi-trend neutral">
+                    <i class="bi bi-calendar-event"></i> Scheduled ahead
                 </div>
             </div>
         </div>
@@ -334,12 +346,10 @@ $currentPage = 'reports';
         <div class="col-md-2">
             <label class="form-label fw-500">Report Type</label>
             <select class="form-select" id="reportType" onchange="updateReportOptions()">
-                <option value="">All Reports</option>
-                <option value="financial">💰 Financial</option>
-                <option value="membership">👥 Membership</option>
-                <option value="activities">📋 Activities</option>
-                <option value="performance">📊 Performance</option>
-                <option value="compliance">📋 Compliance</option>
+                <option value="">Choose a report</option>
+                <?php foreach ($available_reports as $key => $report): ?>
+                    <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($report['title']) ?></option>
+                <?php endforeach; ?>
             </select>
         </div>
         <div class="col-md-2">
@@ -379,110 +389,36 @@ $currentPage = 'reports';
 
 <!-- Report Categories Grid -->
 <div class="row g-4 mb-5" id="reportCategories">
-    <div class="col-lg-4 col-md-6">
-        <div class="report-card report-financial" onclick="selectReportCategory('financial')">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-start justify-content-between mb-3">
-                    <div class="report-icon">
-                        <i class="bi bi-cash-coin"></i>
+    <?php foreach ($available_reports as $key => $report): ?>
+        <?php $meta = $report_ui[$key] ?? ['icon' => 'bi-file-earmark-text', 'badge' => 'category-performance', 'label' => 'Report']; ?>
+        <div class="col-lg-4 col-md-6">
+            <a class="report-card d-block text-decoration-none" href="/reports/<?= htmlspecialchars($key) ?>">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-start justify-content-between mb-3">
+                        <div class="report-icon">
+                            <i class="bi <?= htmlspecialchars($meta['icon']) ?>"></i>
+                        </div>
+                        <span class="report-category-badge <?= htmlspecialchars($meta['badge']) ?>"><?= htmlspecialchars($meta['label']) ?></span>
                     </div>
-                    <span class="report-category-badge category-financial">Financial</span>
-                </div>
-                <h5 class="card-title fw-600 mb-2">Financial Reports</h5>
-                <p class="card-text text-muted mb-3">Revenue, expenses, donations, and budget analysis</p>
-                <div class="d-flex justify-content-between text-sm">
-                    <span class="text-muted">Available Reports</span>
-                    <span class="fw-600">12</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-4 col-md-6">
-        <div class="report-card report-membership" onclick="selectReportCategory('membership')">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-start justify-content-between mb-3">
-                    <div class="report-icon">
-                        <i class="bi bi-people"></i>
+                    <h5 class="card-title fw-600 mb-2"><?= htmlspecialchars($report['title']) ?></h5>
+                    <p class="card-text text-muted mb-3"><?= htmlspecialchars($report['description']) ?></p>
+                    <div class="d-flex justify-content-between text-sm">
+                        <span class="text-muted">Open report</span>
+                        <span class="fw-600"><i class="bi bi-arrow-right"></i></span>
                     </div>
-                    <span class="report-category-badge category-membership">Membership</span>
                 </div>
-                <h5 class="card-title fw-600 mb-2">Membership Reports</h5>
-                <p class="card-text text-muted mb-3">Member statistics, registrations, and demographics</p>
-                <div class="d-flex justify-content-between text-sm">
-                    <span class="text-muted">Available Reports</span>
-                    <span class="fw-600">8</span>
-                </div>
-            </div>
+            </a>
         </div>
-    </div>
-    
+    <?php endforeach; ?>
     <div class="col-lg-4 col-md-6">
-        <div class="report-card report-activities" onclick="selectReportCategory('activities')">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-start justify-content-between mb-3">
-                    <div class="report-icon">
-                        <i class="bi bi-calendar-check"></i>
-                    </div>
-                    <span class="report-category-badge category-activities">Activities</span>
-                </div>
-                <h5 class="card-title fw-600 mb-2">Activities Reports</h5>
-                <p class="card-text text-muted mb-3">Events, meetings, tasks, and project progress</p>
-                <div class="d-flex justify-content-between text-sm">
-                    <span class="text-muted">Available Reports</span>
-                    <span class="fw-600">15</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-4 col-md-6">
-        <div class="report-card report-performance" onclick="selectReportCategory('performance')">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-start justify-content-between mb-3">
-                    <div class="report-icon">
-                        <i class="bi bi-graph-up"></i>
-                    </div>
-                    <span class="report-category-badge category-performance">Performance</span>
-                </div>
-                <h5 class="card-title fw-600 mb-2">Performance Reports</h5>
-                <p class="card-text text-muted mb-3">KPIs, targets, achievements, and analytics</p>
-                <div class="d-flex justify-content-between text-sm">
-                    <span class="text-muted">Available Reports</span>
-                    <span class="fw-600">10</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-4 col-md-6">
-        <div class="report-card report-compliance" onclick="selectReportCategory('compliance')">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-start justify-content-between mb-3">
-                    <div class="report-icon">
-                        <i class="bi bi-shield-check"></i>
-                    </div>
-                    <span class="report-category-badge category-compliance">Compliance</span>
-                </div>
-                <h5 class="card-title fw-600 mb-2">Compliance Reports</h5>
-                <p class="card-text text-muted mb-3">Regulatory compliance and audit reports</p>
-                <div class="d-flex justify-content-between text-sm">
-                    <span class="text-muted">Available Reports</span>
-                    <span class="fw-600">6</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-4 col-md-6">
-        <div class="report-card" onclick="showCustomReportModal()">
+        <div class="report-card" onclick="showReportSupportNotice()">
             <div class="card-body p-4 text-center">
                 <div class="report-preview">
                     <div class="report-icon">
-                        <i class="bi bi-plus-lg"></i>
+                        <i class="bi bi-sliders"></i>
                     </div>
-                    <h5 class="fw-600 mb-2">Custom Report</h5>
-                    <p class="text-muted mb-0">Create a custom report with specific parameters</p>
+                    <h5 class="fw-600 mb-2">Filtered Report Builder</h5>
+                    <p class="text-muted mb-0">Use the selector above to open a supported report with scoped filters.</p>
                 </div>
             </div>
         </div>
@@ -570,10 +506,11 @@ $currentPage = 'reports';
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <a href="/reports/<?= $report['id'] ?>/view" class="btn btn-outline-primary">
+                                    <?php $reportType = $report['type'] ?? $report['category'] ?? 'tasks'; ?>
+                                    <a href="/reports/<?= htmlspecialchars($reportType) ?>" class="btn btn-outline-primary">
                                         <i class="bi bi-eye"></i> View
                                     </a>
-                                    <a href="/reports/<?= $report['id'] ?>/download" class="btn btn-outline-secondary">
+                                    <a href="/reports/export/<?= htmlspecialchars($reportType) ?>?format=pdf" class="btn btn-outline-secondary">
                                         <i class="bi bi-download"></i> Download
                                     </a>
                                 </div>
@@ -596,127 +533,15 @@ $currentPage = 'reports';
 <div class="row g-3 mt-4">
     <div class="col-md-12">
         <div class="d-flex gap-3 justify-content-center flex-wrap">
-            <a href="/reports/export/financial?format=pdf" class="export-button">
-                <i class="bi bi-filetype-pdf"></i> Financial PDF
-            </a>
-            <a href="/reports/export/membership?format=excel" class="export-button secondary">
-                <i class="bi bi-filetype-xlsx"></i> Membership Excel
-            </a>
-            <a href="/reports/export/activities?format=csv" class="export-button">
-                <i class="bi bi-filetype-csv"></i> Activities CSV
-            </a>
-            <button class="export-button secondary" onclick="showCustomReportModal()">
-                <i class="bi bi-gear"></i> Custom Export
+            <?php foreach ($quick_export_types as $index => $type): ?>
+                <?php $format = $index === 0 ? 'pdf' : ($index === 1 ? 'excel' : 'csv'); ?>
+                <a href="/reports/export/<?= htmlspecialchars($type) ?>?format=<?= $format ?>" class="export-button<?= $index === 1 ? ' secondary' : '' ?>">
+                    <i class="bi bi-download"></i> <?= htmlspecialchars(ucfirst($type)) ?> <?= strtoupper($format) ?>
+                </a>
+            <?php endforeach; ?>
+            <button class="export-button secondary" onclick="showReportSupportNotice()">
+                <i class="bi bi-info-circle"></i> Supported Exports Only
             </button>
-        </div>
-    </div>
-</div>
-
-<!-- Custom Report Modal -->
-<div class="modal fade" id="customReportModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Create Custom Report</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" action="/reports/create-custom">
-                <div class="modal-body">
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label fw-500">Report Name *</label>
-                            <input type="text" name="report_name" class="form-control" required placeholder="Enter report name">
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label fw-500">Report Category</label>
-                            <select name="category" class="form-select">
-                                <option value="financial">💰 Financial</option>
-                                <option value="membership">👥 Membership</option>
-                                <option value="activities">📋 Activities</option>
-                                <option value="performance">📊 Performance</option>
-                                <option value="compliance">📋 Compliance</option>
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label fw-500">Output Format</label>
-                            <select name="format" class="form-select">
-                                <option value="pdf">📄 PDF Report</option>
-                                <option value="excel">📊 Excel Spreadsheet</option>
-                                <option value="csv">📋 CSV Data</option>
-                                <option value="json">💾 JSON Data</option>
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label fw-500">Date Range From</label>
-                            <input type="date" name="date_from" class="form-control" value="<?= date('Y-m-01') ?>">
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label fw-500">Date Range To</label>
-                            <input type="date" name="date_to" class="form-control" value="<?= date('Y-m-d') ?>">
-                        </div>
-                        
-                        <div class="col-12">
-                            <label class="form-label fw-500">Data Sources</label>
-                            <div class="row g-2">
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="data_sources[]" value="members" id="srcMembers" checked>
-                                        <label class="form-check-label" for="srcMembers">Members Data</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="data_sources[]" value="donations" id="srcDonations" checked>
-                                        <label class="form-check-label" for="srcDonations">Donations Data</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="data_sources[]" value="events" id="srcEvents">
-                                        <label class="form-check-label" for="srcEvents">Events Data</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="data_sources[]" value="meetings" id="srcMeetings">
-                                        <label class="form-check-label" for="srcMeetings">Meetings Data</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="data_sources[]" value="tasks" id="srcTasks">
-                                        <label class="form-check-label" for="srcTasks">Tasks Data</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="data_sources[]" value="finances" id="srcFinances" checked>
-                                        <label class="form-check-label" for="srcFinances">Financial Data</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-12">
-                            <label class="form-label fw-500">Hierarchy Scope</label>
-                            <select name="hierarchy_scope" class="form-select">
-                                <option value="all">All Levels</option>
-                                <option value="godina">Godina Level Only</option>
-                                <option value="gamta">Gamta Level Only</option>
-                                <option value="gurmu">Gurmu Level Only</option>
-                            </select>
-                        </div>
-                        
-                        <div class="col-12">
-                            <label class="form-label fw-500">Additional Notes</label>
-                            <textarea name="notes" class="form-control" rows="3" 
-                                      placeholder="Any specific requirements or notes for this report..."></textarea>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-file-earmark-plus"></i> Generate Report
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
 </div>
@@ -730,7 +555,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function selectReportCategory(category) {
     document.getElementById('reportType').value = category;
-    updateReportOptions();
     // Scroll to filters
     document.querySelector('.report-filter-panel').scrollIntoView({ behavior: 'smooth' });
 }
@@ -742,30 +566,27 @@ function updateReportOptions() {
 }
 
 function generateReport() {
-    const formData = {
-        type: document.getElementById('reportType').value,
-        period: document.getElementById('timePeriod').value,
-        from: document.getElementById('fromDate').value,
-        to: document.getElementById('toDate').value,
-        hierarchy: document.getElementById('hierarchyLevel').value
-    };
-    
-    // Show loading state
-    const btn = event.target;
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating...';
-    btn.disabled = true;
-    
-    // Simulate report generation
-    setTimeout(() => {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-        alert('Report generated successfully!');
-    }, 2000);
+    const type = document.getElementById('reportType').value;
+    if (!type) {
+        alert('Choose a supported report before generating.');
+        return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('date_range', document.getElementById('timePeriod').value);
+    params.set('from', document.getElementById('fromDate').value);
+    params.set('to', document.getElementById('toDate').value);
+
+    const hierarchy = document.getElementById('hierarchyLevel').value;
+    if (hierarchy) {
+        params.set('hierarchy_level', hierarchy);
+    }
+
+    window.location.href = `/reports/${encodeURIComponent(type)}?${params.toString()}`;
 }
 
-function showCustomReportModal() {
-    new bootstrap.Modal(document.getElementById('customReportModal')).show();
+function showReportSupportNotice() {
+    alert('This staging build currently supports direct report pages and export links only.');
 }
 
 function initializeTrendsChart() {

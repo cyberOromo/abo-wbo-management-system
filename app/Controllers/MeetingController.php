@@ -101,12 +101,21 @@ class MeetingController extends BaseController
             
             $stats = $db->fetch($statsSql, $statsParams) ?: [];
             
+            $displayStats = [
+                'total' => (int) ($stats['total'] ?? count($meetings)),
+                'scheduled' => (int) ($stats['scheduled'] ?? 0),
+                'in_progress' => (int) ($stats['in_progress'] ?? 0),
+                'completed' => (int) ($stats['completed'] ?? 0),
+                'recent' => (int) ($stats['recent'] ?? 0)
+            ];
+
             $data = [
                 'title' => 'Meetings Management',
                 'meetings' => $meetings,
-                'stats' => $stats,
+                'stats' => $displayStats,
                 'user' => $user,
-                'scope' => $scope
+                'scope' => $scope,
+                'can_create_meeting' => false
             ];
             
             return $this->render('meetings/index_modern', $data);
