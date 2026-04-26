@@ -46,7 +46,7 @@ final class StagingInternalEmailSeeder
                 'email' => $plan['email'],
                 'role' => $plan['role'],
                 'scope' => $plan['scope']['level'],
-                'position_code' => $plan['position']['code'],
+                'position_code' => $plan['position']['code'] ?? null,
             ], JSON_UNESCAPED_SLASHES) . PHP_EOL;
         }
 
@@ -200,9 +200,25 @@ final class StagingInternalEmailSeeder
     {
         return [
             [
+                'first_name' => 'Aster',
+                'last_name' => 'Duguma',
+                'email' => 'staging.system.admin@example.test',
+                'role' => 'system_admin',
+                'position' => null,
+                'scope' => ['level' => 'global', 'global_id' => $fixtures['global']['id'], 'gurmu_id' => $fixtures['gurmu']['id']],
+            ],
+            [
                 'first_name' => 'Bontu',
                 'last_name' => 'Regassa',
                 'email' => 'staging.bontu.regassa@example.test',
+                'role' => 'admin',
+                'position' => $positions['global_admin'],
+                'scope' => ['level' => 'global', 'global_id' => $fixtures['global']['id']],
+            ],
+            [
+                'first_name' => 'Jawar',
+                'last_name' => 'Benti',
+                'email' => 'staging.admin.ops@example.test',
                 'role' => 'admin',
                 'position' => $positions['global_admin'],
                 'scope' => ['level' => 'global', 'global_id' => $fixtures['global']['id']],
@@ -254,13 +270,15 @@ final class StagingInternalEmailSeeder
             $user = $this->db->fetch('SELECT * FROM users WHERE id = ?', [$user['id']]);
         }
 
-        $assignment = $this->db->fetch(
-            'SELECT id FROM user_assignments WHERE user_id = ? AND position_id = ? AND level_scope = ? AND status = ? LIMIT 1',
-            [$user['id'], $plan['position']['id'], $plan['scope']['level'], 'active']
-        );
+        if ($this->requiresAssignment($plan)) {
+            $assignment = $this->db->fetch(
+                'SELECT id FROM user_assignments WHERE user_id = ? AND position_id = ? AND level_scope = ? AND status = ? LIMIT 1',
+                [$user['id'], $plan['position']['id'], $plan['scope']['level'], 'active']
+            );
 
-        if (!$assignment) {
-            $this->db->insert('user_assignments', $this->buildAssignmentPayload($plan, (int) $user['id']));
+            if (!$assignment) {
+                $this->db->insert('user_assignments', $this->buildAssignmentPayload($plan, (int) $user['id']));
+            }
         }
 
         $userData = [
@@ -293,7 +311,7 @@ final class StagingInternalEmailSeeder
             $user['internal_email'] = $primaryEmail;
         }
 
-        if (in_array($plan['role'], ['admin', 'executive'], true)) {
+        if ($this->requiresAssignment($plan) && in_array($plan['role'], ['admin', 'executive'], true)) {
             $preview = $this->generator->previewEmailGeneration($userData, $plan['position'], $hierarchyData);
             $expectedAlias = $preview['role_alias'] ?? null;
 
@@ -434,10 +452,16 @@ final class StagingInternalEmailSeeder
     private function mapRoleToUserType(string $role): string
     {
         return match ($role) {
+            'system_admin' => 'system_admin',
             'admin' => 'system_admin',
             'executive' => 'executive',
             default => 'member',
         };
+    }
+
+    private function requiresAssignment(array $plan): bool
+    {
+        return !empty($plan['position']) && !empty($plan['position']['id']);
     }
 
     private function resolveScopeCode(string $level): string
