@@ -63,6 +63,12 @@
         --module-accent-strong: rgba(234, 88, 12, 0.22);
     }
 
+    .module-surface.theme-executive {
+        --module-accent: #0f766e;
+        --module-accent-soft: rgba(15, 118, 110, 0.12);
+        --module-accent-strong: rgba(15, 118, 110, 0.24);
+    }
+
     .module-hero {
         position: relative;
         overflow: hidden;
