@@ -82,10 +82,8 @@ class ResponsibilityController extends Controller
     /**
      * View specific responsibility details
      */
-    public function view(): void
+    public function view($responsibilityId = null): void
     {
-        $responsibilityId = $this->getParam('id');
-        
         if (!$responsibilityId) {
             $this->redirectWithMessage('/responsibilities', 'Responsibility ID is required', 'error');
             return;

@@ -13,6 +13,7 @@ class DonationController extends BaseController
     public function __construct()
     {
         parent::__construct();
+        $this->db = Database::getInstance();
     }
 
     /**
@@ -32,7 +33,7 @@ class DonationController extends BaseController
                 'donations' => $donations,
                 'stats' => $stats,
                 'user_scope' => $userScope,
-                'can_create' => true,
+                'can_create' => false,
                 'can_manage' => $this->userCanManageDonations($user),
                 'title' => 'My Donations'
             ]);
@@ -96,19 +97,41 @@ class DonationController extends BaseController
                 'donation_date' => $data['donation_date'] ?? date('Y-m-d'),
                 'payment_method' => $data['payment_method'] ?? 'cash',
                 'reference_number' => $this->generateReferenceNumber(),
-                'status' => 'pending',
                 'gurmu_id' => $data['gurmu_id'] ?? null,
                 'gamta_id' => $data['gamta_id'] ?? null,
                 'godina_id' => $data['godina_id'] ?? null,
                 'created_at' => date('Y-m-d H:i:s')
             ];
 
-            // Insert donation
-            $sql = "INSERT INTO donations (donor_id, amount, type, category, description, donation_date, 
-                    payment_method, reference_number, status, gurmu_id, gamta_id, godina_id, created_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $columns = ['donor_id', 'amount', 'type', 'category', 'description', 'donation_date', 'payment_method', 'reference_number'];
+            $values = [
+                $donationData['donor_id'],
+                $donationData['amount'],
+                $donationData['type'],
+                $donationData['category'],
+                $donationData['description'],
+                $donationData['donation_date'],
+                $donationData['payment_method'],
+                $donationData['reference_number']
+            ];
+
+            if ($this->hasDonationStatusColumn()) {
+                $columns[] = 'status';
+                $values[] = 'pending';
+            }
+
+            $columns = array_merge($columns, ['gurmu_id', 'gamta_id', 'godina_id', 'created_at']);
+            $values = array_merge($values, [
+                $donationData['gurmu_id'],
+                $donationData['gamta_id'],
+                $donationData['godina_id'],
+                $donationData['created_at']
+            ]);
+
+            $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+            $sql = 'INSERT INTO donations (' . implode(', ', $columns) . ') VALUES (' . $placeholders . ')';
             
-            $result = $this->db->query($sql, array_values($donationData));
+            $result = $this->db->query($sql, $values);
             
             if ($result) {
                 $donationId = $this->db->getInsertId();
@@ -269,9 +292,13 @@ class DonationController extends BaseController
                 return $this->jsonResponse(['success' => false, 'message' => 'Permission denied'], 403);
             }
             
-            // Soft delete donation
-            $sql = "UPDATE donations SET status = 'deleted', deleted_at = ? WHERE id = ?";
-            $result = $this->db->query($sql, [date('Y-m-d H:i:s'), $id]);
+            if ($this->hasDonationStatusColumn()) {
+                $sql = "UPDATE donations SET status = 'deleted', deleted_at = ? WHERE id = ?";
+                $result = $this->db->query($sql, [date('Y-m-d H:i:s'), $id]);
+            } else {
+                $sql = "DELETE FROM donations WHERE id = ?";
+                $result = $this->db->query($sql, [$id]);
+            }
             
             if ($result) {
                 // Log deletion activity
@@ -399,6 +426,7 @@ class DonationController extends BaseController
 
     protected function getDonationsForUserScope($userScope)
     {
+        $hasStatusColumn = $this->hasDonationStatusColumn();
         $sql = "SELECT d.*, u.first_name, u.last_name, u.email,
                        go.name as godina_name, ga.name as gamta_name, gu.name as gurmu_name
                 FROM donations d
@@ -406,7 +434,11 @@ class DonationController extends BaseController
                 LEFT JOIN godinas go ON d.godina_id = go.id
                 LEFT JOIN gamtas ga ON d.gamta_id = ga.id
                 LEFT JOIN gurmus gu ON d.gurmu_id = gu.id
-                WHERE d.status != 'deleted'";
+                WHERE 1 = 1";
+
+        if ($hasStatusColumn) {
+            $sql .= " AND d.status != 'deleted'";
+        }
         
         $params = [];
         
@@ -431,6 +463,7 @@ class DonationController extends BaseController
 
     protected function getDonationStatistics($userScope)
     {
+        $hasStatusColumn = $this->hasDonationStatusColumn();
         $sql = "SELECT 
                     COUNT(*) as total_donations,
                     SUM(amount) as total_amount,
@@ -440,7 +473,11 @@ class DonationController extends BaseController
                     COUNT(CASE WHEN YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) THEN 1 END) as month_count,
                     SUM(CASE WHEN YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) THEN amount ELSE 0 END) as month_amount
                 FROM donations 
-                WHERE status != 'deleted'";
+                WHERE 1 = 1";
+
+        if ($hasStatusColumn) {
+            $sql .= " AND status != 'deleted'";
+        }
         
         $params = [];
         
@@ -530,10 +567,15 @@ class DonationController extends BaseController
 
     private function getDonationWithAccess($id, $user)
     {
+        $hasStatusColumn = $this->hasDonationStatusColumn();
         $sql = "SELECT d.*, u.first_name, u.last_name
                 FROM donations d
                 JOIN users u ON d.donor_id = u.id
-                WHERE d.id = ? AND d.status != 'deleted'";
+                WHERE d.id = ?";
+
+        if ($hasStatusColumn) {
+            $sql .= " AND d.status != 'deleted'";
+        }
         
         $donation = Database::getInstance()->fetch($sql, [$id]);
         
@@ -559,6 +601,11 @@ class DonationController extends BaseController
         }
         
         return null;
+    }
+
+    private function hasDonationStatusColumn(): bool
+    {
+        return Database::getInstance()->columnExists('donations', 'status');
     }
 
     private function donationInUserScope($donation, $userScope)

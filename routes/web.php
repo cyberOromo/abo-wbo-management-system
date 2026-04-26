@@ -152,7 +152,6 @@ $router->group(['prefix' => 'positions', 'middleware' => ['auth', 'module_access
 $router->group(['prefix' => 'responsibilities', 'middleware' => ['auth', 'module_access']], function() use ($router) {
     // Main responsibility management
     $router->get('/', 'ResponsibilityController@index')->name('responsibilities.index');
-    $router->get('/{id}', 'ResponsibilityController@view')->name('responsibilities.view');
     
     // Assignment management
     $router->get('/assign', 'ResponsibilityController@assign')->name('responsibilities.assign');
@@ -174,6 +173,9 @@ $router->group(['prefix' => 'responsibilities', 'middleware' => ['auth', 'module
     
     // Reports
     $router->get('/report', 'ResponsibilityController@report')->name('responsibilities.report');
+
+    // Detail view
+    $router->get('/{id}', 'ResponsibilityController@view')->name('responsibilities.view');
 });
 
 // Task management routes
