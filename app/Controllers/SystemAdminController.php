@@ -56,14 +56,15 @@ class SystemAdminController extends Controller
     public function globalSettings()
     {
         $global = GlobalModel::getDefault();
+        $globalData = $global instanceof GlobalModel ? $global->toArray() : (array) $global;
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             return $this->updateGlobalSettings();
         }
         
         return $this->render('admin.global_settings', [
             'title' => 'Global Organization Settings',
-            'global' => $global
+            'global' => $globalData
         ]);
     }
     
@@ -78,6 +79,7 @@ class SystemAdminController extends Controller
             $data = $_POST;
             $globalModel = new GlobalModel();
             $global = GlobalModel::getDefault();
+            $globalData = $global instanceof GlobalModel ? $global->toArray() : (array) $global;
             
             $updateData = [
                 'name' => $data['name'],
@@ -92,7 +94,7 @@ class SystemAdminController extends Controller
                 'fiscal_year_end' => $data['fiscal_year_end']
             ];
             
-            $globalModel->update($global['id'], $updateData);
+            $globalModel->update($globalData['id'], $updateData);
             
             return $this->redirectWithMessage('/admin/global-settings', 'Global settings updated successfully', 'success');
             
@@ -1029,7 +1031,7 @@ class SystemAdminController extends Controller
     /**
      * Validate request data
      */
-    private function validate(array $rules)
+        protected function validate(array $rules, array $messages = []): array
     {
         $data = $_POST;
         $errors = [];
