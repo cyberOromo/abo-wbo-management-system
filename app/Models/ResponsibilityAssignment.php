@@ -180,7 +180,7 @@ class ResponsibilityAssignment extends Model
         $query = "
             SELECT 
                 ra.*,
-                u.full_name as user_name,
+                TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) as user_name,
                 u.email as user_email,
                 r.name_en as responsibility_name_en,
                 r.name_om as responsibility_name_om,
