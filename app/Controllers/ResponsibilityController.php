@@ -394,10 +394,10 @@ class ResponsibilityController extends Controller
                 ])
             ];
             
-            $this->jsonResponse($data);
+            $this->json($data);
             
         } catch (Exception $e) {
-            $this->jsonResponse(['error' => $e->getMessage()], 500);
+            $this->json(['error' => $e->getMessage()], 500);
         }
     }
     

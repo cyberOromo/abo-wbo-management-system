@@ -428,12 +428,9 @@ class DonationController extends BaseController
     {
         $hasStatusColumn = $this->hasDonationStatusColumn();
         $sql = "SELECT d.*, u.first_name, u.last_name, u.email,
-                       go.name as godina_name, ga.name as gamta_name, gu.name as gurmu_name
+                  NULL as godina_name, NULL as gamta_name, NULL as gurmu_name
                 FROM donations d
-                JOIN users u ON d.donor_id = u.id
-                LEFT JOIN godinas go ON d.godina_id = go.id
-                LEFT JOIN gamtas ga ON d.gamta_id = ga.id
-                LEFT JOIN gurmus gu ON d.gurmu_id = gu.id
+              LEFT JOIN users u ON d.donor_id = u.id
                 WHERE 1 = 1";
 
         if ($hasStatusColumn) {
@@ -442,19 +439,7 @@ class DonationController extends BaseController
         
         $params = [];
         
-        // Apply hierarchy-based filtering
-        if (!empty($userScope)) {
-            if ($userScope['level_scope'] === 'gurmu') {
-                $sql .= " AND d.gurmu_id = ?";
-                $params[] = $userScope['gurmu_id'];
-            } elseif ($userScope['level_scope'] === 'gamta') {
-                $sql .= " AND d.gamta_id = ?";
-                $params[] = $userScope['gamta_id'];
-            } elseif ($userScope['level_scope'] === 'godina') {
-                $sql .= " AND d.godina_id = ?";
-                $params[] = $userScope['godina_id'];
-            }
-        }
+        $sql = $this->applyDonationScopeFilter($sql, $params, $userScope, 'd');
         
         $sql .= " ORDER BY d.created_at DESC LIMIT 100";
         
@@ -481,19 +466,7 @@ class DonationController extends BaseController
         
         $params = [];
         
-        // Apply hierarchy filtering
-        if (!empty($userScope)) {
-            if ($userScope['level_scope'] === 'gurmu') {
-                $sql .= " AND gurmu_id = ?";
-                $params[] = $userScope['gurmu_id'];
-            } elseif ($userScope['level_scope'] === 'gamta') {
-                $sql .= " AND gamta_id = ?";
-                $params[] = $userScope['gamta_id'];
-            } elseif ($userScope['level_scope'] === 'godina') {
-                $sql .= " AND godina_id = ?";
-                $params[] = $userScope['godina_id'];
-            }
-        }
+        $sql = $this->applyDonationScopeFilter($sql, $params, $userScope);
         
         return Database::getInstance()->fetch($sql, $params) ?: [];
     }
@@ -610,19 +583,74 @@ class DonationController extends BaseController
 
     private function donationInUserScope($donation, $userScope)
     {
-        if (empty($userScope)) {
+        if (empty($userScope) || empty($userScope['level_scope'])) {
             return false;
         }
-        
-        if ($userScope['level_scope'] === 'gurmu') {
-            return $donation['gurmu_id'] == $userScope['gurmu_id'];
-        } elseif ($userScope['level_scope'] === 'gamta') {
-            return $donation['gamta_id'] == $userScope['gamta_id'];
-        } elseif ($userScope['level_scope'] === 'godina') {
-            return $donation['godina_id'] == $userScope['godina_id'];
+
+        if ($userScope['level_scope'] === 'global') {
+            return true;
+        }
+
+        $unitId = $this->resolveScopeUnitId($userScope);
+        $scopeKey = $userScope['level_scope'] . '_id';
+
+        if ($unitId !== null && isset($donation[$scopeKey])) {
+            return (int) $donation[$scopeKey] === $unitId;
+        }
+
+        if ($unitId !== null && isset($donation['level_scope'], $donation['global_id'])) {
+            return $donation['level_scope'] === $userScope['level_scope']
+                && (int) $donation['global_id'] === $unitId;
         }
         
         return false;
+    }
+
+    private function applyDonationScopeFilter(string $sql, array &$params, array $userScope = [], string $alias = ''): string
+    {
+        if (empty($userScope) || empty($userScope['level_scope']) || $userScope['level_scope'] === 'global') {
+            return $sql;
+        }
+
+        $db = Database::getInstance();
+        $levelScope = $userScope['level_scope'];
+        $unitId = $this->resolveScopeUnitId($userScope);
+
+        if ($unitId === null) {
+            return $sql;
+        }
+
+        $prefix = $alias !== '' ? $alias . '.' : '';
+        $directColumn = $levelScope . '_id';
+
+        if ($db->columnExists('donations', $directColumn)) {
+            $sql .= " AND {$prefix}{$directColumn} = ?";
+            $params[] = $unitId;
+            return $sql;
+        }
+
+        if ($db->columnExists('donations', 'level_scope') && $db->columnExists('donations', 'global_id')) {
+            $sql .= " AND {$prefix}level_scope = ? AND {$prefix}global_id = ?";
+            $params[] = $levelScope;
+            $params[] = $unitId;
+        }
+
+        return $sql;
+    }
+
+    private function resolveScopeUnitId(array $userScope): ?int
+    {
+        if (!empty($userScope['organizational_unit_id'])) {
+            return (int) $userScope['organizational_unit_id'];
+        }
+
+        foreach (['gurmu_id', 'gamta_id', 'godina_id', 'global_id'] as $key) {
+            if (!empty($userScope[$key])) {
+                return (int) $userScope[$key];
+            }
+        }
+
+        return null;
     }
 
     private function logDonationActivity($donationId, $action, $userId)
