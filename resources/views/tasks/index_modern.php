@@ -1,4 +1,7 @@
 <?php
+require __DIR__ . '/index_shell.php';
+return;
+
 $title = $title ?? 'Task Management';
 $tasks = $tasks ?? [];
 $taskStats = $task_stats ?? [];

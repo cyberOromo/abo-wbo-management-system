@@ -118,7 +118,7 @@ class MeetingController extends BaseController
                 'can_create_meeting' => false
             ];
             
-            return $this->render('meetings/index_modern', $data);
+            return $this->render('meetings/index_shell', $data);
             
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to load meetings: ' . $e->getMessage());

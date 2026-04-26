@@ -1,4 +1,7 @@
 <?php
+require __DIR__ . '/index_shell.php';
+return;
+
 $title = $title ?? 'Events Management';
 $events = $events ?? [];
 $stats = $stats ?? [];

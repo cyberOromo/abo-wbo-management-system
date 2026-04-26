@@ -1,4 +1,7 @@
 <?php
+require __DIR__ . '/index_shell.php';
+return;
+
 $currentPage = 'reports';
 $quick_stats = $quick_stats ?? [];
 $available_reports = $available_reports ?? [];

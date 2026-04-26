@@ -1,4 +1,7 @@
 <?php
+require __DIR__ . '/index_shell.php';
+return;
+
 $pageTitle = $title ?? 'Meeting Management';
 $layout = 'modern';
 $meetings = $meetings ?? [];

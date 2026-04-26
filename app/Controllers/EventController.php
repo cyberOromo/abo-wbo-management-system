@@ -106,7 +106,7 @@ class EventController extends BaseController
                 'scope' => $scope
             ];
             
-            return $this->render('events/index_modern', $data);
+            return $this->render('events/index_shell', $data);
             
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to load events: ' . $e->getMessage());

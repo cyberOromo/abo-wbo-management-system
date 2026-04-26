@@ -1,4 +1,7 @@
 <?php
+require __DIR__ . '/detail_shell.php';
+return;
+
 $reportTitle = $report_title ?? ($title ?? 'Report Details');
 $sections = [
     'Report Data' => $report_data ?? null,

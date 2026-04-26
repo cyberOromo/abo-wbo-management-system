@@ -28,7 +28,7 @@ class ReportController extends BaseController
             $quickStats = $this->getQuickStatistics($userScope);
             $recentReports = $this->getRecentReports($user['id']);
             
-            return $this->render('reports/index_modern', [
+            return $this->render('reports/index_shell', [
                 'available_reports' => $availableReports,
                 'quick_stats' => $quickStats,
                 'recent_reports' => $recentReports,
@@ -66,7 +66,7 @@ class ReportController extends BaseController
             
             $userReport = $this->generateUserReport($userScope, $filters);
             
-            return $this->render('reports/detail', [
+            return $this->render('reports/detail_shell', [
                 'report_title' => 'User Reports',
                 'report_data' => $userReport,
                 'filters' => $filters,
@@ -98,7 +98,7 @@ class ReportController extends BaseController
             $positionDistribution = $this->getPositionDistribution($userScope);
             $hierarchyHealth = $this->getHierarchyHealthMetrics($userScope);
             
-            return $this->render('reports/detail', [
+            return $this->render('reports/detail_shell', [
                 'report_title' => 'Organizational Hierarchy Reports',
                 'hierarchy_data' => $hierarchyData,
                 'position_distribution' => $positionDistribution,
@@ -133,7 +133,7 @@ class ReportController extends BaseController
             $taskMetrics = $this->getTaskMetrics($userScope, $filters);
             $productivityData = $this->getProductivityData($userScope, $filters);
             
-            return $this->render('reports/detail', [
+            return $this->render('reports/detail_shell', [
                 'report_title' => 'Task Reports & Analytics',
                 'task_report' => $taskReport,
                 'task_metrics' => $taskMetrics,
@@ -168,7 +168,7 @@ class ReportController extends BaseController
             $attendanceData = $this->getMeetingAttendanceData($userScope, $filters);
             $meetingEffectiveness = $this->getMeetingEffectivenessMetrics($userScope, $filters);
             
-            return $this->render('reports/detail', [
+            return $this->render('reports/detail_shell', [
                 'report_title' => 'Meeting Reports & Analytics',
                 'meeting_report' => $meetingReport,
                 'attendance_data' => $attendanceData,
@@ -203,7 +203,7 @@ class ReportController extends BaseController
             $participationData = $this->getEventParticipationData($userScope, $filters);
             $eventImpact = $this->getEventImpactMetrics($userScope, $filters);
             
-            return $this->render('reports/detail', [
+            return $this->render('reports/detail_shell', [
                 'report_title' => 'Community Events Reports',
                 'event_report' => $eventReport,
                 'participation_data' => $participationData,
@@ -239,7 +239,7 @@ class ReportController extends BaseController
             $donationTrends = $this->getDonationTrends($userScope, $filters);
             $donorAnalysis = $this->getDonorAnalysis($userScope, $filters);
             
-            return $this->render('reports/detail', [
+            return $this->render('reports/detail_shell', [
                 'report_title' => 'Donation Reports & Analytics',
                 'donation_report' => $donationReport,
                 'donation_trends' => $donationTrends,
@@ -274,7 +274,7 @@ class ReportController extends BaseController
             $enrollmentData = $this->getCourseEnrollmentData($userScope, $filters);
             $completionRates = $this->getCourseCompletionRates($userScope, $filters);
             
-            return $this->render('reports/detail', [
+            return $this->render('reports/detail_shell', [
                 'report_title' => 'Education & Training Reports',
                 'course_report' => $courseReport,
                 'enrollment_data' => $enrollmentData,
@@ -776,8 +776,15 @@ class ReportController extends BaseController
     private function generateEventReport($userScope, $filters)
     {
         $hasEventRegistrations = $this->reportTableExists('event_registrations');
+        $hasCreatedBy = Database::getInstance()->columnExists('events', 'created_by');
 
-        $sql = "SELECT e.*, u.first_name, u.last_name";
+        $sql = "SELECT e.*";
+
+        if ($hasCreatedBy) {
+            $sql .= ", u.first_name, u.last_name";
+        } else {
+            $sql .= ", NULL as first_name, NULL as last_name";
+        }
 
         if ($hasEventRegistrations) {
             $sql .= ", COUNT(er.id) as registration_count";
@@ -786,8 +793,12 @@ class ReportController extends BaseController
         }
 
         $sql .= "
-                FROM events e
-                LEFT JOIN users u ON e.created_by = u.id";
+        FROM events e";
+
+    if ($hasCreatedBy) {
+        $sql .= "
+        LEFT JOIN users u ON e.created_by = u.id";
+    }
 
         if ($hasEventRegistrations) {
             $sql .= "
@@ -853,11 +864,18 @@ class ReportController extends BaseController
     private function getEventImpactMetrics($userScope, $filters)
     {
         $hasEventRegistrations = $this->reportTableExists('event_registrations');
+        $hasRequiresPayment = Database::getInstance()->columnExists('events', 'requires_payment');
 
         $sql = "SELECT
                     COUNT(*) as total_events,
                     SUM(CASE WHEN e.status IN ('open_registration', 'in_progress', 'completed') THEN 1 ELSE 0 END) as published_events,
-                    SUM(CASE WHEN e.requires_payment = 1 THEN 1 ELSE 0 END) as paid_events";
+                    ";
+
+        if ($hasRequiresPayment) {
+            $sql .= "SUM(CASE WHEN e.requires_payment = 1 THEN 1 ELSE 0 END) as paid_events";
+        } else {
+            $sql .= "0 as paid_events";
+        }
 
         if ($hasEventRegistrations) {
             $sql .= ", COALESCE(AVG(COALESCE(registration_summary.registration_count, 0)), 0) as average_registrations";
