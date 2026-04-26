@@ -427,10 +427,8 @@ class DonationController extends BaseController
     protected function getDonationsForUserScope($userScope)
     {
         $hasStatusColumn = $this->hasDonationStatusColumn();
-        $sql = "SELECT d.*, u.first_name, u.last_name, u.email,
-                  NULL as godina_name, NULL as gamta_name, NULL as gurmu_name
-                FROM donations d
-              LEFT JOIN users u ON d.donor_id = u.id
+        $sql = "SELECT d.*
+            FROM donations d
                 WHERE 1 = 1";
 
         if ($hasStatusColumn) {
@@ -530,7 +528,19 @@ class DonationController extends BaseController
 
     private function canEditDonation($donation, $user)
     {
-        return $donation['donor_id'] == $user['id'] || $user['role'] === 'admin';
+        if ($user['role'] === 'admin') {
+            return true;
+        }
+
+        if (isset($donation['donor_id'])) {
+            return (int) $donation['donor_id'] === (int) $user['id'];
+        }
+
+        if (isset($donation['member_id'])) {
+            return (int) $donation['member_id'] === (int) $user['id'];
+        }
+
+        return false;
     }
 
     private function canDeleteDonation($donation, $user)
@@ -541,10 +551,9 @@ class DonationController extends BaseController
     private function getDonationWithAccess($id, $user)
     {
         $hasStatusColumn = $this->hasDonationStatusColumn();
-        $sql = "SELECT d.*, u.first_name, u.last_name
-                FROM donations d
-                JOIN users u ON d.donor_id = u.id
-                WHERE d.id = ?";
+        $sql = "SELECT d.*
+            FROM donations d
+            WHERE d.id = ?";
 
         if ($hasStatusColumn) {
             $sql .= " AND d.status != 'deleted'";
@@ -561,7 +570,8 @@ class DonationController extends BaseController
             return $donation;
         }
         
-        if ($donation['donor_id'] == $user['id']) {
+        if ((isset($donation['donor_id']) && (int) $donation['donor_id'] === (int) $user['id'])
+            || (isset($donation['member_id']) && (int) $donation['member_id'] === (int) $user['id'])) {
             return $donation;
         }
         
@@ -622,6 +632,32 @@ class DonationController extends BaseController
 
         $prefix = $alias !== '' ? $alias . '.' : '';
         $directColumn = $levelScope . '_id';
+
+        if ($db->columnExists('donations', 'gurmu_id')) {
+            if ($levelScope === 'gurmu') {
+                $sql .= " AND {$prefix}gurmu_id = ?";
+                $params[] = $unitId;
+                return $sql;
+            }
+
+            if ($levelScope === 'gamta') {
+                $sql .= " AND EXISTS (SELECT 1 FROM gurmus scope_gurmu WHERE scope_gurmu.id = {$prefix}gurmu_id AND scope_gurmu.gamta_id = ?)";
+                $params[] = $unitId;
+                return $sql;
+            }
+
+            if ($levelScope === 'godina') {
+                $sql .= " AND EXISTS (
+                    SELECT 1
+                    FROM gurmus scope_gurmu
+                    INNER JOIN gamtas scope_gamta ON scope_gurmu.gamta_id = scope_gamta.id
+                    WHERE scope_gurmu.id = {$prefix}gurmu_id
+                      AND scope_gamta.godina_id = ?
+                )";
+                $params[] = $unitId;
+                return $sql;
+            }
+        }
 
         if ($db->columnExists('donations', $directColumn)) {
             $sql .= " AND {$prefix}{$directColumn} = ?";

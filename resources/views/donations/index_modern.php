@@ -125,16 +125,42 @@ $can_create = $can_create ?? false;
                                 <?php foreach ($donations as $donation): ?>
                                     <?php
                                     $donorName = trim(($donation['first_name'] ?? '') . ' ' . ($donation['last_name'] ?? ''));
+                                    if ($donorName === '') {
+                                        $donorName = $donation['donor_name']
+                                            ?? $donation['group_name']
+                                            ?? $donation['organization_name']
+                                            ?? (isset($donation['member_id']) ? 'Member #' . $donation['member_id'] : 'Unknown donor');
+                                    }
+
                                     $scopeLabel = $donation['gurmu_name'] ?? $donation['gamta_name'] ?? $donation['godina_name'] ?? 'Current scope';
+                                    if ($scopeLabel === 'Current scope' && !empty($donation['level_scope'])) {
+                                        $scopeLabel = ucfirst($donation['level_scope']);
+                                    }
+
+                                    $referenceLabel = $donation['reference_number']
+                                        ?? $donation['donation_number']
+                                        ?? $donation['receipt_number']
+                                        ?? $donation['uuid']
+                                        ?? 'No reference';
+
+                                    $typeLabel = $donation['type']
+                                        ?? $donation['donation_type']
+                                        ?? $donation['donor_type']
+                                        ?? 'General';
+
+                                    $dateValue = $donation['donation_date']
+                                        ?? $donation['payment_date']
+                                        ?? $donation['created_at']
+                                        ?? 'now';
                                     ?>
                                     <tr>
                                         <td>
                                             <div class="fw-semibold"><?= htmlspecialchars($donorName !== '' ? $donorName : ($donation['email'] ?? 'Unknown donor')) ?></div>
-                                            <small class="text-muted"><?= htmlspecialchars($donation['reference_number'] ?? 'No reference') ?></small>
+                                            <small class="text-muted"><?= htmlspecialchars($referenceLabel) ?></small>
                                         </td>
                                         <td class="fw-semibold text-success">$<?= number_format((float) ($donation['amount'] ?? 0), 2) ?></td>
-                                        <td><?= htmlspecialchars(ucfirst($donation['type'] ?? 'General')) ?></td>
-                                        <td><?= htmlspecialchars(date('M j, Y', strtotime($donation['donation_date'] ?? $donation['created_at'] ?? 'now'))) ?></td>
+                                        <td><?= htmlspecialchars(ucfirst((string) $typeLabel)) ?></td>
+                                        <td><?= htmlspecialchars(date('M j, Y', strtotime((string) $dateValue))) ?></td>
                                         <td><?= htmlspecialchars($scopeLabel) ?></td>
                                         <td><span class="text-muted small">Read-only in current build</span></td>
                                     </tr>
