@@ -42,13 +42,13 @@ Step 5: Full Platform Integration
 
 ### **INTERNAL EMAIL FORMAT STRATEGY:**
 ```
-Primary Format: {position}.{hierarchy}.{firstname}.{lastname}@abo-wbo.org
+Primary Format: {position}.{hierarchy}.{firstname}.{lastname}@j-abo-wbo.org
 
 Examples:
-- dura.global.ababu.namadi@abo-wbo.org (Global Leadership)
-- dinagdee.afrikaa.bontu.regassa@abo-wbo.org (Godina Finance)
-- member.dambalii.ahmed.hassan@abo-wbo.org (Gurmu Member)
-- admin.global.system.administrator@abo-wbo.org (System Admin)
+- dura.global.ababu.namadi@j-abo-wbo.org (Global Leadership)
+- dinagdee.afrikaa.bontu.regassa@j-abo-wbo.org (Godina Finance)
+- member.dambalii.ahmed.hassan@j-abo-wbo.org (Gurmu Member)
+- admin.global.system.administrator@j-abo-wbo.org (System Admin)
 
 Benefits:
 ✅ Hierarchical clarity
@@ -63,7 +63,7 @@ Benefits:
 BEST CHOICE: Custom SMTP + Internal Inbox API
 
 Backend Email System:
-- HostGator cPanel email accounts for @abo-wbo.org addresses
+- HostGator cPanel email accounts for @j-abo-wbo.org addresses
 - Custom PHP mailer for automated email generation
 - External SMTP backup (SendGrid) for personal email verification
 - Database-based internal messaging system

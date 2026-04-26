@@ -17,16 +17,16 @@ class AuthService
     }
 
     /**
-     * Authenticate user with email and password
+     * Authenticate user with internal email and password.
      */
-    public function authenticate(string $email, string $password, bool $rememberMe = false): array
+    public function authenticate(string $internalEmail, string $password, bool $rememberMe = false): array
     {
         try {
-            // Find user by email
-            $user = $this->userModel->findByEmail($email);
+            // Find user by canonical primary login email or preserved active alias.
+            $user = $this->userModel->findByLoginEmail($internalEmail);
             
             if (!$user) {
-                throw new Exception('Invalid email or password');
+                throw new Exception('Invalid internal email or password');
             }
             
             // Check if account is active
@@ -37,12 +37,17 @@ class AuthService
             // Verify password
             if (!password_verify($password, $user['password_hash'])) {
                 // Log failed attempt
-                $this->logLoginAttempt($email, false, 'Invalid password');
-                throw new Exception('Invalid email or password');
+                $this->logLoginAttempt($internalEmail, false, 'Invalid password');
+                throw new Exception('Invalid internal email or password');
             }
             
-            // Check if email is verified
-            if (!$user['email_verified']) {
+            // Internal-only accounts are created by admins with immediate org credentials.
+            $emailVerified = !empty($user['email_verified_at'])
+                || !empty($user['email_verified'])
+                || (($user['account_type'] ?? null) === 'internal_only')
+                || (($user['registration_source'] ?? null) === 'admin_created');
+
+            if (!$emailVerified) {
                 throw new Exception('Email not verified. Please check your email for verification link.');
             }
             
@@ -53,7 +58,7 @@ class AuthService
             $this->userModel->updateLastLogin($user['id']);
             
             // Log successful attempt
-            $this->logLoginAttempt($email, true);
+            $this->logLoginAttempt($internalEmail, true);
             
             return [
                 'success' => true,

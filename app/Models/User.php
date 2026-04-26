@@ -152,6 +152,45 @@ class User extends Model
             [$email]
         );
     }
+
+    /**
+     * Find user by internal email used for authentication.
+     */
+    public function findByInternalEmail($internalEmail)
+    {
+        return $this->db->fetch(
+            "SELECT * FROM {$this->table} WHERE internal_email = ?",
+            [$internalEmail]
+        );
+    }
+
+    /**
+     * Find a user by canonical internal email or by an active alias.
+     */
+    public function findByLoginEmail($loginEmail)
+    {
+        return $this->db->fetch(
+            "SELECT u.*, 
+                    CASE 
+                        WHEN u.internal_email = ? THEN u.internal_email
+                        ELSE ie.internal_email
+                    END AS authenticated_email,
+                    CASE 
+                        WHEN u.internal_email = ? THEN 'primary'
+                        ELSE ie.email_type
+                    END AS authenticated_email_type
+             FROM {$this->table} u
+             LEFT JOIN internal_emails ie
+                ON ie.user_id = u.id
+               AND ie.internal_email = ?
+               AND ie.status = 'active'
+             WHERE u.status = 'active'
+               AND (u.internal_email = ? OR ie.id IS NOT NULL)
+             ORDER BY CASE WHEN u.internal_email = ? THEN 0 ELSE 1 END
+             LIMIT 1",
+            [$loginEmail, $loginEmail, $loginEmail, $loginEmail, $loginEmail]
+        );
+    }
     
     /**
      * Check if email exists

@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Gurmu;
 use App\Models\Gamta;
 use App\Models\UserAssignment;
+use App\Services\InternalEmailGenerator;
 use App\Utils\Database;
 use Exception;
 
@@ -21,16 +22,17 @@ class MemberRegistrationController extends Controller
     protected $gurmuModel;
     protected $gamtaModel;
     protected $db;
+    protected $emailGenerator;
     
     public function __construct()
     {
-        parent::__construct();
         $this->requireAuth();
         
         $this->db = Database::getInstance();
         $this->userModel = new User();
         $this->gurmuModel = new Gurmu();
         $this->gamtaModel = new Gamta();
+        $this->emailGenerator = new InternalEmailGenerator();
     }
     
     /**
@@ -39,7 +41,7 @@ class MemberRegistrationController extends Controller
     public function index()
     {
         $currentUser = auth_user();
-        $allowedGurmus = $this->getAllowedGurmus($currentUser);
+        $allowedGurmus = $this->resolveAllowedGurmus($currentUser);
         $recentRegistrations = $this->getRecentRegistrations($currentUser);
         
         return $this->render('members.registration', [
@@ -70,12 +72,16 @@ class MemberRegistrationController extends Controller
             if ($existingUser) {
                 throw new Exception('A user with this email already exists.');
             }
+
+            $this->db->beginTransaction();
             
             // Create the new member
             $newMemberId = $this->createMember($data, $currentUser['id']);
             
             // Log the registration activity
             $this->logRegistrationActivity($currentUser['id'], $newMemberId, $data['gurmu_id']);
+
+            $this->db->commit();
             
             return $this->jsonResponse([
                 'success' => true,
@@ -84,6 +90,10 @@ class MemberRegistrationController extends Controller
             ]);
             
         } catch (Exception $e) {
+            if ($this->db->getPdo()->inTransaction()) {
+                $this->db->rollback();
+            }
+
             return $this->jsonResponse([
                 'success' => false,
                 'message' => $e->getMessage()
@@ -106,6 +116,25 @@ class MemberRegistrationController extends Controller
             'data' => $stats
         ]);
     }
+
+    public function getStats()
+    {
+        return $this->stats();
+    }
+
+    public function getAllowedGurmus($currentUser = null)
+    {
+        if (is_array($currentUser)) {
+            return $this->resolveAllowedGurmus($currentUser);
+        }
+
+        $this->requireAuth();
+
+        return $this->jsonResponse([
+            'success' => true,
+            'data' => $this->resolveAllowedGurmus(auth_user())
+        ]);
+    }
     
     /**
      * HELPER METHODS
@@ -114,11 +143,18 @@ class MemberRegistrationController extends Controller
     /**
      * Get Gurmus that the current user can register members for
      */
-    private function getAllowedGurmus($currentUser)
+    private function resolveAllowedGurmus($currentUser)
     {
-        // System Admin can access all Gurmus
-        if (in_array($currentUser['role'], ['system_admin', 'super_admin'])) {
-            return $this->gurmuModel->getActive();
+        // Admin-level users can access all Gurmus.
+        if ($this->isRegistrationAdmin($currentUser)) {
+            return $this->db->fetchAll(
+                "SELECT g.*, gm.name as gamta_name, god.name as godina_name
+                 FROM gurmus g
+                 LEFT JOIN gamtas gm ON g.gamta_id = gm.id
+                 LEFT JOIN godinas god ON gm.godina_id = god.id
+                 WHERE g.status = 'active'
+                 ORDER BY gm.name, g.name"
+            );
         }
         
         // Check if user has a leadership position in any Gurmu
@@ -126,8 +162,7 @@ class MemberRegistrationController extends Controller
         
         // Get user's active assignments
         $assignments = $this->db->fetchAll("
-            SELECT ua.*, p.key_name as position_key, p.name as position_name,
-                   ua.organizational_unit_id, ua.level_scope
+            SELECT ua.*, p.key_name as position_key, p.name as position_name
             FROM user_assignments ua
             JOIN positions p ON ua.position_id = p.id
             WHERE ua.user_id = ? AND ua.status = 'active'
@@ -135,26 +170,42 @@ class MemberRegistrationController extends Controller
         
         foreach ($assignments as $assignment) {
             // Leaders at Gurmu level can register members for their Gurmu
-            if ($assignment['level_scope'] === 'gurmu') {
-                $gurmu = $this->gurmuModel->find($assignment['organizational_unit_id']);
-                if ($gurmu && $gurmu['status'] === 'active') {
+            if ($assignment['level_scope'] === 'gurmu' && !empty($assignment['gurmu_id'])) {
+                $gurmu = $this->db->fetch(
+                    "SELECT g.*, gm.name as gamta_name, god.name as godina_name
+                     FROM gurmus g
+                     LEFT JOIN gamtas gm ON g.gamta_id = gm.id
+                     LEFT JOIN godinas god ON gm.godina_id = god.id
+                     WHERE g.id = ? AND g.status = 'active'",
+                    [$assignment['gurmu_id']]
+                );
+                if ($gurmu) {
                     $allowedGurmus[] = $gurmu;
                 }
             }
             // Leaders at Gamta level can register members for all Gurmus in their Gamta
-            else if ($assignment['level_scope'] === 'gamta') {
-                $gurmus = $this->gurmuModel->where('gamta_id', $assignment['organizational_unit_id'])
-                                          ->where('status', 'active')
-                                          ->get();
+            else if ($assignment['level_scope'] === 'gamta' && !empty($assignment['gamta_id'])) {
+                $gurmus = $this->db->fetchAll(
+                    "SELECT g.*, gm.name as gamta_name, god.name as godina_name
+                     FROM gurmus g
+                     LEFT JOIN gamtas gm ON g.gamta_id = gm.id
+                     LEFT JOIN godinas god ON gm.godina_id = god.id
+                     WHERE g.gamta_id = ? AND g.status = 'active'
+                     ORDER BY g.name",
+                    [$assignment['gamta_id']]
+                );
                 $allowedGurmus = array_merge($allowedGurmus, $gurmus);
             }
             // Leaders at Godina level can register members for all Gurmus in their Godina
-            else if ($assignment['level_scope'] === 'godina') {
+            else if ($assignment['level_scope'] === 'godina' && !empty($assignment['godina_id'])) {
                 $gurmus = $this->db->fetchAll("
-                    SELECT g.* FROM gurmus g
+                    SELECT g.*, gm.name as gamta_name, god.name as godina_name
+                    FROM gurmus g
                     JOIN gamtas gm ON g.gamta_id = gm.id
+                    JOIN godinas god ON gm.godina_id = god.id
                     WHERE gm.godina_id = ? AND g.status = 'active'
-                ", [$assignment['organizational_unit_id']]);
+                    ORDER BY gm.name, g.name
+                ", [$assignment['godina_id']]);
                 $allowedGurmus = array_merge($allowedGurmus, $gurmus);
             }
         }
@@ -200,12 +251,12 @@ class MemberRegistrationController extends Controller
      */
     private function validateGurmuPermission($currentUser, $gurmuId)
     {
-        // System Admin can register for any Gurmu
-        if (in_array($currentUser['role'], ['system_admin', 'super_admin'])) {
+        // Admin-level users can register for any Gurmu.
+        if ($this->isRegistrationAdmin($currentUser)) {
             return true;
         }
         
-        $allowedGurmus = $this->getAllowedGurmus($currentUser);
+        $allowedGurmus = $this->resolveAllowedGurmus($currentUser);
         $allowed = false;
         
         foreach ($allowedGurmus as $gurmu) {
@@ -232,36 +283,82 @@ class MemberRegistrationController extends Controller
         
         $memberData = [
             'first_name' => $data['first_name'],
-            'middle_name' => $data['middle_name'] ?? null,
             'last_name' => $data['last_name'],
             'email' => $data['email'],
-            'password' => password_hash($tempPassword, PASSWORD_DEFAULT),
+            'password_hash' => password_hash($tempPassword, PASSWORD_DEFAULT),
             'phone' => $data['phone'] ?? null,
-            'date_of_birth' => $data['date_of_birth'] ?? null,
-            'gender' => $data['gender'] ?? null,
+            'birth_date' => $data['date_of_birth'] ?? null,
             'gurmu_id' => $data['gurmu_id'],
-            'level_scope' => 'gurmu', // All members start at Gurmu level
-            'language_preference' => $data['language_preference'] ?? 'en',
+            'role' => 'member',
+            'language' => $data['language_preference'] ?? 'en',
             'status' => 'active',
-            'approval_status' => 'approved', // Auto-approved by authorized registrar
-            'approved_by' => $createdBy,
-            'approved_at' => date('Y-m-d H:i:s'),
-            'created_by' => $createdBy,
+            'address' => $data['address'] ?? null,
+            'emergency_contact' => !empty($data['emergency_contact'])
+                ? json_encode(['details' => $data['emergency_contact']])
+                : null,
+            'registration_source' => 'admin_created',
+            'account_type' => 'internal_only',
+            'onboarding_completed' => 0,
             'metadata' => json_encode([
+                'middle_name' => $data['middle_name'] ?? null,
+                'gender' => $data['gender'] ?? null,
                 'address' => $data['address'] ?? null,
                 'emergency_contact' => $data['emergency_contact'] ?? null,
                 'registration_notes' => $data['notes'] ?? null,
+                'registered_by' => $createdBy,
                 'temp_password' => $tempPassword, // Store for initial email
                 'requires_password_change' => true
             ])
         ];
-        
-        $memberId = $this->userModel->create($memberData);
+
+        $memberId = $this->db->insert('users', $memberData);
+        $internalEmail = $this->provisionMemberInternalEmail($memberId, $data, $createdBy, $tempPassword);
         
         // Send welcome email with temporary password
-        $this->sendWelcomeEmail($data['email'], $data['first_name'], $tempPassword);
+        $this->sendWelcomeEmail($data['email'], $data['first_name'], $tempPassword, $internalEmail);
         
         return $memberId;
+    }
+
+    private function provisionMemberInternalEmail($memberId, $data, $createdBy, $tempPassword)
+    {
+        $hierarchyData = $this->db->fetch(
+            "SELECT g.id, g.code, g.name, 'gurmu' as level, gm.id as gamta_id, gm.name as gamta_name,
+                    god.id as godina_id, god.name as godina_name
+             FROM gurmus g
+             LEFT JOIN gamtas gm ON g.gamta_id = gm.id
+             LEFT JOIN godinas god ON gm.godina_id = god.id
+             WHERE g.id = ?",
+            [$data['gurmu_id']]
+        );
+
+        if (!$hierarchyData) {
+            throw new Exception('Unable to resolve Gurmu hierarchy for internal email generation.');
+        }
+
+        $internalEmail = $this->emailGenerator->generateInternalEmail([
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name']
+        ], null, $hierarchyData);
+
+        $this->emailGenerator->createInternalEmailRecord($memberId, $internalEmail, [
+            'email_type' => 'primary',
+            'quota_mb' => 1024,
+            'created_by' => $createdBy,
+            'creation_method' => 'member_registration',
+            'hierarchy_data' => $hierarchyData,
+            'position_data' => ['key_name' => 'member']
+        ]);
+
+        $this->emailGenerator->createCPanelEmailAccount($internalEmail, $tempPassword, 1024);
+
+        $this->db->update('users', [
+            'internal_email' => $internalEmail,
+            'internal_account_created_at' => date('Y-m-d H:i:s'),
+            'internal_credentials_sent_at' => date('Y-m-d H:i:s')
+        ], ['id' => $memberId]);
+
+        return $internalEmail;
     }
     
     /**
@@ -283,11 +380,11 @@ class MemberRegistrationController extends Controller
     /**
      * Send welcome email to new member
      */
-    private function sendWelcomeEmail($email, $firstName, $tempPassword)
+    private function sendWelcomeEmail($email, $firstName, $tempPassword, $internalEmail = null)
     {
         // TODO: Implement email sending
         // For now, log the credentials
-        error_log("Welcome email for {$email}: Temp password: {$tempPassword}");
+        error_log("Welcome email for {$email}: Internal email {$internalEmail}; Temp password: {$tempPassword}");
     }
     
     /**
@@ -295,14 +392,30 @@ class MemberRegistrationController extends Controller
      */
     private function logRegistrationActivity($registrarId, $newMemberId, $gurmuId)
     {
-        $this->db->insert('activity_logs', [
-            'user_id' => $registrarId,
-            'action' => 'member_registration',
-            'description' => "Registered new member (ID: {$newMemberId}) for Gurmu ID: {$gurmuId}",
-            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
-            'created_at' => date('Y-m-d H:i:s')
-        ]);
+        if ($this->memberTableExists('activity_logs')) {
+            $this->db->insert('activity_logs', [
+                'user_id' => $registrarId,
+                'action' => 'member_registration',
+                'description' => "Registered new member (ID: {$newMemberId}) for Gurmu ID: {$gurmuId}",
+                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+                'created_at' => date('Y-m-d H:i:s')
+            ]);
+            return;
+        }
+
+        if ($this->memberTableExists('audit_logs')) {
+            $this->db->insert('audit_logs', [
+                'user_id' => $registrarId,
+                'action' => 'member_registration',
+                'table_name' => 'users',
+                'record_id' => $newMemberId,
+                'new_values' => json_encode(['gurmu_id' => $gurmuId]),
+                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+                'created_at' => date('Y-m-d H:i:s')
+            ]);
+        }
     }
     
     /**
@@ -310,34 +423,42 @@ class MemberRegistrationController extends Controller
      */
     private function getRecentRegistrations($currentUser)
     {
-        if (in_array($currentUser['role'], ['system_admin', 'super_admin'])) {
-            // System admin sees all recent registrations
+        if ($this->isRegistrationAdmin($currentUser)) {
+            // Admin sees all recent registrations in the last 30 days.
             $query = "
                 SELECT u.*, g.name as gurmu_name, gm.name as gamta_name, god.name as godina_name,
-                       creator.first_name as registered_by_name
+                       'System' as registered_by_name
                 FROM users u
                 LEFT JOIN gurmus g ON u.gurmu_id = g.id
                 LEFT JOIN gamtas gm ON g.gamta_id = gm.id
                 LEFT JOIN godinas god ON gm.godina_id = god.id
-                LEFT JOIN users creator ON u.created_by = creator.id
                 WHERE u.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
                 ORDER BY u.created_at DESC
                 LIMIT 20
             ";
             return $this->db->fetchAll($query);
         } else {
-            // Leaders see only their registrations
+            // Leaders see recent registrations in Gurmus they are allowed to manage.
+            $allowedGurmus = $this->resolveAllowedGurmus($currentUser);
+            $gurmuIds = array_column($allowedGurmus, 'id');
+
+            if (empty($gurmuIds)) {
+                return [];
+            }
+
+            $placeholders = implode(',', array_fill(0, count($gurmuIds), '?'));
             $query = "
                 SELECT u.*, g.name as gurmu_name, gm.name as gamta_name, god.name as godina_name
                 FROM users u
                 LEFT JOIN gurmus g ON u.gurmu_id = g.id
                 LEFT JOIN gamtas gm ON g.gamta_id = gm.id
                 LEFT JOIN godinas god ON gm.godina_id = god.id
-                WHERE u.created_by = ? AND u.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                WHERE u.gurmu_id IN ({$placeholders})
+                  AND u.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
                 ORDER BY u.created_at DESC
                 LIMIT 20
             ";
-            return $this->db->fetchAll($query, [$currentUser['id']]);
+            return $this->db->fetchAll($query, $gurmuIds);
         }
     }
     
@@ -346,7 +467,7 @@ class MemberRegistrationController extends Controller
      */
     private function getMemberRegistrationStats($currentUser)
     {
-        $allowedGurmus = $this->getAllowedGurmus($currentUser);
+        $allowedGurmus = $this->resolveAllowedGurmus($currentUser);
         $gurmuIds = array_column($allowedGurmus, 'id');
         
         if (empty($gurmuIds)) {
@@ -383,11 +504,16 @@ class MemberRegistrationController extends Controller
             'today' => $today
         ];
     }
+
+    private function isRegistrationAdmin($currentUser)
+    {
+        return in_array($currentUser['role'] ?? '', ['admin', 'system_admin', 'super_admin']);
+    }
     
     /**
      * Validate request data
      */
-    private function validate(array $rules)
+    protected function validate(array $rules, array $messages = []): array
     {
         $data = $_POST;
         $errors = [];
@@ -450,9 +576,21 @@ class MemberRegistrationController extends Controller
      */
     private function validateCSRF()
     {
-        if (!isset($_POST['_token']) || !hash_equals($_SESSION['_token'], $_POST['_token'])) {
+        if (!isset($_POST['_token'], $_SESSION['_token']) || !hash_equals($_SESSION['_token'], $_POST['_token'])) {
             throw new Exception('Invalid CSRF token');
         }
+    }
+
+    private function memberTableExists($tableName)
+    {
+        $count = $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = ?",
+            [$tableName]
+        );
+
+        return (int) $count > 0;
     }
     
     /**

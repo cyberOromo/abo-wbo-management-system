@@ -9,8 +9,9 @@ use App\Models\Gamta;
 use App\Models\Gurmu;
 use App\Models\Position;
 use App\Models\UserAssignment;
+use App\Services\InternalEmailGenerator;
 use App\Utils\Database;
-use App\Utils\Email;
+use App\Utils\EmailSender;
 use App\Utils\Logger;
 use Exception;
 
@@ -26,19 +27,19 @@ class UserLeaderRegistrationController extends Controller
     private User $userModel;
     private Position $positionModel;
     private UserAssignment $assignmentModel;
-    private Email $emailService;
+    private InternalEmailGenerator $emailGenerator;
+    private EmailSender $emailService;
     private Logger $logger;
 
     public function __construct()
     {
-        parent::__construct();
-        
         // Initialize dependencies
         $this->db = Database::getInstance();
         $this->userModel = new User();
         $this->positionModel = new Position();
         $this->assignmentModel = new UserAssignment();
-        $this->emailService = new Email();
+        $this->emailGenerator = new InternalEmailGenerator();
+        $this->emailService = new EmailSender();
         $this->logger = new Logger();
         
         // CRITICAL: Verify System Admin access
@@ -110,9 +111,12 @@ class UserLeaderRegistrationController extends Controller
                 
                 // Assign positions to user
                 $assignmentResults = $this->assignPositionsToUser($userId, $positionData);
+
+                // Provision immutable primary email plus office aliases.
+                $emailProvisioning = $this->provisionUserInternalEmails($userId, $userData, $positionData);
                 
                 // Send welcome email with credentials
-                $this->sendWelcomeEmail($userId, $userData, $assignmentResults);
+                $this->sendWelcomeEmail($userId, $userData, $assignmentResults, $emailProvisioning);
                 
                 // Log the registration
                 $this->logUserRegistration($userId, $assignmentResults);
@@ -125,7 +129,9 @@ class UserLeaderRegistrationController extends Controller
                     'message' => 'User registered successfully with leadership positions assigned',
                     'data' => [
                         'user_id' => $userId,
-                        'assignments' => $assignmentResults
+                        'assignments' => $assignmentResults,
+                        'internal_email' => $emailProvisioning['primary_email'] ?? null,
+                        'role_aliases' => $emailProvisioning['aliases'] ?? []
                     ]
                 ]);
                 
@@ -219,9 +225,9 @@ class UserLeaderRegistrationController extends Controller
 
             // Get positions for the specified level
             $positions = $this->db->fetchAll(
-                "SELECT id, name, description, is_executive, hierarchy_level 
+                "SELECT id, name, description, is_executive, hierarchy_type 
                  FROM positions 
-                 WHERE hierarchy_level = ? 
+                 WHERE hierarchy_type = ? 
                  ORDER BY is_executive DESC, name",
                 [$level]
             );
@@ -308,6 +314,7 @@ class UserLeaderRegistrationController extends Controller
                     u.first_name,
                     u.last_name,
                     u.email,
+                    u.internal_email,
                     u.role,
                     u.status,
                     u.created_at,
@@ -315,10 +322,10 @@ class UserLeaderRegistrationController extends Controller
                     GROUP_CONCAT(
                         CONCAT(p.name, ' (', 
                             CASE 
-                                WHEN ua.hierarchy_level = 'global' THEN 'Global'
-                                WHEN ua.hierarchy_level = 'godina' THEN god.name
-                                WHEN ua.hierarchy_level = 'gamta' THEN gam.name
-                                WHEN ua.hierarchy_level = 'gurmu' THEN gur.name
+                                WHEN ua.level_scope = 'global' THEN 'Global'
+                                WHEN ua.level_scope = 'godina' THEN god.name
+                                WHEN ua.level_scope = 'gamta' THEN gam.name
+                                WHEN ua.level_scope = 'gurmu' THEN gur.name
                             END,
                         ')')
                         SEPARATOR ', '
@@ -326,22 +333,22 @@ class UserLeaderRegistrationController extends Controller
                 FROM users u
                 LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
                 LEFT JOIN positions p ON ua.position_id = p.id
-                LEFT JOIN godinas god ON ua.hierarchy_id = god.id AND ua.hierarchy_level = 'godina'
-                LEFT JOIN gamtas gam ON ua.hierarchy_id = gam.id AND ua.hierarchy_level = 'gamta'
-                LEFT JOIN gurmus gur ON ua.hierarchy_id = gur.id AND ua.hierarchy_level = 'gurmu'
+                LEFT JOIN godinas god ON ua.godina_id = god.id AND ua.level_scope = 'godina'
+                LEFT JOIN gamtas gam ON ua.gamta_id = gam.id AND ua.level_scope = 'gamta'
+                LEFT JOIN gurmus gur ON ua.gurmu_id = gur.id AND ua.level_scope = 'gurmu'
                 $whereClause
-                GROUP BY u.id, u.first_name, u.last_name, u.email, u.role, u.status, u.created_at
+                GROUP BY u.id, u.first_name, u.last_name, u.email, u.internal_email, u.role, u.status, u.created_at
                 ORDER BY u.created_at DESC
                 LIMIT ? OFFSET ?
             ", array_merge($params, [$limit, $offset]));
 
             // Get total count
-            $totalCount = $this->db->fetchOne("
-                SELECT COUNT(DISTINCT u.id) as total
+            $totalCount = (int) $this->db->fetchColumn("
+                SELECT COUNT(DISTINCT u.id)
                 FROM users u
                 LEFT JOIN user_assignments ua ON u.id = ua.user_id
                 $whereClause
-            ", $params)['total'];
+            ", $params);
 
             return $this->jsonResponse([
                 'success' => true,
@@ -388,7 +395,7 @@ class UserLeaderRegistrationController extends Controller
 
             try {
                 // Deactivate current assignments
-                $this->db->execute(
+                $this->db->query(
                     "UPDATE user_assignments SET status = 'inactive', updated_at = NOW() WHERE user_id = ?",
                     [$userId]
                 );
@@ -428,6 +435,10 @@ class UserLeaderRegistrationController extends Controller
     private function enforceSystemAdminAccess()
     {
         if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['system_admin', 'super_admin'])) {
+            if (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin') {
+                return;
+            }
+
             if ($this->isJsonRequest()) {
                 echo json_encode(['success' => false, 'message' => 'Access denied. System Admin required.']);
                 exit;
@@ -534,27 +545,47 @@ class UserLeaderRegistrationController extends Controller
     {
         // Generate temporary password
         $temporaryPassword = $this->generateTemporaryPassword();
+
+        $storageRole = match ($userData['role']) {
+            'admin', 'system_admin' => 'admin',
+            'leader' => 'executive',
+            default => 'member',
+        };
         
         $userRecord = [
             'first_name' => $userData['first_name'],
-            'middle_name' => $userData['middle_name'],
             'last_name' => $userData['last_name'],
             'email' => $userData['email'],
+            'personal_email' => $userData['email'],
             'phone' => $userData['phone'],
+            'personal_phone' => $userData['phone'] ?: null,
             'password_hash' => password_hash($temporaryPassword, PASSWORD_DEFAULT),
-            'role' => $userData['role'],
+            'role' => $storageRole,
             'status' => 'active',
-            'date_of_birth' => $userData['date_of_birth'] ?: null,
-            'gender' => $userData['gender'] ?: null,
+            'birth_date' => $userData['date_of_birth'] ?: null,
             'address' => $userData['address'],
-            'emergency_contact' => $userData['emergency_contact'],
-            'language_preference' => $userData['language_preference'],
-            'must_change_password' => 1,
-            'created_by' => $_SESSION['user']['id'],
-            'created_at' => date('Y-m-d H:i:s')
+            'emergency_contact' => !empty($userData['emergency_contact'])
+                ? json_encode(['details' => $userData['emergency_contact']])
+                : null,
+            'language' => $userData['language_preference'] ?: 'en',
+            'registration_source' => 'admin_created',
+            'account_type' => 'internal_only',
+            'email_verified_at' => date('Y-m-d H:i:s'),
+            'personal_email_verified' => 1,
+            'onboarding_completed' => 0,
+            'metadata' => json_encode([
+                'middle_name' => $userData['middle_name'] ?: null,
+                'gender' => $userData['gender'] ?: null,
+                'language_preference' => $userData['language_preference'] ?: 'en',
+                'notes' => $userData['notes'] ?: null,
+                'registered_by' => $_SESSION['user']['id'],
+                'requested_role' => $userData['role'],
+                'temporary_password' => $temporaryPassword,
+                'requires_password_change' => true
+            ])
         ];
 
-        $userId = $this->userModel->create($userRecord);
+        $userId = $this->db->insert('users', $userRecord);
         
         // Store temporary password for email
         $userRecord['temporary_password'] = $temporaryPassword;
@@ -588,37 +619,130 @@ class UserLeaderRegistrationController extends Controller
      */
     private function createUserAssignment(int $userId, array $assignment): int
     {
+        $scopeColumns = [
+            'global_id' => null,
+            'godina_id' => null,
+            'gamta_id' => null,
+            'gurmu_id' => null,
+        ];
+
+        if (($assignment['hierarchy_level'] ?? null) !== 'global') {
+            $scopeColumn = $assignment['hierarchy_level'] . '_id';
+            if (array_key_exists($scopeColumn, $scopeColumns)) {
+                $scopeColumns[$scopeColumn] = $assignment['hierarchy_id'] ?: null;
+            }
+        }
+
         $assignmentData = [
             'user_id' => $userId,
             'position_id' => $assignment['position_id'],
-            'hierarchy_level' => $assignment['hierarchy_level'],
-            'hierarchy_id' => $assignment['hierarchy_id'],
+            'level_scope' => $assignment['hierarchy_level'],
             'start_date' => $assignment['start_date'],
             'end_date' => $assignment['end_date'],
             'status' => 'active',
-            'notes' => $assignment['notes'],
+            'appointment_type' => 'appointed',
             'assigned_by' => $_SESSION['user']['id'],
+            'assignment_reason' => $assignment['notes'] ?: 'Assigned during admin registration',
+            'metadata' => json_encode(['notes' => $assignment['notes'] ?: null]),
             'created_at' => date('Y-m-d H:i:s')
-        ];
+        ] + $scopeColumns;
 
-        return $this->assignmentModel->create($assignmentData);
+        return $this->db->insert('user_assignments', $assignmentData);
+    }
+
+    private function provisionUserInternalEmails(int $userId, array $userData, array $positionData): array
+    {
+        $primaryEmail = $this->emailGenerator->generateInternalEmail($userData);
+        $temporaryPassword = $this->tempUserData['temporary_password'] ?? $this->generateTemporaryPassword();
+
+        $this->emailGenerator->createInternalEmailRecord($userId, $primaryEmail, [
+            'email_type' => 'primary',
+            'quota_mb' => 2048,
+            'created_by' => $_SESSION['user']['id'],
+            'creation_method' => 'user_leader_registration_primary'
+        ]);
+        $this->emailGenerator->createCPanelEmailAccount($primaryEmail, $temporaryPassword, 2048);
+
+        $aliases = [];
+        $seenAliases = [];
+
+        foreach ($positionData as $assignment) {
+            $position = $this->db->fetch("SELECT * FROM positions WHERE id = ?", [$assignment['position_id']]);
+            $hierarchyData = $this->resolveHierarchyData($assignment['hierarchy_level'], $assignment['hierarchy_id']);
+
+            if (!$position || !$hierarchyData) {
+                continue;
+            }
+
+            $aliasEmail = $this->emailGenerator->provisionRoleAlias($userId, $userData, $position, $hierarchyData, [
+                'forward_to' => $primaryEmail,
+                'created_by' => $_SESSION['user']['id'],
+                'creation_method' => 'user_leader_registration_alias'
+            ]);
+
+            if ($aliasEmail && !isset($seenAliases[$aliasEmail])) {
+                $aliases[] = $aliasEmail;
+                $seenAliases[$aliasEmail] = true;
+            }
+        }
+
+        $this->db->update('users', [
+            'internal_email' => $primaryEmail,
+            'internal_account_created_at' => date('Y-m-d H:i:s'),
+            'internal_credentials_sent_at' => date('Y-m-d H:i:s')
+        ], ['id' => $userId]);
+
+        $this->tempUserData['internal_email'] = $primaryEmail;
+        $this->tempUserData['role_aliases'] = $aliases;
+
+        return [
+            'primary_email' => $primaryEmail,
+            'aliases' => $aliases,
+        ];
+    }
+
+    private function resolveHierarchyData(string $level, $hierarchyId): array
+    {
+        if ($level === 'global') {
+            return ['level' => 'global', 'code' => 'global'];
+        }
+
+        if (empty($hierarchyId)) {
+            return [];
+        }
+
+        return match ($level) {
+            'godina' => $this->db->fetch("SELECT id, code, name, 'godina' as level FROM godinas WHERE id = ?", [$hierarchyId]) ?: [],
+            'gamta' => $this->db->fetch("SELECT id, code, name, 'gamta' as level FROM gamtas WHERE id = ?", [$hierarchyId]) ?: [],
+            'gurmu' => $this->db->fetch("SELECT id, code, name, 'gurmu' as level FROM gurmus WHERE id = ?", [$hierarchyId]) ?: [],
+            default => [],
+        };
     }
 
     /**
      * Send welcome email with credentials
      */
-    private function sendWelcomeEmail(int $userId, array $userData, array $assignments)
+    private function sendWelcomeEmail(int $userId, array $userData, array $assignments, array $emailProvisioning = [])
     {
         if (isset($this->tempUserData['temporary_password'])) {
             $emailData = [
                 'name' => $userData['first_name'] . ' ' . $userData['last_name'],
                 'email' => $userData['email'],
                 'temporary_password' => $this->tempUserData['temporary_password'],
+                'internal_email' => $emailProvisioning['primary_email'] ?? ($this->tempUserData['internal_email'] ?? null),
+                'role_aliases' => $emailProvisioning['aliases'] ?? ($this->tempUserData['role_aliases'] ?? []),
                 'assignments' => $assignments,
                 'login_url' => $_SERVER['HTTP_HOST'] . '/auth/login'
             ];
 
-            $this->emailService->sendUserWelcomeEmail($emailData);
+            $this->emailService->sendWelcomeEmail(
+                $emailData['email'],
+                $emailData['name'],
+                [
+                    'username' => $emailData['internal_email'] ?? $emailData['email'],
+                    'password' => $emailData['temporary_password'] ?? '',
+                ]
+            );
         }
     }
 
@@ -644,9 +768,9 @@ class UserLeaderRegistrationController extends Controller
     private function getPositions(): array
     {
         return $this->db->fetchAll("
-            SELECT id, name, description, hierarchy_level, is_executive 
+            SELECT id, name, description, hierarchy_type, is_executive 
             FROM positions 
-            ORDER BY hierarchy_level, is_executive DESC, name
+            ORDER BY hierarchy_type, is_executive DESC, name
         ");
     }
 
@@ -661,6 +785,7 @@ class UserLeaderRegistrationController extends Controller
                 u.first_name,
                 u.last_name,
                 u.email,
+                u.internal_email,
                 u.role,
                 u.status,
                 u.created_at,
@@ -669,7 +794,7 @@ class UserLeaderRegistrationController extends Controller
             FROM users u
             LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
             LEFT JOIN positions p ON ua.position_id = p.id
-            WHERE u.created_by = ?
+            WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(u.metadata, '$.registered_by')) AS UNSIGNED) = ?
             GROUP BY u.id
             ORDER BY u.created_at DESC
             LIMIT 10
@@ -684,11 +809,11 @@ class UserLeaderRegistrationController extends Controller
         $adminId = $_SESSION['user']['id'];
         
         return [
-            'total_users' => $this->db->fetchOne("SELECT COUNT(*) as count FROM users WHERE created_by = ?", [$adminId])['count'],
-            'this_month' => $this->db->fetchOne("SELECT COUNT(*) as count FROM users WHERE created_by = ? AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())", [$adminId])['count'],
-            'this_week' => $this->db->fetchOne("SELECT COUNT(*) as count FROM users WHERE created_by = ? AND WEEK(created_at) = WEEK(NOW()) AND YEAR(created_at) = YEAR(NOW())", [$adminId])['count'],
-            'today' => $this->db->fetchOne("SELECT COUNT(*) as count FROM users WHERE created_by = ? AND DATE(created_at) = DATE(NOW())", [$adminId])['count'],
-            'active_assignments' => $this->db->fetchOne("SELECT COUNT(*) as count FROM user_assignments ua JOIN users u ON ua.user_id = u.id WHERE u.created_by = ? AND ua.status = 'active'", [$adminId])['count']
+            'total_users' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.registered_by')) AS UNSIGNED) = ?", [$adminId]),
+            'this_month' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.registered_by')) AS UNSIGNED) = ? AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())", [$adminId]),
+            'this_week' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.registered_by')) AS UNSIGNED) = ? AND WEEK(created_at) = WEEK(NOW()) AND YEAR(created_at) = YEAR(NOW())", [$adminId]),
+            'today' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.registered_by')) AS UNSIGNED) = ? AND DATE(created_at) = DATE(NOW())", [$adminId]),
+            'active_assignments' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM user_assignments ua JOIN users u ON ua.user_id = u.id WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(u.metadata, '$.registered_by')) AS UNSIGNED) = ? AND ua.status = 'active'", [$adminId])
         ];
     }
 
@@ -697,11 +822,18 @@ class UserLeaderRegistrationController extends Controller
      */
     private function getOccupiedPositions(string $level, int $hierarchyId): array
     {
-        $positions = $this->db->fetchAll("
-            SELECT DISTINCT position_id 
-            FROM user_assignments 
-            WHERE hierarchy_level = ? AND hierarchy_id = ? AND status = 'active'
-        ", [$level, $hierarchyId]);
+        if ($level === 'global') {
+            $positions = $this->db->fetchAll(
+                "SELECT DISTINCT position_id FROM user_assignments WHERE level_scope = 'global' AND status = 'active'"
+            );
+            return array_column($positions, 'position_id');
+        }
+
+        $scopeColumn = $level . '_id';
+        $positions = $this->db->fetchAll(
+            "SELECT DISTINCT position_id FROM user_assignments WHERE level_scope = ? AND {$scopeColumn} = ? AND status = 'active'",
+            [$level, $hierarchyId]
+        );
 
         return array_column($positions, 'position_id');
     }

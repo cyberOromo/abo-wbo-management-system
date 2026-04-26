@@ -199,7 +199,8 @@
                 </div>
                 <div class="alert alert-light border mb-3">
                     <small><strong>Domain:</strong> j-abo-wbo.org</small><br>
-                    <small><strong>Format:</strong> {position}.{hierarchy}.{firstname}.{lastname}@j-abo-wbo.org</small>
+                    <small><strong>Primary Login:</strong> {firstname}.{lastInitial}@j-abo-wbo.org</small><br>
+                    <small><strong>Optional Alias:</strong> {position}.{hierarchy}@j-abo-wbo.org</small>
                 </div>
                 <div class="text-center">
                     <a href="/user-emails" class="btn btn-info btn-sm text-white">

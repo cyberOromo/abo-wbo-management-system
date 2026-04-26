@@ -28,7 +28,7 @@ class ReportController extends BaseController
             $quickStats = $this->getQuickStatistics($userScope);
             $recentReports = $this->getRecentReports($user['id']);
             
-            echo $this->render('reports/index_modern', [
+            return $this->render('reports/index_modern', [
                 'available_reports' => $availableReports,
                 'quick_stats' => $quickStats,
                 'recent_reports' => $recentReports,
@@ -66,7 +66,8 @@ class ReportController extends BaseController
             
             $userReport = $this->generateUserReport($userScope, $filters);
             
-            echo $this->render('reports/users', [
+            return $this->render('reports/detail', [
+                'report_title' => 'User Reports',
                 'report_data' => $userReport,
                 'filters' => $filters,
                 'user_scope' => $userScope,
@@ -97,7 +98,8 @@ class ReportController extends BaseController
             $positionDistribution = $this->getPositionDistribution($userScope);
             $hierarchyHealth = $this->getHierarchyHealthMetrics($userScope);
             
-            echo $this->render('reports/hierarchy', [
+            return $this->render('reports/detail', [
+                'report_title' => 'Organizational Hierarchy Reports',
                 'hierarchy_data' => $hierarchyData,
                 'position_distribution' => $positionDistribution,
                 'hierarchy_health' => $hierarchyHealth,
@@ -131,7 +133,8 @@ class ReportController extends BaseController
             $taskMetrics = $this->getTaskMetrics($userScope, $filters);
             $productivityData = $this->getProductivityData($userScope, $filters);
             
-            echo $this->render('reports/tasks', [
+            return $this->render('reports/detail', [
+                'report_title' => 'Task Reports & Analytics',
                 'task_report' => $taskReport,
                 'task_metrics' => $taskMetrics,
                 'productivity_data' => $productivityData,
@@ -165,7 +168,8 @@ class ReportController extends BaseController
             $attendanceData = $this->getMeetingAttendanceData($userScope, $filters);
             $meetingEffectiveness = $this->getMeetingEffectivenessMetrics($userScope, $filters);
             
-            echo $this->render('reports/meetings', [
+            return $this->render('reports/detail', [
+                'report_title' => 'Meeting Reports & Analytics',
                 'meeting_report' => $meetingReport,
                 'attendance_data' => $attendanceData,
                 'effectiveness_metrics' => $meetingEffectiveness,
@@ -199,7 +203,8 @@ class ReportController extends BaseController
             $participationData = $this->getEventParticipationData($userScope, $filters);
             $eventImpact = $this->getEventImpactMetrics($userScope, $filters);
             
-            echo $this->render('reports/events', [
+            return $this->render('reports/detail', [
+                'report_title' => 'Community Events Reports',
                 'event_report' => $eventReport,
                 'participation_data' => $participationData,
                 'event_impact' => $eventImpact,
@@ -234,7 +239,8 @@ class ReportController extends BaseController
             $donationTrends = $this->getDonationTrends($userScope, $filters);
             $donorAnalysis = $this->getDonorAnalysis($userScope, $filters);
             
-            echo $this->render('reports/donations', [
+            return $this->render('reports/detail', [
+                'report_title' => 'Donation Reports & Analytics',
                 'donation_report' => $donationReport,
                 'donation_trends' => $donationTrends,
                 'donor_analysis' => $donorAnalysis,
@@ -268,7 +274,8 @@ class ReportController extends BaseController
             $enrollmentData = $this->getCourseEnrollmentData($userScope, $filters);
             $completionRates = $this->getCourseCompletionRates($userScope, $filters);
             
-            echo $this->render('reports/courses', [
+            return $this->render('reports/detail', [
+                'report_title' => 'Education & Training Reports',
                 'course_report' => $courseReport,
                 'enrollment_data' => $enrollmentData,
                 'completion_rates' => $completionRates,
@@ -294,21 +301,22 @@ class ReportController extends BaseController
             
             $format = $_GET['format'] ?? 'pdf';
             $filters = $_GET;
+            $normalizedType = $this->normalizeExportType($type);
             
             // Validate report type and user permissions
-            if (!$this->canExportReport($type, $user)) {
+            if (!$this->canExportReport($normalizedType, $user)) {
                 return $this->jsonResponse(['success' => false, 'message' => 'Permission denied'], 403);
             }
             
-            $reportData = $this->generateExportData($type, $userScope, $filters);
+            $reportData = $this->generateExportData($normalizedType, $userScope, $filters);
             
             switch ($format) {
                 case 'csv':
-                    return $this->exportToCsv($reportData, $type);
+                    return $this->exportToCsv($reportData, $normalizedType);
                 case 'excel':
-                    return $this->exportToExcel($reportData, $type);
+                    return $this->exportToExcel($reportData, $normalizedType);
                 case 'pdf':
-                    return $this->exportToPdf($reportData, $type);
+                    return $this->exportToPdf($reportData, $normalizedType);
                 default:
                     return $this->jsonResponse(['success' => false, 'message' => 'Invalid export format'], 400);
             }
@@ -516,20 +524,607 @@ class ReportController extends BaseController
         return Database::getInstance()->fetchAll($sql, $params);
     }
 
-    private function getDateRangeCondition($range)
+    private function getDateRangeCondition($range, $column = 't.created_at')
     {
         switch ($range) {
             case '7_days':
-                return "t.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+                return "{$column} >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
             case '30_days':
-                return "t.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                return "{$column} >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
             case '90_days':
-                return "t.created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)";
+                return "{$column} >= DATE_SUB(NOW(), INTERVAL 90 DAY)";
             case 'this_year':
-                return "YEAR(t.created_at) = YEAR(NOW())";
+                return "YEAR({$column}) = YEAR(NOW())";
             default:
                 return "1=1";
         }
+    }
+
+    private function getPositionDistribution($userScope)
+    {
+        $sql = "SELECT p.name as label, COUNT(ua.id) as value
+                FROM positions p
+                LEFT JOIN user_assignments ua ON p.id = ua.position_id AND ua.status = 'active'
+                GROUP BY p.id, p.name
+                ORDER BY value DESC, p.name ASC
+                LIMIT 20";
+
+        return Database::getInstance()->fetchAll($sql);
+    }
+
+    private function getHierarchyHealthMetrics($userScope)
+    {
+        $sql = "SELECT
+                    (SELECT COUNT(*) FROM godinas) as total_godinas,
+                    (SELECT COUNT(*) FROM gamtas) as total_gamtas,
+                    (SELECT COUNT(*) FROM gurmus) as total_gurmus,
+                    (SELECT COUNT(*) FROM users WHERE status = 'active') as active_users,
+                    (SELECT COUNT(*) FROM user_assignments WHERE status = 'active') as active_assignments";
+
+        return Database::getInstance()->fetch($sql) ?: [];
+    }
+
+    private function getTaskMetrics($userScope, $filters)
+    {
+        $sql = "SELECT
+                    COUNT(*) as total_tasks,
+                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
+                    SUM(CASE WHEN t.status IN ('pending', 'in_progress', 'under_review') THEN 1 ELSE 0 END) as active_tasks
+                FROM tasks t
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['status'] !== 'all') {
+            $sql .= " AND t.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if ($filters['priority'] !== 'all') {
+            $sql .= " AND t.priority = ?";
+            $params[] = $filters['priority'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 't.created_at');
+        }
+
+        $metrics = Database::getInstance()->fetch($sql, $params) ?: [];
+
+        $totalTasks = (int) ($metrics['total_tasks'] ?? 0);
+        $completedTasks = (int) ($metrics['completed_tasks'] ?? 0);
+        $metrics['average_progress'] = $totalTasks > 0
+            ? round(($completedTasks / $totalTasks) * 100, 2)
+            : 0;
+
+        return $metrics;
+    }
+
+    private function getProductivityData($userScope, $filters)
+    {
+        $sql = "SELECT DATE(t.created_at) as label, COUNT(*) as value
+                FROM tasks t
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['status'] !== 'all') {
+            $sql .= " AND t.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if ($filters['priority'] !== 'all') {
+            $sql .= " AND t.priority = ?";
+            $params[] = $filters['priority'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 't.created_at');
+        }
+
+        $sql .= " GROUP BY DATE(t.created_at) ORDER BY DATE(t.created_at) DESC LIMIT 30";
+
+        return Database::getInstance()->fetchAll($sql, $params);
+    }
+
+    private function generateMeetingReport($userScope, $filters)
+    {
+        $hasMeetingAttendees = $this->reportTableExists('meeting_attendees');
+
+        $sql = "SELECT m.*, u.first_name, u.last_name";
+
+        if ($hasMeetingAttendees) {
+            $sql .= ", COUNT(ma.id) as attendee_count,
+                       SUM(CASE WHEN ma.attendance_status = 'present' THEN 1 ELSE 0 END) as present_count";
+        } else {
+            $sql .= ", 0 as attendee_count, 0 as present_count";
+        }
+
+        $sql .= "
+                FROM meetings m
+                LEFT JOIN users u ON m.created_by = u.id";
+
+        if ($hasMeetingAttendees) {
+            $sql .= "
+                LEFT JOIN meeting_attendees ma ON m.id = ma.meeting_id";
+        }
+
+        $sql .= "
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['meeting_type'] !== 'all') {
+            $sql .= " AND m.meeting_type = ?";
+            $params[] = $filters['meeting_type'];
+        }
+
+        if ($filters['status'] !== 'all') {
+            $sql .= " AND m.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'm.start_datetime');
+        }
+
+        $sql .= " GROUP BY m.id ORDER BY m.start_datetime DESC LIMIT 500";
+
+        return Database::getInstance()->fetchAll($sql, $params);
+    }
+
+    private function getMeetingAttendanceData($userScope, $filters)
+    {
+        if (!$this->reportTableExists('meeting_attendees')) {
+            return [];
+        }
+
+        $sql = "SELECT ma.attendance_status as label, COUNT(*) as value
+                FROM meeting_attendees ma
+                INNER JOIN meetings m ON ma.meeting_id = m.id
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['meeting_type'] !== 'all') {
+            $sql .= " AND m.meeting_type = ?";
+            $params[] = $filters['meeting_type'];
+        }
+
+        if ($filters['status'] !== 'all') {
+            $sql .= " AND m.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'm.start_datetime');
+        }
+
+        $sql .= " GROUP BY ma.attendance_status ORDER BY value DESC";
+
+        return Database::getInstance()->fetchAll($sql, $params);
+    }
+
+    private function getMeetingEffectivenessMetrics($userScope, $filters)
+    {
+        $hasMeetingAttendees = $this->reportTableExists('meeting_attendees');
+
+        $sql = "SELECT
+                    COUNT(*) as total_meetings,
+                    SUM(CASE WHEN m.status = 'completed' THEN 1 ELSE 0 END) as completed_meetings,
+                    SUM(CASE WHEN m.platform IN ('zoom', 'hybrid') THEN 1 ELSE 0 END) as virtual_meetings";
+
+        if ($hasMeetingAttendees) {
+            $sql .= ", COALESCE(AVG(COALESCE(attendance_summary.present_count, 0)), 0) as average_present_attendees";
+        } else {
+            $sql .= ", 0 as average_present_attendees";
+        }
+
+        $sql .= "
+                FROM meetings m";
+
+        if ($hasMeetingAttendees) {
+            $sql .= "
+                LEFT JOIN (
+                    SELECT meeting_id,
+                           SUM(CASE WHEN attendance_status = 'present' THEN 1 ELSE 0 END) as present_count
+                    FROM meeting_attendees
+                    GROUP BY meeting_id
+                ) attendance_summary ON attendance_summary.meeting_id = m.id";
+        }
+
+        $sql .= "
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['meeting_type'] !== 'all') {
+            $sql .= " AND m.meeting_type = ?";
+            $params[] = $filters['meeting_type'];
+        }
+
+        if ($filters['status'] !== 'all') {
+            $sql .= " AND m.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'm.start_datetime');
+        }
+
+        return Database::getInstance()->fetch($sql, $params) ?: [];
+    }
+
+    private function generateEventReport($userScope, $filters)
+    {
+        $hasEventRegistrations = $this->reportTableExists('event_registrations');
+
+        $sql = "SELECT e.*, u.first_name, u.last_name";
+
+        if ($hasEventRegistrations) {
+            $sql .= ", COUNT(er.id) as registration_count";
+        } else {
+            $sql .= ", 0 as registration_count";
+        }
+
+        $sql .= "
+                FROM events e
+                LEFT JOIN users u ON e.created_by = u.id";
+
+        if ($hasEventRegistrations) {
+            $sql .= "
+                LEFT JOIN event_registrations er ON e.id = er.event_id";
+        }
+
+        $sql .= "
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['event_type'] !== 'all') {
+            $sql .= " AND e.event_type = ?";
+            $params[] = $filters['event_type'];
+        }
+
+        if ($filters['status'] !== 'all') {
+            $sql .= " AND e.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'e.start_datetime');
+        }
+
+        $sql .= " GROUP BY e.id ORDER BY e.start_datetime DESC LIMIT 500";
+
+        return Database::getInstance()->fetchAll($sql, $params);
+    }
+
+    private function getEventParticipationData($userScope, $filters)
+    {
+        if (!$this->reportTableExists('event_registrations')) {
+            return [];
+        }
+
+        $sql = "SELECT er.status as label, COUNT(*) as value
+                FROM event_registrations er
+                INNER JOIN events e ON er.event_id = e.id
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['event_type'] !== 'all') {
+            $sql .= " AND e.event_type = ?";
+            $params[] = $filters['event_type'];
+        }
+
+        if ($filters['status'] !== 'all') {
+            $sql .= " AND e.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'e.start_datetime');
+        }
+
+        $sql .= " GROUP BY er.status ORDER BY value DESC";
+
+        return Database::getInstance()->fetchAll($sql, $params);
+    }
+
+    private function getEventImpactMetrics($userScope, $filters)
+    {
+        $hasEventRegistrations = $this->reportTableExists('event_registrations');
+
+        $sql = "SELECT
+                    COUNT(*) as total_events,
+                    SUM(CASE WHEN e.status IN ('open_registration', 'in_progress', 'completed') THEN 1 ELSE 0 END) as published_events,
+                    SUM(CASE WHEN e.requires_payment = 1 THEN 1 ELSE 0 END) as paid_events";
+
+        if ($hasEventRegistrations) {
+            $sql .= ", COALESCE(AVG(COALESCE(registration_summary.registration_count, 0)), 0) as average_registrations";
+        } else {
+            $sql .= ", 0 as average_registrations";
+        }
+
+        $sql .= "
+                FROM events e";
+
+        if ($hasEventRegistrations) {
+            $sql .= "
+                LEFT JOIN (
+                    SELECT event_id, COUNT(*) as registration_count
+                    FROM event_registrations
+                    GROUP BY event_id
+                ) registration_summary ON registration_summary.event_id = e.id";
+        }
+
+        $sql .= "
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['event_type'] !== 'all') {
+            $sql .= " AND e.event_type = ?";
+            $params[] = $filters['event_type'];
+        }
+
+        if ($filters['status'] !== 'all') {
+            $sql .= " AND e.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'e.start_datetime');
+        }
+
+        return Database::getInstance()->fetch($sql, $params) ?: [];
+    }
+
+    private function generateDonationReport($userScope, $filters)
+    {
+        $sql = "SELECT d.*
+                FROM donations d
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['donation_type'] !== 'all') {
+            $sql .= " AND d.donation_type = ?";
+            $params[] = $filters['donation_type'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'd.created_at');
+        }
+
+        if ($filters['amount_range'] !== 'all') {
+            switch ($filters['amount_range']) {
+                case 'under_100':
+                    $sql .= " AND d.amount < 100";
+                    break;
+                case '100_500':
+                    $sql .= " AND d.amount BETWEEN 100 AND 500";
+                    break;
+                case '500_1000':
+                    $sql .= " AND d.amount BETWEEN 500 AND 1000";
+                    break;
+                case 'over_1000':
+                    $sql .= " AND d.amount > 1000";
+                    break;
+            }
+        }
+
+        $sql .= " ORDER BY d.created_at DESC LIMIT 500";
+
+        return Database::getInstance()->fetchAll($sql, $params);
+    }
+
+    private function getDonationTrends($userScope, $filters)
+    {
+        $sql = "SELECT DATE_FORMAT(d.created_at, '%Y-%m') as label,
+                       COUNT(*) as donation_count,
+                       COALESCE(SUM(d.amount), 0) as total_amount
+                FROM donations d
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['donation_type'] !== 'all') {
+            $sql .= " AND d.donation_type = ?";
+            $params[] = $filters['donation_type'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'd.created_at');
+        }
+
+        $sql .= " GROUP BY DATE_FORMAT(d.created_at, '%Y-%m') ORDER BY label DESC LIMIT 12";
+
+        return Database::getInstance()->fetchAll($sql, $params);
+    }
+
+    private function getDonorAnalysis($userScope, $filters)
+    {
+        $sql = "SELECT CONCAT(d.donor_type, ' / ', d.payment_status) as label, COUNT(*) as value
+                FROM donations d
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['donation_type'] !== 'all') {
+            $sql .= " AND d.donation_type = ?";
+            $params[] = $filters['donation_type'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'd.created_at');
+        }
+
+        $sql .= " GROUP BY d.donor_type, d.payment_status ORDER BY value DESC";
+
+        return Database::getInstance()->fetchAll($sql, $params);
+    }
+
+    private function generateCourseReport($userScope, $filters)
+    {
+        $hasCourseEnrollments = $this->reportTableExists('course_enrollments');
+
+        $sql = "SELECT c.*";
+
+        if ($hasCourseEnrollments) {
+            $sql .= ", COUNT(ce.id) as enrollment_count";
+        } else {
+            $sql .= ", 0 as enrollment_count";
+        }
+
+        $sql .= "
+                FROM courses c";
+
+        if ($hasCourseEnrollments) {
+            $sql .= "
+                LEFT JOIN course_enrollments ce ON c.id = ce.course_id";
+        }
+
+        $sql .= "
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['status'] !== 'all') {
+            $sql .= " AND c.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'c.created_at');
+        }
+
+        $sql .= " GROUP BY c.id ORDER BY c.created_at DESC LIMIT 500";
+
+        return Database::getInstance()->fetchAll($sql, $params);
+    }
+
+    private function getCourseEnrollmentData($userScope, $filters)
+    {
+        if (!$this->reportTableExists('course_enrollments')) {
+            return [];
+        }
+
+        $sql = "SELECT ce.status as label, COUNT(*) as value
+                FROM course_enrollments ce
+                INNER JOIN courses c ON ce.course_id = c.id
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['status'] !== 'all') {
+            $sql .= " AND c.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'c.created_at');
+        }
+
+        $sql .= " GROUP BY ce.status ORDER BY value DESC";
+
+        return Database::getInstance()->fetchAll($sql, $params);
+    }
+
+    private function getCourseCompletionRates($userScope, $filters)
+    {
+        if (!$this->reportTableExists('course_enrollments')) {
+            return [
+                'total_enrollments' => 0,
+                'completed_enrollments' => 0,
+                'average_progress' => 0,
+            ];
+        }
+
+        $sql = "SELECT
+                    COUNT(*) as total_enrollments,
+                    SUM(CASE WHEN ce.status = 'completed' THEN 1 ELSE 0 END) as completed_enrollments
+                FROM course_enrollments ce
+                INNER JOIN courses c ON ce.course_id = c.id
+                WHERE 1=1";
+
+        $params = [];
+
+        if ($filters['status'] !== 'all') {
+            $sql .= " AND c.status = ?";
+            $params[] = $filters['status'];
+        }
+
+        if ($filters['date_range'] !== 'all') {
+            $sql .= " AND " . $this->getDateRangeCondition($filters['date_range'], 'c.created_at');
+        }
+
+        $metrics = Database::getInstance()->fetch($sql, $params) ?: [];
+
+        $totalEnrollments = (int) ($metrics['total_enrollments'] ?? 0);
+        $completedEnrollments = (int) ($metrics['completed_enrollments'] ?? 0);
+        $metrics['average_progress'] = $totalEnrollments > 0
+            ? round(($completedEnrollments / $totalEnrollments) * 100, 2)
+            : 0;
+
+        return $metrics;
+    }
+
+    private function getGodinaStatistics($userScope)
+    {
+        return Database::getInstance()->fetchAll(
+            "SELECT g.name as label, COUNT(ga.id) as value
+             FROM godinas g
+             LEFT JOIN gamtas ga ON ga.godina_id = g.id
+             GROUP BY g.id, g.name
+             ORDER BY value DESC, g.name ASC"
+        );
+    }
+
+    private function getGamtaStatistics($userScope)
+    {
+        return Database::getInstance()->fetchAll(
+            "SELECT ga.name as label, COUNT(gu.id) as value
+             FROM gamtas ga
+             LEFT JOIN gurmus gu ON gu.gamta_id = ga.id
+             GROUP BY ga.id, ga.name
+             ORDER BY value DESC, ga.name ASC"
+        );
+    }
+
+    private function getGurmuStatistics($userScope)
+    {
+        return Database::getInstance()->fetchAll(
+            "SELECT gu.name as label, COUNT(u.id) as value
+             FROM gurmus gu
+             LEFT JOIN users u ON u.gurmu_id = gu.id AND u.status = 'active'
+             GROUP BY gu.id, gu.name
+             ORDER BY value DESC, gu.name ASC"
+        );
+    }
+
+    private function getPositionStatistics($userScope)
+    {
+        return Database::getInstance()->fetchAll(
+            "SELECT p.name as label, COUNT(ua.id) as value
+             FROM positions p
+             LEFT JOIN user_assignments ua ON ua.position_id = p.id AND ua.status = 'active'
+             GROUP BY p.id, p.name
+             ORDER BY value DESC, p.name ASC"
+        );
+    }
+
+    private function reportTableExists($tableName)
+    {
+        $count = Database::getInstance()->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = ?",
+            [$tableName]
+        );
+
+        return (int) $count > 0;
     }
 
     // Additional helper methods for other report types...
@@ -568,7 +1163,7 @@ class ReportController extends BaseController
     private function getUpcomingMeetingsInScope($userScope)
     {
         $sql = "SELECT COUNT(*) as count FROM meetings m 
-                WHERE m.start_date >= NOW() AND m.status = 'scheduled'";
+                WHERE m.start_datetime >= NOW() AND m.status = 'scheduled'";
         
         $result = Database::getInstance()->fetch($sql);
         return $result ? $result['count'] : 0;
@@ -588,7 +1183,7 @@ class ReportController extends BaseController
     private function getRecentEventsInScope($userScope)
     {
         $sql = "SELECT COUNT(*) as count FROM events e 
-                WHERE e.start_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                WHERE e.start_datetime >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
         
         $result = Database::getInstance()->fetch($sql);
         return $result ? $result['count'] : 0;
@@ -600,9 +1195,294 @@ class ReportController extends BaseController
         return [];
     }
 
-    // Export methods would be implemented here
-    private function exportToCsv($data, $type) {}
-    private function exportToExcel($data, $type) {}
-    private function exportToPdf($data, $type) {}
-    private function generateExportData($type, $userScope, $filters) { return []; }
+    private function exportToCsv($data, $type)
+    {
+        $rows = $this->flattenExportData($data);
+        $handle = fopen('php://temp', 'r+');
+
+        if (!empty($rows)) {
+            fputcsv($handle, array_keys($rows[0]));
+            foreach ($rows as $row) {
+                fputcsv($handle, $row);
+            }
+        } else {
+            fputcsv($handle, ['message']);
+            fputcsv($handle, ['No report rows available']);
+        }
+
+        rewind($handle);
+        $content = stream_get_contents($handle);
+        fclose($handle);
+
+        return $this->sendExportResponse($content, $this->buildExportFilename($type, 'csv'), 'text/csv; charset=UTF-8');
+    }
+
+    private function exportToExcel($data, $type)
+    {
+        $rows = $this->flattenExportData($data);
+        $headers = !empty($rows) ? array_keys($rows[0]) : ['message'];
+
+        $html = '<table border="1"><thead><tr>';
+        foreach ($headers as $header) {
+            $html .= '<th>' . htmlspecialchars((string) $header, ENT_QUOTES, 'UTF-8') . '</th>';
+        }
+        $html .= '</tr></thead><tbody>';
+
+        if (!empty($rows)) {
+            foreach ($rows as $row) {
+                $html .= '<tr>';
+                foreach ($headers as $header) {
+                    $html .= '<td>' . htmlspecialchars((string) ($row[$header] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
+                }
+                $html .= '</tr>';
+            }
+        } else {
+            $html .= '<tr><td>No report rows available</td></tr>';
+        }
+
+        $html .= '</tbody></table>';
+
+        return $this->sendExportResponse(
+            $html,
+            $this->buildExportFilename($type, 'xls'),
+            'application/vnd.ms-excel; charset=UTF-8'
+        );
+    }
+
+    private function exportToPdf($data, $type)
+    {
+        $lines = [
+            strtoupper(str_replace('_', ' ', $type)) . ' REPORT',
+            'Generated: ' . date('Y-m-d H:i:s'),
+            '',
+        ];
+
+        foreach ($this->flattenExportData($data) as $row) {
+            foreach ($row as $key => $value) {
+                $lines[] = $key . ': ' . $value;
+            }
+            $lines[] = '';
+        }
+
+        if (count($lines) === 3) {
+            $lines[] = 'No report rows available';
+        }
+
+        $content = $this->buildSimplePdf($lines);
+
+        return $this->sendExportResponse($content, $this->buildExportFilename($type, 'pdf'), 'application/pdf');
+    }
+
+    private function generateExportData($type, $userScope, $filters)
+    {
+        $defaultTaskFilters = [
+            'status' => $filters['status'] ?? 'all',
+            'priority' => $filters['priority'] ?? 'all',
+            'date_range' => $filters['date_range'] ?? '30_days',
+            'assigned_to' => $filters['assigned_to'] ?? 'all',
+        ];
+
+        $defaultMeetingFilters = [
+            'date_range' => $filters['date_range'] ?? '30_days',
+            'meeting_type' => $filters['meeting_type'] ?? 'all',
+            'status' => $filters['status'] ?? 'all',
+        ];
+
+        $defaultEventFilters = [
+            'date_range' => $filters['date_range'] ?? '90_days',
+            'event_type' => $filters['event_type'] ?? 'all',
+            'status' => $filters['status'] ?? 'all',
+        ];
+
+        $defaultDonationFilters = [
+            'date_range' => $filters['date_range'] ?? '30_days',
+            'donation_type' => $filters['donation_type'] ?? 'all',
+            'category' => $filters['category'] ?? 'all',
+            'amount_range' => $filters['amount_range'] ?? 'all',
+        ];
+
+        $defaultCourseFilters = [
+            'date_range' => $filters['date_range'] ?? '90_days',
+            'course_type' => $filters['course_type'] ?? 'all',
+            'status' => $filters['status'] ?? 'all',
+        ];
+
+        switch ($type) {
+            case 'summary':
+                return [[
+                    'total_members' => $this->getTotalMembersInScope($userScope),
+                    'active_tasks' => $this->getActiveTasksInScope($userScope),
+                    'upcoming_meetings' => $this->getUpcomingMeetingsInScope($userScope),
+                    'monthly_donations' => $this->getMonthlyDonationsInScope($userScope),
+                    'recent_events' => $this->getRecentEventsInScope($userScope),
+                ]];
+            case 'detailed':
+                return array_merge(
+                    $this->flattenExportData($this->generateTaskReport($userScope, $defaultTaskFilters), 'tasks'),
+                    $this->flattenExportData($this->generateMeetingReport($userScope, $defaultMeetingFilters), 'meetings'),
+                    $this->flattenExportData($this->generateEventReport($userScope, $defaultEventFilters), 'events'),
+                    $this->flattenExportData($this->generateDonationReport($userScope, $defaultDonationFilters), 'donations')
+                );
+            case 'users':
+                return $this->generateUserReport($userScope, [
+                    'role' => $filters['role'] ?? 'all',
+                    'status' => $filters['status'] ?? 'all',
+                    'registration_period' => $filters['registration_period'] ?? '30_days',
+                ]);
+            case 'hierarchy':
+                return $this->generateHierarchyReport($userScope);
+            case 'tasks':
+                return $this->generateTaskReport($userScope, $defaultTaskFilters);
+            case 'meetings':
+                return $this->generateMeetingReport($userScope, $defaultMeetingFilters);
+            case 'events':
+                return $this->generateEventReport($userScope, $defaultEventFilters);
+            case 'donations':
+                return $this->generateDonationReport($userScope, $defaultDonationFilters);
+            case 'courses':
+                return $this->generateCourseReport($userScope, $defaultCourseFilters);
+            default:
+                return [];
+        }
+    }
+
+    private function normalizeExportType($type)
+    {
+        $aliases = [
+            'financial' => 'donations',
+            'membership' => 'users',
+            'activities' => 'tasks',
+        ];
+
+        return $aliases[$type] ?? $type;
+    }
+
+    private function flattenExportData($data, $section = null)
+    {
+        if ($data === null) {
+            return [];
+        }
+
+        if (is_array($data) && $this->isAssocArray($data)) {
+            $allScalar = true;
+            foreach ($data as $value) {
+                if (is_array($value) || is_object($value)) {
+                    $allScalar = false;
+                    break;
+                }
+            }
+
+            if ($allScalar) {
+                return [[
+                    'section' => $section ?? 'report',
+                ] + array_map([$this, 'stringifyExportValue'], $data)];
+            }
+
+            $rows = [];
+            foreach ($data as $key => $value) {
+                $rows = array_merge($rows, $this->flattenExportData($value, (string) $key));
+            }
+            return $rows;
+        }
+
+        if (is_array($data)) {
+            $rows = [];
+            foreach ($data as $item) {
+                if (is_array($item) && $this->isAssocArray($item)) {
+                    $rows[] = [
+                        'section' => $section ?? 'report',
+                    ] + array_map([$this, 'stringifyExportValue'], $item);
+                } else {
+                    $rows[] = [
+                        'section' => $section ?? 'report',
+                        'value' => $this->stringifyExportValue($item),
+                    ];
+                }
+            }
+            return $rows;
+        }
+
+        return [[
+            'section' => $section ?? 'report',
+            'value' => $this->stringifyExportValue($data),
+        ]];
+    }
+
+    private function stringifyExportValue($value)
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    private function isAssocArray(array $data)
+    {
+        return array_keys($data) !== range(0, count($data) - 1);
+    }
+
+    private function buildExportFilename($type, $extension)
+    {
+        return sprintf('%s_report_%s.%s', $type, date('Ymd_His'), $extension);
+    }
+
+    private function sendExportResponse($content, $filename, $contentType)
+    {
+        if (PHP_SAPI !== 'cli') {
+            header('Content-Type: ' . $contentType);
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Content-Length: ' . strlen($content));
+        }
+
+        echo $content;
+        return $content;
+    }
+
+    private function buildSimplePdf(array $lines)
+    {
+        $sanitizedLines = [];
+        foreach ($lines as $line) {
+            $sanitizedLines[] = str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], (string) $line);
+        }
+
+        $text = "BT\n/F1 10 Tf\n50 780 Td\n14 TL\n";
+        foreach ($sanitizedLines as $index => $line) {
+            if ($index === 0) {
+                $text .= '(' . $line . ") Tj\n";
+            } else {
+                $text .= 'T* (' . $line . ") Tj\n";
+            }
+        }
+        $text .= "ET";
+
+        $objects = [];
+        $objects[] = "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj";
+        $objects[] = "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj";
+        $objects[] = "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj";
+        $objects[] = "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj";
+        $objects[] = "5 0 obj << /Length " . strlen($text) . " >> stream\n" . $text . "\nendstream endobj";
+
+        $pdf = "%PDF-1.4\n";
+        $offsets = [0];
+        foreach ($objects as $object) {
+            $offsets[] = strlen($pdf);
+            $pdf .= $object . "\n";
+        }
+
+        $xrefOffset = strlen($pdf);
+        $pdf .= "xref\n0 " . (count($objects) + 1) . "\n";
+        $pdf .= "0000000000 65535 f \n";
+        for ($index = 1; $index <= count($objects); $index++) {
+            $pdf .= sprintf("%010d 00000 n \n", $offsets[$index]);
+        }
+        $pdf .= "trailer << /Size " . (count($objects) + 1) . " /Root 1 0 R >>\n";
+        $pdf .= "startxref\n" . $xrefOffset . "\n%%EOF";
+
+        return $pdf;
+    }
 }

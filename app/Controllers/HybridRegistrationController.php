@@ -446,6 +446,13 @@ class HybridRegistrationController extends Controller
             
             $internalEmail = $this->emailGenerator->generateInternalEmail($registration, $positionData, $hierarchyData);
             $emailId = $this->emailGenerator->createInternalEmailRecord($userId, $internalEmail);
+
+            if ($positionData && !empty($positionData['key_name']) && $positionData['key_name'] !== 'member') {
+                $this->emailGenerator->provisionRoleAlias($userId, $registration, $positionData, $hierarchyData, [
+                    'forward_to' => $internalEmail,
+                    'creation_method' => 'hybrid_registration_alias'
+                ]);
+            }
             
             // Generate temporary password
             $tempPassword = $this->emailGenerator->generateEmailPassword();

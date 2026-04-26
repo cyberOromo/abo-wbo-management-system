@@ -61,7 +61,7 @@
                         <div class="email-preview-display">
                             <span id="emailPreviewDisplay">Will be generated based on your information</span>
                         </div>
-                        <small class="text-muted">Format: position.hierarchy.firstname.lastname@abo-wbo.org</small>
+                        <small class="text-muted">Primary login: firstname.lastInitial@j-abo-wbo.org. Position-and-hierarchy aliases are added later for executive or admin roles when applicable.</small>
                     </div>
                 </div>
             </div>

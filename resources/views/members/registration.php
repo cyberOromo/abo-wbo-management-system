@@ -310,10 +310,9 @@ $current_user = $current_user ?? [];
                                 ?>
                                 <?php foreach ($groupedGurmus as $gamtaId => $gurmus): ?>
                                     <?php
-                                    // Get Gamta info for optgroup
-                                    $gamta = $this->db->fetchOne("SELECT name FROM gamtas WHERE id = ?", [$gamtaId]);
+                                    $gamtaName = $gurmus[0]['gamta_name'] ?? 'Unknown Gamta';
                                     ?>
-                                    <optgroup label="<?= htmlspecialchars($gamta['name'] ?? 'Unknown Gamta') ?>">
+                                    <optgroup label="<?= htmlspecialchars($gamtaName) ?>">
                                         <?php foreach ($gurmus as $gurmu): ?>
                                             <option value="<?= $gurmu['id'] ?>"><?= htmlspecialchars($gurmu['name']) ?></option>
                                         <?php endforeach; ?>

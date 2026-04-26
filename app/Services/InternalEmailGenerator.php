@@ -7,8 +7,9 @@ use Exception;
 /**
  * Internal Email Generator Service
  * 
- * Generates and manages internal organizational email addresses
- * Format: {position}.{hierarchy}.{firstname}.{lastname}@j-abo-wbo.org
+ * Generates and manages internal organizational email addresses.
+ * Primary format: {firstname}.{lastInitial}@j-abo-wbo.org
+ * Optional alias format: {position}.{hierarchy}@j-abo-wbo.org
  * 
  * Features:
  * - Hierarchical email generation
@@ -38,7 +39,7 @@ class InternalEmailGenerator
         $maxAttempts = 10;
         
         while ($attempts < $maxAttempts) {
-            $email = $this->buildEmailAddress($userData, $positionData, $hierarchyData, $attempts);
+            $email = $this->buildPrimaryEmailAddress($userData, $hierarchyData, $attempts);
             
             if ($this->isEmailUnique($email)) {
                 return $email;
@@ -49,51 +50,97 @@ class InternalEmailGenerator
         
         throw new Exception("Unable to generate unique internal email after {$maxAttempts} attempts");
     }
+
+    /**
+     * Generate a unique immutable primary email for an existing user during migration.
+     */
+    public function generateMigrationPrimaryEmail(int $userId, array $userData, array $reservedEmails = []): string
+    {
+        $attempts = 0;
+        $maxAttempts = 10;
+
+        while ($attempts < $maxAttempts) {
+            $email = $this->buildPrimaryEmailAddress($userData, null, $attempts);
+
+            if ($this->isEmailAvailableToUser($email, $userId, $reservedEmails)) {
+                return $email;
+            }
+
+            $attempts++;
+        }
+
+        throw new Exception("Unable to generate migration-safe primary email after {$maxAttempts} attempts");
+    }
+
+    /**
+     * Generate a short role-based alias for executive/admin office holders.
+     */
+    public function generateRoleBasedAlias(array $userData, array $positionData = null, array $hierarchyData = null): ?string
+    {
+        if (!$positionData || empty($positionData['key_name'])) {
+            return null;
+        }
+
+        $attempts = 0;
+        $maxAttempts = 10;
+
+        while ($attempts < $maxAttempts) {
+            $email = $this->buildRoleAliasAddress($positionData, $hierarchyData, $attempts);
+
+            if ($this->isEmailUnique($email)) {
+                return $email;
+            }
+
+            $attempts++;
+        }
+
+        throw new Exception("Unable to generate unique role alias after {$maxAttempts} attempts");
+    }
     
     /**
      * Build email address based on hierarchy and position
      */
-    protected function buildEmailAddress(array $userData, array $positionData = null, array $hierarchyData = null, int $attempt = 0): string
+    protected function buildPrimaryEmailAddress(array $userData, array $hierarchyData = null, int $attempt = 0): string
     {
-        $parts = [];
-        
-        // Position prefix (if available)
-        if ($positionData && !empty($positionData['key_name'])) {
-            $parts[] = $this->sanitizeEmailPart($positionData['key_name']);
-        } else {
-            $parts[] = 'member'; // Default for members without specific positions
-        }
-        
-        // Hierarchy identifier
-        if ($hierarchyData) {
-            $hierarchyPart = $this->getHierarchyIdentifier($hierarchyData);
-            if ($hierarchyPart) {
-                $parts[] = $hierarchyPart;
-            }
-        } else {
-            $parts[] = 'general'; // Default hierarchy
-        }
-        
-        // Name parts
         $firstName = $this->sanitizeEmailPart($userData['first_name']);
-        $lastName = $this->sanitizeEmailPart($userData['last_name']);
-        
-        // Handle collision attempts
+        $lastInitial = $this->sanitizeEmailPart(substr((string) ($userData['last_name'] ?? ''), 0, 1));
+
+        $parts = [
+            $firstName,
+            $lastInitial ?: 'x'
+        ];
+
         if ($attempt > 0) {
-            $lastName .= $attempt;
+            $parts[1] .= $attempt;
         }
-        
-        $parts[] = $firstName;
-        $parts[] = $lastName;
-        
-        // Join parts and create email
+
         $localPart = implode('.', $parts);
-        
-        // Ensure length compliance
+
         if (strlen($localPart) > $this->maxEmailLength) {
             $localPart = $this->truncateEmailPart($localPart, $this->maxEmailLength);
         }
-        
+
+        return strtolower($localPart) . '@' . $this->domain;
+    }
+
+    protected function buildRoleAliasAddress(array $positionData, array $hierarchyData = null, int $attempt = 0): string
+    {
+        $positionPart = $this->sanitizeEmailPart($positionData['key_name'] ?? 'user');
+        $hierarchyPart = $this->getHierarchyIdentifier($hierarchyData ?? []);
+
+        if ($attempt > 0) {
+            $positionPart .= $attempt;
+        }
+
+        $localPart = implode('.', array_filter([
+            $positionPart,
+            $hierarchyPart ?: 'general'
+        ]));
+
+        if (strlen($localPart) > $this->maxEmailLength) {
+            $localPart = $this->truncateEmailPart($localPart, $this->maxEmailLength);
+        }
+
         return strtolower($localPart) . '@' . $this->domain;
     }
     
@@ -109,13 +156,13 @@ class InternalEmailGenerator
                 return 'global';
                 
             case 'godina':
-                return $this->sanitizeEmailPart($hierarchyData['godina_code'] ?? 'godina');
+                return $this->sanitizeEmailPart($hierarchyData['godina_code'] ?? $hierarchyData['code'] ?? 'godina');
                 
             case 'gamta':
-                return $this->sanitizeEmailPart($hierarchyData['gamta_code'] ?? 'gamta');
+                return $this->sanitizeEmailPart($hierarchyData['gamta_code'] ?? $hierarchyData['code'] ?? 'gamta');
                 
             case 'gurmu':
-                return $this->sanitizeEmailPart($hierarchyData['gurmu_code'] ?? 'gurmu');
+                return $this->sanitizeEmailPart($hierarchyData['gurmu_code'] ?? $hierarchyData['code'] ?? 'gurmu');
                 
             default:
                 return 'general';
@@ -207,6 +254,54 @@ class InternalEmailGenerator
         
         return !$userExists;
     }
+
+    /**
+     * Check whether an email can be claimed by a specific user during migration.
+     */
+    public function isEmailAvailableToUser(string $email, ?int $userId = null, array $reservedEmails = []): bool
+    {
+        $normalizedEmail = strtolower($email);
+
+        foreach ($reservedEmails as $reservedEmail) {
+            if (strtolower((string) $reservedEmail) !== $normalizedEmail) {
+                continue;
+            }
+
+            if ($userId && $this->emailBelongsToUser($normalizedEmail, $userId)) {
+                return true;
+            }
+
+            return false;
+        }
+
+        if ($userId && $this->emailBelongsToUser($normalizedEmail, $userId)) {
+            return true;
+        }
+
+        return $this->isEmailUnique($normalizedEmail);
+    }
+
+    /**
+     * Check whether an email already belongs to the target user.
+     */
+    public function emailBelongsToUser(string $email, int $userId): bool
+    {
+        $ownedUserEmail = $this->db->fetch(
+            "SELECT id FROM users WHERE id = ? AND internal_email = ?",
+            [$userId, $email]
+        );
+
+        if ($ownedUserEmail) {
+            return true;
+        }
+
+        $ownedInternalEmail = $this->db->fetch(
+            "SELECT id FROM internal_emails WHERE user_id = ? AND internal_email = ?",
+            [$userId, $email]
+        );
+
+        return (bool) $ownedInternalEmail;
+    }
     
     /**
      * Create internal email record
@@ -232,6 +327,32 @@ class InternalEmailGenerator
         ];
         
         return $this->db->insert('internal_emails', $data);
+    }
+
+    public function provisionRoleAlias(int $userId, array $userData, array $positionData = null, array $hierarchyData = null, array $options = []): ?string
+    {
+        if (!$positionData || empty($positionData['key_name'])) {
+            return null;
+        }
+
+        $aliasEmail = $this->generateRoleBasedAlias($userData, $positionData, $hierarchyData);
+
+        $this->createInternalEmailRecord($userId, $aliasEmail, [
+            'email_type' => 'alias',
+            'quota_mb' => 0,
+            'forward_to' => $options['forward_to'] ?? null,
+            'created_by' => $options['created_by'] ?? null,
+            'creation_method' => $options['creation_method'] ?? 'role_alias',
+            'hierarchy_data' => $hierarchyData,
+            'position_data' => $positionData
+        ]);
+
+        $this->db->update('internal_emails', [
+            'status' => 'active',
+            'activated_at' => date('Y-m-d H:i:s')
+        ], ['internal_email' => $aliasEmail]);
+
+        return $aliasEmail;
     }
     
     /**
@@ -442,17 +563,23 @@ class InternalEmailGenerator
     public function previewEmailGeneration(array $userData, array $positionData = null, array $hierarchyData = null): array
     {
         try {
-            $email = $this->buildEmailAddress($userData, $positionData, $hierarchyData, 0);
+            $email = $this->buildPrimaryEmailAddress($userData, $hierarchyData, 0);
+            $roleAlias = null;
+
+            if ($positionData && !empty($positionData['key_name']) && $positionData['key_name'] !== 'member') {
+                $roleAlias = $this->buildRoleAliasAddress($positionData, $hierarchyData, 0);
+            }
             
             return [
                 'success' => true,
                 'email' => $email,
                 'is_unique' => $this->isEmailUnique($email),
+                'role_alias' => $roleAlias,
                 'breakdown' => [
-                    'position' => $positionData['key_name'] ?? 'member',
-                    'hierarchy' => $this->getHierarchyIdentifier($hierarchyData ?? []),
+                    'position' => $positionData['key_name'] ?? null,
+                    'hierarchy_alias' => $this->getHierarchyIdentifier($hierarchyData ?? []),
                     'first_name' => $this->sanitizeEmailPart($userData['first_name']),
-                    'last_name' => $this->sanitizeEmailPart($userData['last_name']),
+                    'last_initial' => $this->sanitizeEmailPart(substr((string) ($userData['last_name'] ?? ''), 0, 1)) ?: 'x',
                     'domain' => $this->domain
                 ]
             ];

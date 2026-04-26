@@ -7,22 +7,23 @@
     <input type="hidden" name="_token" value="<?= csrf_token() ?>">
     
     <div class="mb-3">
-        <label for="email" class="form-label">
+        <label for="internal_email" class="form-label">
             <i class="bi bi-envelope me-1"></i>
-            Email Address
+            Internal Email Address
         </label>
         <input type="email" 
-               class="form-control <?= session_has_error('email') ? 'is-invalid' : '' ?>" 
-               id="email" 
-               name="email" 
-               value="<?= old_input('email') ?>"
-               placeholder="Enter your email address"
+               class="form-control <?= session_has_error('internal_email') ? 'is-invalid' : '' ?>" 
+               id="internal_email" 
+               name="internal_email" 
+               value="<?= old_input('internal_email') ?>"
+               placeholder="Enter your internal email address"
                required>
-        <?php if (session_has_error('email')): ?>
+        <?php if (session_has_error('internal_email')): ?>
             <div class="invalid-feedback">
-                <?= session_get_error('email') ?>
+                <?= session_get_error('internal_email') ?>
             </div>
         <?php endif; ?>
+        <div class="form-text">Use your organizational account, for example `bontu.r@j-abo-wbo.org`.</div>
     </div>
     
     <div class="mb-3">

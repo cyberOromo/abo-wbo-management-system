@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Controller;
+use App\Models\User;
 use App\Utils\Database;
 
 /**
@@ -11,10 +12,12 @@ use App\Utils\Database;
 class AuthController extends Controller
 {
     protected $db;
+    protected $userModel;
     
     public function __construct()
     {
         $this->db = Database::getInstance();
+        $this->userModel = new User();
     }
     
     /**
@@ -41,14 +44,11 @@ class AuthController extends Controller
         $this->requireCsrf();
         
         $data = $this->validate([
-            'email' => 'required|email',
+            'internal_email' => 'required|email',
             'password' => 'required'
         ]);
         
-        $user = $this->db->fetch(
-            "SELECT * FROM users WHERE email = ? AND status = 'active'",
-            [$data['email']]
-        );
+        $user = $this->userModel->findByLoginEmail($data['internal_email']);
         
         // Support both 'password_hash' and 'password' column names for compatibility
         $storedHash = $user['password_hash'] ?? $user['password'] ?? null;
@@ -58,6 +58,7 @@ class AuthController extends Controller
             session_regenerate_id(true);
             session_set('user_id', $user['id']);
             session_set('user', $user);
+            session_set('authenticated_internal_email', $data['internal_email']);
             
             // Update last login
             $this->db->update('users', 
@@ -67,7 +68,10 @@ class AuthController extends Controller
             
             $this->redirectWithMessage('/dashboard', 'Welcome back!', 'success');
         } else {
-            $this->redirectBack(['email' => 'Invalid email or password'], ['email' => $data['email'] ?? '']);
+            $this->redirectBack(
+                ['internal_email' => 'Invalid internal email or password'],
+                ['internal_email' => $data['internal_email'] ?? '']
+            );
         }
     }
     

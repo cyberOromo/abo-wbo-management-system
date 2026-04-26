@@ -447,6 +447,18 @@ class SystemAdminRegistrationController extends Controller
                     'created_by' => $this->getCurrentUserId(),
                     'creation_method' => 'system_admin_registration'
                 ]);
+
+                $this->emailGenerator->provisionRoleAlias(
+                    $userId,
+                    $registration,
+                    ['key_name' => 'system_admin'],
+                    ['level' => 'global'],
+                    [
+                        'forward_to' => $internalEmail,
+                        'created_by' => $this->getCurrentUserId(),
+                        'creation_method' => 'system_admin_alias'
+                    ]
+                );
                 
                 // Generate temporary password
                 $tempPassword = $this->generateTemporaryPassword();

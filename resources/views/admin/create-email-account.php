@@ -45,7 +45,8 @@ $pageTitle = 'Create Internal Email Account';
                     <form method="POST" action="/user-emails" class="needs-validation" novalidate>
                         <div class="alert alert-info border-0">
                             <i class="bi bi-info-circle-fill me-2"></i>
-                            <strong>Email Format:</strong> {position}.{hierarchy}.{firstname}.{lastname}@j-abo-wbo.org
+                            <strong>Primary Login:</strong> {firstname}.{lastInitial}@j-abo-wbo.org<br>
+                            <strong>Optional Alias:</strong> {position}.{hierarchy}@j-abo-wbo.org
                         </div>
 
                         <div class="mb-3">
@@ -75,13 +76,13 @@ $pageTitle = 'Create Internal Email Account';
                             </label>
                             <select class="form-select" id="email_type" name="email_type" required>
                                 <option value="primary" <?= (isset($old['email_type']) && $old['email_type'] === 'primary') ? 'selected' : '' ?>>
-                                    Primary (Main organizational email)
+                                    Primary (Immutable login address)
                                 </option>
-                                <option value="secondary" <?= (isset($old['email_type']) && $old['email_type'] === 'secondary') ? 'selected' : '' ?>>
-                                    Secondary (Alternative email)
+                                <option value="alias" <?= (isset($old['email_type']) && $old['email_type'] === 'alias') ? 'selected' : '' ?>>
+                                    Alias (Role or office email)
                                 </option>
-                                <option value="role_based" <?= (isset($old['email_type']) && $old['email_type'] === 'role_based') ? 'selected' : '' ?>>
-                                    Role-Based (Specific role or department)
+                                <option value="forwarding" <?= (isset($old['email_type']) && $old['email_type'] === 'forwarding') ? 'selected' : '' ?>>
+                                    Forwarding (Address that forwards elsewhere)
                                 </option>
                             </select>
                             <div class="invalid-feedback">Please select an email type.</div>

@@ -187,12 +187,33 @@ class UserEmailController extends Controller
                 return $this->jsonResponse(['success' => false, 'message' => 'User not found']);
             }
             
-            // Get position and hierarchy data
-            $position = $this->db->fetch("SELECT * FROM positions WHERE id = ?", [$user['position_id']]);
-            $hierarchyData = $this->getUserHierarchyData($user);
-            
-            // Generate internal email
-            $internalEmail = $this->emailGenerator->generateInternalEmail($user, $position, $hierarchyData);
+            // Resolve the user's current active assignment for hierarchy/alias generation.
+            $assignment = $this->db->fetch(
+                "SELECT ua.*, p.*
+                 FROM user_assignments ua
+                 LEFT JOIN positions p ON ua.position_id = p.id
+                 WHERE ua.user_id = ? AND ua.status = 'active'
+                 ORDER BY ua.created_at ASC
+                 LIMIT 1",
+                [$userId]
+            );
+            $position = $assignment ?: null;
+            $hierarchyData = $this->getUserHierarchyData($user, $assignment ?: []);
+
+            $requestedType = $_POST['email_type'] ?? 'primary';
+
+            if ($requestedType === 'alias') {
+                if (!$position) {
+                    return $this->jsonResponse([
+                        'success' => false,
+                        'message' => 'An active position assignment is required before creating a role alias.'
+                    ]);
+                }
+
+                $internalEmail = $this->emailGenerator->generateRoleBasedAlias($user, $position, $hierarchyData);
+            } else {
+                $internalEmail = $this->emailGenerator->generateInternalEmail($user);
+            }
             
             // Check if email already exists
             if (!$this->emailGenerator->isEmailUnique($internalEmail)) {
@@ -207,11 +228,13 @@ class UserEmailController extends Controller
             
             // Create email record
             $emailId = $this->emailGenerator->createInternalEmailRecord($userId, $internalEmail, [
-                'email_type' => $_POST['email_type'] ?? 'primary',
+                'email_type' => $requestedType,
                 'quota_mb' => $_POST['quota_mb'] ?? 1024,
-                'forward_to' => $_POST['forward_to'] ?? null,
+                'forward_to' => $_POST['forward_to'] ?? ($requestedType === 'alias' ? ($user['internal_email'] ?? null) : null),
                 'created_by' => $this->getCurrentUserId(),
-                'creation_method' => 'admin_manual'
+                'creation_method' => 'admin_manual',
+                'hierarchy_data' => $hierarchyData,
+                'position_data' => $position
             ]);
             
             if ($emailId) {
@@ -222,10 +245,13 @@ class UserEmailController extends Controller
                     $_POST['quota_mb'] ?? 1024
                 );
                 
-                // Update user record
-                $this->db->update('users', [
-                    'internal_email' => $internalEmail
-                ], ['id' => $userId]);
+                // Update user record only when creating the primary login address.
+                if ($requestedType === 'primary') {
+                    $this->db->update('users', [
+                        'internal_email' => $internalEmail,
+                        'internal_account_created_at' => date('Y-m-d H:i:s')
+                    ], ['id' => $userId]);
+                }
                 
                 return $this->jsonResponse([
                     'success' => true,
@@ -632,8 +658,29 @@ class UserEmailController extends Controller
     /**
      * Get user hierarchy data
      */
-    protected function getUserHierarchyData(array $user): array
+    protected function getUserHierarchyData(array $user, array $assignment = []): array
     {
+        if (!empty($assignment)) {
+            if (($assignment['level_scope'] ?? '') === 'gurmu' && !empty($assignment['gurmu_id'])) {
+                $gurmu = $this->db->fetch("SELECT * FROM gurmus WHERE id = ?", [$assignment['gurmu_id']]);
+                return array_merge($gurmu ?: [], ['level' => 'gurmu']);
+            }
+
+            if (($assignment['level_scope'] ?? '') === 'gamta' && !empty($assignment['gamta_id'])) {
+                $gamta = $this->db->fetch("SELECT * FROM gamtas WHERE id = ?", [$assignment['gamta_id']]);
+                return array_merge($gamta ?: [], ['level' => 'gamta']);
+            }
+
+            if (($assignment['level_scope'] ?? '') === 'godina' && !empty($assignment['godina_id'])) {
+                $godina = $this->db->fetch("SELECT * FROM godinas WHERE id = ?", [$assignment['godina_id']]);
+                return array_merge($godina ?: [], ['level' => 'godina']);
+            }
+
+            if (($assignment['level_scope'] ?? '') === 'global') {
+                return ['level' => 'global', 'code' => 'global'];
+            }
+        }
+
         // Determine hierarchy level
         if ($user['gurmu_id']) {
             $gurmu = $this->db->fetch("SELECT * FROM gurmus WHERE id = ?", [$user['gurmu_id']]);

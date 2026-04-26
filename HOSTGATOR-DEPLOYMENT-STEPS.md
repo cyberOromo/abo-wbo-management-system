@@ -278,7 +278,7 @@ SELECT
 -- Verify system admin user
 SELECT id, email, user_type, level_scope, status 
 FROM users 
-WHERE email = 'admin@abo-wbo.org';
+WHERE email = 'admin@j-abo-wbo.org';
 
 -- Test user_summary_view (should work without errors)
 SELECT * FROM user_summary_view LIMIT 5;
