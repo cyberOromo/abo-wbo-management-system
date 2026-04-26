@@ -1177,7 +1177,11 @@ class SystemAdminController extends Controller
     private function requireSystemAdmin()
     {
         $user = auth_user();
-        if (!$user || !in_array($user['role'], ['system_admin', 'super_admin'])) {
+        $role = $user['role'] ?? null;
+        $userType = $user['user_type'] ?? null;
+
+        if (!$user || (!in_array($role, ['admin', 'system_admin', 'super_admin'], true)
+            && !in_array($userType, ['system_admin', 'super_admin'], true))) {
             $this->redirect('/dashboard');
         }
     }

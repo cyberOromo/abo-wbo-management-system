@@ -193,16 +193,21 @@ class Database
     
     public function tableExists(string $table): bool
     {
-        $sql = "SHOW TABLES LIKE :table";
-        $result = $this->fetch($sql, ['table' => $table]);
-        return $result !== null;
+        $sql = "SELECT COUNT(*) as count
+                FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?";
+        return (int) ($this->fetchColumn($sql, [$table]) ?? 0) > 0;
     }
     
     public function columnExists(string $table, string $column): bool
     {
-        $sql = "SHOW COLUMNS FROM {$table} LIKE :column";
-        $result = $this->fetch($sql, ['column' => $column]);
-        return $result !== null;
+        $sql = "SELECT COUNT(*) as count
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND column_name = ?";
+        return (int) ($this->fetchColumn($sql, [$table, $column]) ?? 0) > 0;
     }
     
     /**

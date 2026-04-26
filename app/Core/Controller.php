@@ -9,6 +9,10 @@ abstract class Controller
 {
     protected $data = [];
     protected $layout = 'app';
+
+    public function __construct()
+    {
+    }
     
     /**
      * Render view with data
