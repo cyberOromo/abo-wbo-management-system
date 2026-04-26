@@ -719,11 +719,18 @@ class ReportController extends BaseController
     private function getMeetingEffectivenessMetrics($userScope, $filters)
     {
         $hasMeetingAttendees = $this->reportTableExists('meeting_attendees');
+        $hasPlatform = Database::getInstance()->columnExists('meetings', 'platform');
 
         $sql = "SELECT
                     COUNT(*) as total_meetings,
                     SUM(CASE WHEN m.status = 'completed' THEN 1 ELSE 0 END) as completed_meetings,
-                    SUM(CASE WHEN m.platform IN ('zoom', 'hybrid') THEN 1 ELSE 0 END) as virtual_meetings";
+                    ";
+
+        if ($hasPlatform) {
+            $sql .= "SUM(CASE WHEN m.platform IN ('zoom', 'hybrid') THEN 1 ELSE 0 END) as virtual_meetings";
+        } else {
+            $sql .= "0 as virtual_meetings";
+        }
 
         if ($hasMeetingAttendees) {
             $sql .= ", COALESCE(AVG(COALESCE(attendance_summary.present_count, 0)), 0) as average_present_attendees";
