@@ -1049,18 +1049,27 @@ class TaskController extends BaseController
         
         // Apply hierarchy filtering based on user scope
         if (!empty($userScope)) {
-            if ($userScope['level_scope'] === 'gurmu') {
-                $sql .= " AND (t.gurmu_id = ? OR t.assigned_to = ?)";
-                $params[] = $userScope['gurmu_id'];
-                $params[] = $userScope['user_id'];
-            } elseif ($userScope['level_scope'] === 'gamta') {
-                $sql .= " AND (t.gamta_id = ? OR t.assigned_to = ?)";
-                $params[] = $userScope['gamta_id'];
-                $params[] = $userScope['user_id'];
-            } elseif ($userScope['level_scope'] === 'godina') {
-                $sql .= " AND (t.godina_id = ? OR t.assigned_to = ?)";
-                $params[] = $userScope['godina_id'];
-                $params[] = $userScope['user_id'];
+            $userId = $userScope['user_id'] ?? null;
+            $scopeLevel = $userScope['level_scope'] ?? null;
+            $scopeId = null;
+
+            if ($scopeLevel === 'gurmu') {
+                $scopeId = $userScope['gurmu_id'] ?? null;
+            } elseif ($scopeLevel === 'gamta') {
+                $scopeId = $userScope['gamta_id'] ?? null;
+            } elseif ($scopeLevel === 'godina') {
+                $scopeId = $userScope['godina_id'] ?? null;
+            }
+
+            if ($scopeLevel && $scopeId !== null && $userId) {
+                $sql .= " AND ((t.level_scope = ? AND t.scope_id = ?) OR t.assigned_to = ?)";
+                $params[] = $scopeLevel;
+                $params[] = $scopeId;
+                $params[] = $userId;
+            } elseif ($userId) {
+                $sql .= " AND (t.assigned_to = ? OR t.created_by = ?)";
+                $params[] = $userId;
+                $params[] = $userId;
             }
         }
         
@@ -1086,10 +1095,27 @@ class TaskController extends BaseController
         
         // Apply hierarchy filtering
         if (!empty($userScope)) {
-            if ($userScope['level_scope'] === 'gurmu') {
-                $sql .= " AND (t.gurmu_id = ? OR t.assigned_to = ?)";
-                $params[] = $userScope['gurmu_id'];
-                $params[] = $userScope['user_id'];
+            $userId = $userScope['user_id'] ?? null;
+            $scopeLevel = $userScope['level_scope'] ?? null;
+            $scopeId = null;
+
+            if ($scopeLevel === 'gurmu') {
+                $scopeId = $userScope['gurmu_id'] ?? null;
+            } elseif ($scopeLevel === 'gamta') {
+                $scopeId = $userScope['gamta_id'] ?? null;
+            } elseif ($scopeLevel === 'godina') {
+                $scopeId = $userScope['godina_id'] ?? null;
+            }
+
+            if ($scopeLevel && $scopeId !== null && $userId) {
+                $sql .= " AND ((t.level_scope = ? AND t.scope_id = ?) OR t.assigned_to = ?)";
+                $params[] = $scopeLevel;
+                $params[] = $scopeId;
+                $params[] = $userId;
+            } elseif ($userId) {
+                $sql .= " AND (t.assigned_to = ? OR t.created_by = ?)";
+                $params[] = $userId;
+                $params[] = $userId;
             }
         }
         
