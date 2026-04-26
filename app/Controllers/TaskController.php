@@ -1037,6 +1037,10 @@ class TaskController extends BaseController
     protected function getTasksForUserScope($userScope)
     {
         $db = \App\Utils\Database::getInstance();
+        $hasScopeId = $db->columnExists('tasks', 'scope_id');
+        $hasGodinaId = $db->columnExists('tasks', 'godina_id');
+        $hasGamtaId = $db->columnExists('tasks', 'gamta_id');
+        $hasGurmuId = $db->columnExists('tasks', 'gurmu_id');
         
         $sql = "SELECT t.*, u.first_name, u.last_name,
                        au.first_name as assigned_first_name, au.last_name as assigned_last_name
@@ -1061,10 +1065,27 @@ class TaskController extends BaseController
                 $scopeId = $userScope['godina_id'] ?? null;
             }
 
-            if ($scopeLevel && $scopeId !== null && $userId) {
+            if ($scopeLevel && $scopeId !== null && $userId && $hasScopeId) {
                 $sql .= " AND ((t.level_scope = ? AND t.scope_id = ?) OR t.assigned_to = ?)";
                 $params[] = $scopeLevel;
                 $params[] = $scopeId;
+                $params[] = $userId;
+            } elseif ($scopeLevel === 'gurmu' && $scopeId !== null && $userId && $hasGurmuId) {
+                $sql .= " AND (t.gurmu_id = ? OR t.assigned_to = ?)";
+                $params[] = $scopeId;
+                $params[] = $userId;
+            } elseif ($scopeLevel === 'gamta' && $scopeId !== null && $userId && $hasGamtaId) {
+                $sql .= " AND (t.gamta_id = ? OR t.assigned_to = ?)";
+                $params[] = $scopeId;
+                $params[] = $userId;
+            } elseif ($scopeLevel === 'godina' && $scopeId !== null && $userId && $hasGodinaId) {
+                $sql .= " AND (t.godina_id = ? OR t.assigned_to = ?)";
+                $params[] = $scopeId;
+                $params[] = $userId;
+            } elseif ($scopeLevel && $userId) {
+                $sql .= " AND (t.level_scope = ? OR t.assigned_to = ? OR t.created_by = ?)";
+                $params[] = $scopeLevel;
+                $params[] = $userId;
                 $params[] = $userId;
             } elseif ($userId) {
                 $sql .= " AND (t.assigned_to = ? OR t.created_by = ?)";
@@ -1081,6 +1102,10 @@ class TaskController extends BaseController
     protected function getTaskStatistics($userScope)
     {
         $db = \App\Utils\Database::getInstance();
+        $hasScopeId = $db->columnExists('tasks', 'scope_id');
+        $hasGodinaId = $db->columnExists('tasks', 'godina_id');
+        $hasGamtaId = $db->columnExists('tasks', 'gamta_id');
+        $hasGurmuId = $db->columnExists('tasks', 'gurmu_id');
         
         $sql = "SELECT 
                     COUNT(*) as total,
@@ -1107,10 +1132,27 @@ class TaskController extends BaseController
                 $scopeId = $userScope['godina_id'] ?? null;
             }
 
-            if ($scopeLevel && $scopeId !== null && $userId) {
+            if ($scopeLevel && $scopeId !== null && $userId && $hasScopeId) {
                 $sql .= " AND ((t.level_scope = ? AND t.scope_id = ?) OR t.assigned_to = ?)";
                 $params[] = $scopeLevel;
                 $params[] = $scopeId;
+                $params[] = $userId;
+            } elseif ($scopeLevel === 'gurmu' && $scopeId !== null && $userId && $hasGurmuId) {
+                $sql .= " AND (t.gurmu_id = ? OR t.assigned_to = ?)";
+                $params[] = $scopeId;
+                $params[] = $userId;
+            } elseif ($scopeLevel === 'gamta' && $scopeId !== null && $userId && $hasGamtaId) {
+                $sql .= " AND (t.gamta_id = ? OR t.assigned_to = ?)";
+                $params[] = $scopeId;
+                $params[] = $userId;
+            } elseif ($scopeLevel === 'godina' && $scopeId !== null && $userId && $hasGodinaId) {
+                $sql .= " AND (t.godina_id = ? OR t.assigned_to = ?)";
+                $params[] = $scopeId;
+                $params[] = $userId;
+            } elseif ($scopeLevel && $userId) {
+                $sql .= " AND (t.level_scope = ? OR t.assigned_to = ? OR t.created_by = ?)";
+                $params[] = $scopeLevel;
+                $params[] = $userId;
                 $params[] = $userId;
             } elseif ($userId) {
                 $sql .= " AND (t.assigned_to = ? OR t.created_by = ?)";
