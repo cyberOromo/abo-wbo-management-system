@@ -87,7 +87,7 @@ class ResponsibilityController extends Controller
         $responsibilityId = $this->getParam('id');
         
         if (!$responsibilityId) {
-            $this->redirect('/responsibilities', 'error', 'Responsibility ID is required');
+            $this->redirectWithMessage('/responsibilities', 'Responsibility ID is required', 'error');
             return;
         }
         
@@ -95,7 +95,7 @@ class ResponsibilityController extends Controller
             $responsibility = $this->responsibilityModel->find($responsibilityId);
             
             if (!$responsibility) {
-                $this->redirect('/responsibilities', 'error', 'Responsibility not found');
+                $this->redirectWithMessage('/responsibilities', 'Responsibility not found', 'error');
                 return;
             }
             
@@ -170,11 +170,11 @@ class ResponsibilityController extends Controller
             } else {
                 // Individual assignment
                 $assignmentId = $this->assignmentModel->assignResponsibility($data);
-                $this->redirect('/responsibilities/assignments/' . $assignmentId, 'success', 'Responsibility assigned successfully');
+                $this->redirectWithMessage('/responsibilities/assignments/' . $assignmentId, 'Responsibility assigned successfully', 'success');
             }
             
         } catch (Exception $e) {
-            $this->redirect('/responsibilities/assign', 'error', $e->getMessage());
+            $this->redirectWithMessage('/responsibilities/assign', $e->getMessage(), 'error');
         }
     }
     
@@ -262,7 +262,7 @@ class ResponsibilityController extends Controller
             $assignments = $this->assignmentModel->getAssignmentsWithFilters(['id' => $assignmentId]);
             
             if (empty($assignments)) {
-                $this->redirect('/responsibilities/assignments', 'error', 'Assignment not found');
+                $this->redirectWithMessage('/responsibilities/assignments', 'Assignment not found', 'error');
                 return;
             }
             
@@ -373,10 +373,10 @@ class ResponsibilityController extends Controller
                 ? 'Successfully initialized ' . count($created) . ' responsibilities'
                 : 'All responsibilities already exist';
             
-            $this->redirect('/responsibilities', 'success', $message);
+            $this->redirectWithMessage('/responsibilities', $message, 'success');
             
         } catch (Exception $e) {
-            $this->redirect('/responsibilities', 'error', 'Failed to initialize responsibilities: ' . $e->getMessage());
+            $this->redirectWithMessage('/responsibilities', 'Failed to initialize responsibilities: ' . $e->getMessage(), 'error');
         }
     }
     
@@ -528,7 +528,7 @@ class ResponsibilityController extends Controller
         
         $type = count($failed) > 0 ? 'warning' : 'success';
         
-        $this->redirect('/responsibilities/assignments', $type, $message);
+        $this->redirectWithMessage('/responsibilities/assignments', $message, $type);
     }
     
     /**
@@ -555,6 +555,6 @@ class ResponsibilityController extends Controller
     private function handleError(Exception $e, string $userMessage): void
     {
         error_log($userMessage . ': ' . $e->getMessage());
-        $this->redirect('/responsibilities', 'error', $userMessage);
+        $this->redirectWithMessage('/responsibilities', $userMessage, 'error');
     }
 }
