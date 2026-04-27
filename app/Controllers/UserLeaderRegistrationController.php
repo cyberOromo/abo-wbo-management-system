@@ -54,6 +54,8 @@ class UserLeaderRegistrationController extends Controller
         try {
             // Get organizational data for dropdowns
             $godinas = $this->getGodinas();
+            $gamtas = $this->getGamtas();
+            $gurmus = $this->getGurmus();
             $positions = $this->getPositions();
             $recent_registrations = $this->getRecentRegistrations();
             $statistics = $this->getRegistrationStatistics();
@@ -61,6 +63,8 @@ class UserLeaderRegistrationController extends Controller
             return $this->view('admin/user_leader_registration', [
                 'title' => 'User & Leader Registration',
                 'godinas' => $godinas,
+                'gamtas' => $gamtas,
+                'gurmus' => $gurmus,
                 'positions' => $positions,
                 'recent_registrations' => $recent_registrations,
                 'statistics' => $statistics,
@@ -760,6 +764,28 @@ class UserLeaderRegistrationController extends Controller
     private function getGodinas(): array
     {
         return $this->db->fetchAll("SELECT id, name, description FROM godinas ORDER BY name");
+    }
+
+    private function getGamtas(): array
+    {
+        return $this->db->fetchAll(
+            "SELECT ga.id, ga.name, ga.description, ga.godina_id, god.name AS godina_name
+             FROM gamtas ga
+             LEFT JOIN godinas god ON ga.godina_id = god.id
+             ORDER BY god.name, ga.name"
+        );
+    }
+
+    private function getGurmus(): array
+    {
+        return $this->db->fetchAll(
+            "SELECT gu.id, gu.name, gu.description, gu.gamta_id, ga.name AS gamta_name,
+                    ga.godina_id, god.name AS godina_name
+             FROM gurmus gu
+             LEFT JOIN gamtas ga ON gu.gamta_id = ga.id
+             LEFT JOIN godinas god ON ga.godina_id = god.id
+             ORDER BY god.name, ga.name, gu.name"
+        );
     }
 
     /**

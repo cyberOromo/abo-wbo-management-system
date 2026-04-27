@@ -6,6 +6,8 @@
 
 $title = $title ?? 'User & Leader Registration';
 $godinas = $godinas ?? [];
+$gamtas = $gamtas ?? [];
+$gurmus = $gurmus ?? [];
 $positions = $positions ?? [];
 $recent_registrations = $recent_registrations ?? [];
 $statistics = $statistics ?? [];
@@ -437,6 +439,8 @@ $current_user = $current_user ?? [];
 <script>
 let assignmentCount = 1;
 let godinasData = <?= json_encode($godinas) ?>;
+let gamtasData = <?= json_encode($gamtas) ?>;
+let gurmusData = <?= json_encode($gurmus) ?>;
 let positionsData = <?= json_encode($positions) ?>;
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -513,15 +517,13 @@ function loadHierarchyOptions(index) {
     } else if (level) {
         // Load hierarchy options based on level
         hierarchySelect.disabled = false;
-        
-        if (level === 'godina') {
-            godinasData.forEach(godina => {
-                const option = document.createElement('option');
-                option.value = godina.id;
-                option.textContent = godina.name;
-                hierarchySelect.appendChild(option);
-            });
-        }
+
+        getHierarchyOptions(level).forEach(unit => {
+            const option = document.createElement('option');
+            option.value = unit.id;
+            option.textContent = unit.label;
+            hierarchySelect.appendChild(option);
+        });
         
         // When hierarchy is selected, load positions
         hierarchySelect.onchange = function() {
@@ -539,7 +541,7 @@ function loadPositionsForLevel(index, level, hierarchyId) {
     const positionSelect = document.querySelector(`select[name="assignments[${index}][position_id]"]`);
     
     // Filter positions by hierarchy level
-    const levelPositions = positionsData.filter(pos => pos.hierarchy_level === level);
+    const levelPositions = positionsData.filter(pos => pos.hierarchy_type === level);
     
     positionSelect.innerHTML = '<option value="">Select Position</option>';
     
@@ -551,6 +553,43 @@ function loadPositionsForLevel(index, level, hierarchyId) {
     });
     
     positionSelect.disabled = false;
+}
+
+function getHierarchyOptions(level) {
+    if (level === 'godina') {
+        return godinasData.map(godina => ({
+            id: godina.id,
+            label: godina.name
+        }));
+    }
+
+    if (level === 'gamta') {
+        return gamtasData.map(gamta => ({
+            id: gamta.id,
+            label: `${gamta.name}${gamta.godina_name ? ' - ' + gamta.godina_name : ''}`
+        }));
+    }
+
+    if (level === 'gurmu') {
+        return gurmusData.map(gurmu => {
+            const labelParts = [gurmu.name];
+
+            if (gurmu.gamta_name) {
+                labelParts.push(gurmu.gamta_name);
+            }
+
+            if (gurmu.godina_name) {
+                labelParts.push(gurmu.godina_name);
+            }
+
+            return {
+                id: gurmu.id,
+                label: labelParts.join(' - ')
+            };
+        });
+    }
+
+    return [];
 }
 
 function addAssignment() {

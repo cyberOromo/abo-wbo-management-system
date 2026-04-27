@@ -190,9 +190,9 @@ class DashboardController extends Controller
         
         $user = auth_user();
         $userScope = $this->getUserHierarchicalScope($user);
-        
-        // Route to appropriate dashboard based on role
-        $userType = $user['role'] ?? 'member';
+
+        // Prefer the active assignment when it exists so promoted users land on the correct dashboard.
+        $userType = $this->resolveDashboardUserType($user, $userScope);
         
         switch ($userType) {
             case 'admin':
@@ -204,6 +204,21 @@ class DashboardController extends Controller
             default:
                 return $this->memberDashboard($userScope);
         }
+    }
+
+    private function resolveDashboardUserType($user, $userScope): string
+    {
+        $storedRole = (string) ($user['role'] ?? 'member');
+
+        if (in_array($storedRole, ['admin', 'system_admin', 'super_admin'], true)) {
+            return $storedRole === 'super_admin' ? 'system_admin' : $storedRole;
+        }
+
+        if (!empty($userScope['position_id']) && ($userScope['position_key'] ?? 'member') !== 'member') {
+            return 'executive';
+        }
+
+        return 'member';
     }
     
     /**
