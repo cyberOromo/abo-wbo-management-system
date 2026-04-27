@@ -396,6 +396,8 @@ class UserLeaderRegistrationController extends BaseController
         }
 
         try {
+            $this->validateCsrfToken();
+
             $userId = (int) ($_POST['user_id'] ?? 0);
             $assignments = $_POST['assignments'] ?? [];
 
@@ -409,20 +411,49 @@ class UserLeaderRegistrationController extends BaseController
                 return $this->jsonResponse(['success' => false, 'message' => 'User not found']);
             }
 
+            $currentRole = $this->normalizeRegistrationRole((string) ($user['user_type'] ?? $user['role'] ?? 'member'));
+            $requestedRole = $this->normalizeRegistrationRole((string) ($_POST['role'] ?? $currentRole));
+
+            if (!in_array($requestedRole, ['member', 'executive', 'admin', 'system_admin'], true)) {
+                return $this->jsonResponse(['success' => false, 'message' => 'Invalid user role selected']);
+            }
+
             $validAssignments = array_values(array_filter(
                 is_array($assignments) ? $assignments : [],
                 fn (array $assignment): bool => $this->validateAssignmentData($assignment)
             ));
 
-            if (empty($validAssignments)) {
-                return $this->jsonResponse(['success' => false, 'message' => 'At least one valid assignment is required']);
+            if (!$this->roleRequiresLeadershipAssignments($requestedRole) && $this->hasLeadershipAssignments($assignments)) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Members cannot be assigned positions or responsibilities. Change the role to Executive before adding assignments.'
+                ]);
+            }
+
+            if ($this->roleRequiresLeadershipAssignments($requestedRole) && empty($validAssignments)) {
+                return $this->jsonResponse(['success' => false, 'message' => 'At least one valid assignment is required for the selected role']);
             }
 
             $this->db->beginTransaction();
 
             try {
+                $this->syncManagedUserRole($userId, $requestedRole, $validAssignments);
+
                 $activeAssignments = $this->getActiveUserAssignments($userId);
                 $hasSingleActiveConstraint = $this->hasSingleActiveAssignmentConstraint();
+
+                if (!$this->roleRequiresLeadershipAssignments($requestedRole)) {
+                    $this->deactivateResponsibilityAssignments($userId);
+                    $this->deactivateUserAssignments($userId);
+
+                    $this->db->commit();
+
+                    return $this->jsonResponse([
+                        'success' => true,
+                        'message' => 'User role updated to Member. Active assignments and responsibilities were removed.',
+                        'data' => ['role' => $requestedRole, 'assignment_ids' => []]
+                    ]);
+                }
 
                 if ($hasSingleActiveConstraint && count($validAssignments) > 1) {
                     throw new Exception('Current assignment schema supports only one active assignment per user.');
@@ -460,7 +491,7 @@ class UserLeaderRegistrationController extends BaseController
                 return $this->jsonResponse([
                     'success' => true,
                     'message' => 'User assignments updated successfully',
-                    'data' => ['assignment_ids' => $newAssignments]
+                    'data' => ['role' => $requestedRole, 'assignment_ids' => $newAssignments]
                 ]);
 
             } catch (Exception $e) {
@@ -915,6 +946,34 @@ class UserLeaderRegistrationController extends BaseController
         }
 
         $this->db->update('responsibility_assignments', $payload, ['user_id' => $userId]);
+    }
+
+    private function syncManagedUserRole(int $userId, string $role, array $assignments): void
+    {
+        $payload = [
+            'user_type' => $role,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        if ($this->roleRequiresLeadershipAssignments($role)) {
+            $primaryAssignment = $this->resolvePrimaryPlacement(['role' => $role], $assignments);
+
+            if (empty($primaryAssignment)) {
+                throw new Exception('A valid leadership assignment is required before changing this user role.');
+            }
+
+            $resolvedScope = $this->resolveUserScopeData($primaryAssignment);
+            $payload['position_id'] = $primaryAssignment['position_id'] ?? null;
+            $payload['level_scope'] = $resolvedScope['level_scope'];
+            $payload['gurmu_id'] = $resolvedScope['gurmu_id'];
+        } else {
+            $payload['position_id'] = null;
+        }
+
+        $filteredPayload = $this->filterTableData('users', $payload);
+        if (!empty($filteredPayload)) {
+            $this->db->update('users', $filteredPayload, ['id' => $userId]);
+        }
     }
 
     private function provisionUserInternalEmails(int $userId, array $userData, array $positionData): array

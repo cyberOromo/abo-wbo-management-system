@@ -389,12 +389,27 @@ $breadcrumbs = [
                     <input type="hidden" name="_token" value="<?= $_SESSION['_token'] ?? '' ?>">
                     <input type="hidden" name="user_id" id="editAssignmentsUserId" value="">
                     <div id="userAssignmentsFeedback" class="d-none"></div>
+                    <div class="row g-3 align-items-end mb-3">
+                        <div class="col-lg-6">
+                            <label class="form-label" for="editAssignmentsRole">User Role *</label>
+                            <select class="form-select" id="editAssignmentsRole" name="role">
+                                <option value="member">Member</option>
+                                <option value="executive">Executive</option>
+                                <option value="admin">Administrator</option>
+                                <option value="system_admin">System Administrator</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-6">
+                            <div id="editAssignmentsRoleHelp" class="small text-muted"></div>
+                        </div>
+                    </div>
+                    <div id="editAssignmentsRoleNotice" class="d-none"></div>
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                         <div>
                             <div class="fw-semibold" id="editAssignmentsHeading">Update assignments</div>
                             <small class="text-muted">This uses the canonical leadership registration assignment flow.</small>
                         </div>
-                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="addEditAssignmentRow()">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="addAssignmentsButton" onclick="addEditAssignmentRow()">
                             <i class="bi bi-plus me-1"></i>Add Assignment
                         </button>
                     </div>
@@ -402,8 +417,8 @@ $breadcrumbs = [
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle me-1"></i>Save Assignments
+                    <button type="submit" class="btn btn-primary" id="saveAssignmentsButton">
+                        <i class="bi bi-check-circle me-1"></i>Save Changes
                     </button>
                 </div>
             </form>
@@ -510,6 +525,70 @@ const usersHierarchyData = {
 };
 
 let editAssignmentIndex = 0;
+let activeEditUser = null;
+
+function normalizeManagedUserRole(role) {
+    const value = String(role || '').trim().toLowerCase();
+
+    if (value === 'leader' || value === 'executive') {
+        return 'executive';
+    }
+
+    if (value === 'administrator' || value === 'admin') {
+        return 'admin';
+    }
+
+    if (value === 'system administrator' || value === 'system_admin' || value === 'super_admin') {
+        return 'system_admin';
+    }
+
+    return value === 'member' || value === 'user' ? 'member' : value;
+}
+
+function roleAllowsAssignmentEditing(role) {
+    return ['executive', 'admin', 'system_admin'].includes(normalizeManagedUserRole(role));
+}
+
+function syncEditAssignmentsRoleState() {
+    const roleSelect = document.getElementById('editAssignmentsRole');
+    const notice = document.getElementById('editAssignmentsRoleNotice');
+    const help = document.getElementById('editAssignmentsRoleHelp');
+    const container = document.getElementById('editAssignmentsContainer');
+    const addButton = document.getElementById('addAssignmentsButton');
+    const selectedRole = normalizeManagedUserRole(roleSelect?.value || 'member');
+    const allowsAssignments = roleAllowsAssignmentEditing(selectedRole);
+    const hadAssignments = Boolean(activeEditUser && Array.isArray(activeEditUser.assignments) && activeEditUser.assignments.length > 0);
+
+    addButton.disabled = !allowsAssignments;
+    addButton.classList.toggle('disabled', !allowsAssignments);
+
+    if (!allowsAssignments) {
+        help.textContent = 'Members cannot hold positions or responsibilities. Change the role to Executive before adding assignments.';
+        notice.className = 'alert alert-warning mb-3';
+        notice.innerHTML = hadAssignments
+            ? 'This user currently has active leadership assignments. Save as Member to remove those assignments and their linked responsibilities, or change the role to Executive first to keep editing them.'
+            : 'Members cannot be assigned positions or responsibilities. Change the role to Executive, Administrator, or System Administrator before adding assignments.';
+        container.innerHTML = '';
+        return;
+    }
+
+    help.textContent = 'Leadership roles can hold positions and responsibilities. Add or update assignments below.';
+    notice.className = 'd-none';
+    notice.innerHTML = '';
+
+    if (!container.querySelector('[data-edit-assignment-row]')) {
+        const assignments = Array.isArray(activeEditUser?.assignments) ? activeEditUser.assignments : [];
+        editAssignmentIndex = 0;
+        container.innerHTML = '';
+
+        if (assignments.length === 0) {
+            addEditAssignmentRow();
+            return;
+        }
+
+        assignments.forEach(assignment => addEditAssignmentRow(assignment));
+    }
+}
 
 function confirmDelete(userId, userName) {
     document.getElementById('deleteUserName').textContent = userName;
@@ -853,6 +932,11 @@ function removeEditAssignmentRow(index) {
 }
 
 function addEditAssignmentRow(assignment = {}) {
+    if (!roleAllowsAssignmentEditing(document.getElementById('editAssignmentsRole')?.value || 'member')) {
+        setAssignmentsFeedback('Change the user role to Executive before adding assignments.', 'warning');
+        return;
+    }
+
     const container = document.getElementById('editAssignmentsContainer');
     const index = editAssignmentIndex++;
     container.insertAdjacentHTML('beforeend', buildEditAssignmentRow(index, assignment));
@@ -868,6 +952,7 @@ function openEditAssignments(userId) {
     const container = document.getElementById('editAssignmentsContainer');
     container.innerHTML = '<div class="text-center py-5"><div class="spinner-border" role="status"></div></div>';
     document.getElementById('editAssignmentsUserId').value = userId;
+    document.getElementById('editAssignmentsRole').value = 'member';
     setAssignmentsFeedback('');
     modal.show();
 
@@ -880,25 +965,33 @@ function openEditAssignments(userId) {
 
             const user = payload.data.user || {};
             const assignments = payload.data.assignments || [];
+            activeEditUser = { user, assignments };
             document.getElementById('editAssignmentsHeading').textContent = `Update assignments for ${user.first_name || ''} ${user.last_name || ''}`.trim();
+            document.getElementById('editAssignmentsRole').value = normalizeManagedUserRole(user.user_type || user.role_key || 'member');
             container.innerHTML = '';
             editAssignmentIndex = 0;
-
-            if (assignments.length === 0) {
-                addEditAssignmentRow();
-                return;
-            }
-
-            assignments.forEach(assignment => addEditAssignmentRow(assignment));
+            syncEditAssignmentsRoleState();
         })
         .catch(error => {
+            activeEditUser = null;
             container.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(error.message || 'Unable to load assignments.')}</div>`;
         });
 }
 
+document.getElementById('editAssignmentsRole').addEventListener('change', function () {
+    setAssignmentsFeedback('');
+    syncEditAssignmentsRoleState();
+});
+
 document.getElementById('userAssignmentsForm').addEventListener('submit', function (event) {
     event.preventDefault();
     setAssignmentsFeedback('');
+
+    const selectedRole = normalizeManagedUserRole(document.getElementById('editAssignmentsRole')?.value || 'member');
+    if (!roleAllowsAssignmentEditing(selectedRole) && document.querySelector('[data-edit-assignment-row]')) {
+        setAssignmentsFeedback('Members cannot hold assignments. Change the role to Executive before saving assignments.', 'warning');
+        return;
+    }
 
     const submitButton = this.querySelector('button[type="submit"]');
     const originalHtml = submitButton.innerHTML;
