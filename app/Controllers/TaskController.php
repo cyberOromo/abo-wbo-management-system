@@ -201,7 +201,7 @@ class TaskController extends BaseController
             $assignedUsers = [];
             if (!empty($task['assigned_to'])) {
                 foreach ($task['assigned_to'] as $userId) {
-                    $assignedUser = $this->userModel->find($userId);
+                    $assignedUser = $this->normalizeRecord($this->userModel->find($userId));
                     if ($assignedUser) {
                         $assignedUsers[] = $assignedUser;
                     }
@@ -1165,18 +1165,21 @@ class TaskController extends BaseController
 
     private function loadTaskRecord(int $id): ?array
     {
-        $task = $this->taskModel->find($id);
+        return $this->normalizeRecord($this->taskModel->find($id));
+    }
 
-        if ($task === null) {
+    private function normalizeRecord($record): ?array
+    {
+        if ($record === null) {
             return null;
         }
 
-        if (is_array($task)) {
-            return $task;
+        if (is_array($record)) {
+            return $record;
         }
 
-        if (is_object($task) && method_exists($task, 'getAttributes')) {
-            return $task->getAttributes();
+        if (is_object($record) && method_exists($record, 'getAttributes')) {
+            return $record->getAttributes();
         }
 
         return null;
