@@ -315,7 +315,7 @@ class UserLeaderRegistrationController extends BaseController
             }
             
             if ($role) {
-                $conditions[] = "u.role = ?";
+                $conditions[] = "u.user_type = ?";
                 $params[] = $role;
             }
             
@@ -334,7 +334,7 @@ class UserLeaderRegistrationController extends BaseController
                     u.last_name,
                     u.email,
                     u.internal_email,
-                    u.role,
+                    u.user_type AS role,
                     u.status,
                     u.created_at,
                     COUNT(ua.id) as assignment_count,
@@ -356,7 +356,7 @@ class UserLeaderRegistrationController extends BaseController
                 LEFT JOIN gamtas gam ON ua.gamta_id = gam.id AND ua.level_scope = 'gamta'
                 LEFT JOIN gurmus gur ON ua.gurmu_id = gur.id AND ua.level_scope = 'gurmu'
                 $whereClause
-                GROUP BY u.id, u.first_name, u.last_name, u.email, u.internal_email, u.role, u.status, u.created_at
+                GROUP BY u.id, u.first_name, u.last_name, u.email, u.internal_email, u.user_type, u.status, u.created_at
                 ORDER BY u.created_at DESC
                 LIMIT ? OFFSET ?
             ", array_merge($params, [$limit, $offset]));
@@ -583,7 +583,7 @@ class UserLeaderRegistrationController extends BaseController
             'phone' => $userData['phone'],
             'personal_phone' => $userData['phone'] ?: null,
             'password_hash' => password_hash($temporaryPassword, PASSWORD_DEFAULT),
-            'role' => $storageRole,
+            'user_type' => $storageRole,
             'status' => 'active',
             'birth_date' => $userData['date_of_birth'] ?: null,
             'address' => $userData['address'],
@@ -831,7 +831,7 @@ class UserLeaderRegistrationController extends BaseController
                 u.last_name,
                 u.email,
                 u.internal_email,
-                u.role,
+                u.user_type AS role,
                 u.status,
                 u.created_at,
                 COUNT(ua.id) as position_count,
@@ -841,7 +841,7 @@ class UserLeaderRegistrationController extends BaseController
             LEFT JOIN positions p ON ua.position_id = p.id
                         WHERE JSON_VALID(u.metadata)
                             AND CAST(JSON_UNQUOTE(JSON_EXTRACT(u.metadata, '$.registered_by')) AS UNSIGNED) = ?
-            GROUP BY u.id, u.first_name, u.last_name, u.email, u.internal_email, u.role, u.status, u.created_at
+            GROUP BY u.id, u.first_name, u.last_name, u.email, u.internal_email, u.user_type, u.status, u.created_at
             ORDER BY u.created_at DESC
             LIMIT 10
         ", [$_SESSION['user']['id']]);

@@ -36,7 +36,7 @@ $_SESSION['_token'] = $_SESSION['_token'] ?? bin2hex(random_bytes(16));
 
 try {
     $db = \App\Utils\Database::getInstance();
-    $currentUser = $db->fetch('SELECT id, first_name, last_name, email, role, user_type, status FROM users WHERE id = ?', [1]);
+    $currentUser = $db->fetch('SELECT id, first_name, last_name, email, user_type, status FROM users WHERE id = ?', [1]);
 
     if ($currentUser) {
         $_SESSION['user_id'] = $currentUser['id'];
