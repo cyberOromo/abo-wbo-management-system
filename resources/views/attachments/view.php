@@ -49,9 +49,27 @@ $sizeLabel = !empty($attachment['size']) ? number_format(((int) $attachment['siz
                     <p class="mb-3">Audio preview is available directly in the browser.</p>
                     <audio controls preload="metadata" src="<?= htmlspecialchars((string) ($attachment['stream_url'] ?? '#')) ?>" class="w-100"></audio>
                 </div>
-            <?php elseif (in_array($previewKind, ['pdf', 'text'], true)): ?>
+            <?php elseif ($previewKind === 'pdf'): ?>
                 <div class="attachment-preview-frame">
-                    <iframe src="<?= htmlspecialchars((string) ($attachment['stream_url'] ?? '#')) ?>" title="<?= htmlspecialchars($displayName) ?>"></iframe>
+                    <object data="<?= htmlspecialchars((string) ($attachment['stream_url'] ?? '#')) ?>" type="application/pdf" class="attachment-pdf-object">
+                        <div class="attachment-preview-empty border-0 rounded-0 h-100">
+                            <i class="bi bi-file-earmark-pdf"></i>
+                            <p class="mb-2">This browser could not render the PDF inline.</p>
+                            <p class="module-muted-note mb-3">Open the raw file in a new tab or download it directly.</p>
+                            <div class="d-flex gap-2 flex-wrap justify-content-center">
+                                <a href="<?= htmlspecialchars((string) ($attachment['stream_url'] ?? '#')) ?>" class="btn btn-outline-primary" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Open Raw</a>
+                                <a href="<?= htmlspecialchars((string) ($attachment['download_url'] ?? '#')) ?>" class="btn btn-primary"><i class="bi bi-download me-1"></i>Download</a>
+                            </div>
+                        </div>
+                    </object>
+                </div>
+            <?php elseif ($previewKind === 'text'): ?>
+                <div class="attachment-preview-frame text-frame">
+                    <div class="attachment-text-toolbar">
+                        <span class="badge text-bg-light border"><?= htmlspecialchars($mimeType) ?></span>
+                        <span class="text-muted small">Rendered directly from the attachment stream for a more reliable inline preview.</span>
+                    </div>
+                    <pre class="attachment-text-content" id="attachmentTextPreview" data-stream-url="<?= htmlspecialchars((string) ($attachment['stream_url'] ?? '#')) ?>">Loading preview...</pre>
                 </div>
             <?php else: ?>
                 <div class="attachment-preview-empty">
@@ -93,7 +111,8 @@ $sizeLabel = !empty($attachment['size']) ? number_format(((int) $attachment['siz
 
     .attachment-preview-frame iframe,
     .attachment-preview-frame img,
-    .attachment-preview-frame video {
+    .attachment-preview-frame video,
+    .attachment-pdf-object {
         width: 100%;
         height: 70vh;
         border: 0;
@@ -132,4 +151,65 @@ $sizeLabel = !empty($attachment['size']) ? number_format(((int) $attachment['siz
         color: var(--module-accent);
         margin-bottom: 1rem;
     }
+
+    .attachment-preview-frame.text-frame {
+        display: flex;
+        flex-direction: column;
+        background: #0f172a;
+    }
+
+    .attachment-text-toolbar {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        align-items: center;
+        padding: 0.85rem 1rem;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.92);
+        color: #cbd5e1;
+        flex-wrap: wrap;
+    }
+
+    .attachment-text-content {
+        margin: 0;
+        padding: 1.25rem;
+        min-height: 70vh;
+        color: #e2e8f0;
+        background: #0f172a;
+        overflow: auto;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
 </style>
+
+<?php if ($previewKind === 'text'): ?>
+<script>
+    (function () {
+        const preview = document.getElementById('attachmentTextPreview');
+        if (!preview) {
+            return;
+        }
+
+        const streamUrl = preview.getAttribute('data-stream-url');
+        if (!streamUrl) {
+            preview.textContent = 'Preview unavailable.';
+            return;
+        }
+
+        fetch(streamUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error('Unable to load attachment preview.');
+                }
+
+                const text = await response.text();
+                preview.textContent = text.trim() !== '' ? text : 'This attachment is empty.';
+            })
+            .catch((error) => {
+                preview.textContent = error.message || 'Unable to load attachment preview.';
+            });
+    })();
+</script>
+<?php endif; ?>
