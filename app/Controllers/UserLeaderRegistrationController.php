@@ -2,7 +2,7 @@
 
 namespace App\Controllers;
 
-use App\Core\Controller;
+use App\Core\BaseController;
 use App\Models\User;
 use App\Models\Godina;
 use App\Models\Gamta;
@@ -21,7 +21,7 @@ use Exception;
  * CRITICAL: This module is ONLY accessible by System Administrators
  * Handles registration of users with leadership positions and role assignments
  */
-class UserLeaderRegistrationController extends Controller
+class UserLeaderRegistrationController extends BaseController
 {
     private Database $db;
     private User $userModel;
@@ -60,7 +60,7 @@ class UserLeaderRegistrationController extends Controller
             $recent_registrations = $this->getRecentRegistrations();
             $statistics = $this->getRegistrationStatistics();
             
-            return $this->view('admin/user_leader_registration', [
+            return $this->render('admin/user_leader_registration', [
                 'title' => 'User & Leader Registration',
                 'godinas' => $godinas,
                 'gamtas' => $gamtas,
@@ -77,7 +77,8 @@ class UserLeaderRegistrationController extends Controller
                 'user_id' => $_SESSION['user']['id'] ?? null
             ]);
             
-            return $this->redirect('/admin')->with('error', 'Unable to load registration page');
+            $this->setError('Unable to load registration page');
+            return $this->redirect('/admin');
         }
     }
 
@@ -92,9 +93,7 @@ class UserLeaderRegistrationController extends Controller
 
         try {
             // Validate CSRF token
-            if (!$this->validateCsrfToken()) {
-                return $this->jsonResponse(['success' => false, 'message' => 'Invalid security token']);
-            }
+            $this->validateCsrfToken();
 
             // Extract and validate input data
             $userData = $this->extractUserData();
@@ -443,12 +442,13 @@ class UserLeaderRegistrationController extends Controller
                 return;
             }
 
-            if ($this->isJsonRequest()) {
+            if ($this->isAjaxRequest()) {
                 echo json_encode(['success' => false, 'message' => 'Access denied. System Admin required.']);
                 exit;
             }
             
-            $this->redirect('/dashboard')->with('error', 'Access denied. System Administrator privileges required.');
+            $this->setError('Access denied. System Administrator privileges required.');
+            $this->redirect('/dashboard');
             exit;
         }
     }
