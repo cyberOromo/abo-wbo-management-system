@@ -174,7 +174,7 @@ class TaskController extends BaseController
             $userScope = $this->getUserScope($user);
             
             // Get task details
-            $task = $this->taskModel->find($id);
+            $task = $this->loadTaskRecord($id);
             if (!$task) {
                 $this->redirect('/tasks?error=task_not_found');
                 return;
@@ -237,7 +237,7 @@ class TaskController extends BaseController
             $userScope = $this->getUserScope($user);
             
             // Get task details
-            $task = $this->taskModel->find($id);
+            $task = $this->loadTaskRecord($id);
             if (!$task) {
                 $this->redirect('/tasks?error=task_not_found');
                 return;
@@ -296,7 +296,7 @@ class TaskController extends BaseController
             $this->requireCsrf();
             
             // Get task
-            $task = $this->taskModel->find($id);
+            $task = $this->loadTaskRecord($id);
             if (!$task || !$this->canEditTask($task, $user, $userScope)) {
                 $this->redirect('/tasks?error=update_access_denied');
                 return;
@@ -383,7 +383,7 @@ class TaskController extends BaseController
             }
             
             // Get task
-            $task = $this->taskModel->find($id);
+            $task = $this->loadTaskRecord($id);
             if (!$task || !$this->canAccessTask($task, $user, $userScope)) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'message' => 'Access denied']);
@@ -417,7 +417,7 @@ class TaskController extends BaseController
             $userScope = $this->getUserScope($user);
             $this->requireCsrf();
 
-            $task = $this->taskModel->find($id);
+            $task = $this->loadTaskRecord($id);
             if (!$task || !$this->canEditTask($task, $user, $userScope)) {
                 $this->redirect('/tasks?error=progress_access_denied');
                 return;
@@ -450,7 +450,7 @@ class TaskController extends BaseController
             $userScope = $this->getUserScope($user);
             $this->requireCsrf();
 
-            $task = $this->taskModel->find($id);
+            $task = $this->loadTaskRecord($id);
             if (!$task || !$this->canEditTask($task, $user, $userScope)) {
                 $this->redirect('/tasks?error=assignment_access_denied');
                 return;
@@ -474,7 +474,7 @@ class TaskController extends BaseController
             $userScope = $this->getUserScope($user);
             $this->requireCsrf();
 
-            $task = $this->taskModel->find($id);
+            $task = $this->loadTaskRecord($id);
             if (!$task || !$this->canAccessTask($task, $user, $userScope)) {
                 $this->redirect('/tasks?error=comment_access_denied');
                 return;
@@ -1161,6 +1161,25 @@ class TaskController extends BaseController
     protected function getUserScope(array $user): array
     {
         return $this->getUserHierarchicalScope((int) ($user['id'] ?? 0));
+    }
+
+    private function loadTaskRecord(int $id): ?array
+    {
+        $task = $this->taskModel->find($id);
+
+        if ($task === null) {
+            return null;
+        }
+
+        if (is_array($task)) {
+            return $task;
+        }
+
+        if (is_object($task) && method_exists($task, 'getAttributes')) {
+            return $task->getAttributes();
+        }
+
+        return null;
     }
 
     private function getTaskCategoryOptions(): array
