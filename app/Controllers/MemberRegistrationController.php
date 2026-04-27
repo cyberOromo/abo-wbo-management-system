@@ -576,6 +576,14 @@ class MemberRegistrationController extends Controller
      */
     private function validateCSRF()
     {
+        if (function_exists('csrf_verify')) {
+            if (!csrf_verify($_POST['_token'] ?? '')) {
+                throw new Exception('Invalid CSRF token');
+            }
+
+            return;
+        }
+
         if (!isset($_POST['_token'], $_SESSION['_token']) || !hash_equals($_SESSION['_token'], $_POST['_token'])) {
             throw new Exception('Invalid CSRF token');
         }
