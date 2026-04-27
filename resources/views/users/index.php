@@ -388,6 +388,7 @@ $breadcrumbs = [
                 <div class="modal-body">
                     <input type="hidden" name="_token" value="<?= $_SESSION['_token'] ?? '' ?>">
                     <input type="hidden" name="user_id" id="editAssignmentsUserId" value="">
+                    <div id="userAssignmentsFeedback" class="d-none"></div>
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                         <div>
                             <div class="fw-semibold" id="editAssignmentsHeading">Update assignments</div>
@@ -525,6 +526,51 @@ function escapeHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+function normalizeDateInputValue(value) {
+    const text = String(value || '').trim();
+    if (!text) {
+        return '';
+    }
+
+    const isoMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoMatch) {
+        return isoMatch[1];
+    }
+
+    const usMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (usMatch) {
+        return `${usMatch[3]}-${usMatch[1].padStart(2, '0')}-${usMatch[2].padStart(2, '0')}`;
+    }
+
+    return '';
+}
+
+function setAssignmentsFeedback(message, type = 'danger') {
+    const feedback = document.getElementById('userAssignmentsFeedback');
+    if (!feedback) {
+        return;
+    }
+
+    if (!message) {
+        feedback.className = 'd-none';
+        feedback.innerHTML = '';
+        return;
+    }
+
+    feedback.className = `alert alert-${type} mb-3`;
+    feedback.innerHTML = escapeHtml(message);
+}
+
+async function parseJsonResponse(response, fallbackMessage) {
+    const text = await response.text();
+
+    try {
+        return JSON.parse(text);
+    } catch (error) {
+        throw new Error(text.startsWith('<') ? fallbackMessage : (text || fallbackMessage));
+    }
+}
+
 function applyUserViewMode(mode) {
     document.querySelectorAll('[data-user-view-surface]').forEach(element => {
         const shouldShow = element.getAttribute('data-user-view-surface') === mode;
@@ -647,7 +693,7 @@ function buildEditAssignmentRow(index, assignment = {}) {
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">Start Date</label>
-                        <input type="date" class="form-control" name="assignments[${index}][start_date]" value="${escapeHtml(assignment.start_date || '')}">
+                        <input type="date" class="form-control" name="assignments[${index}][start_date]" value="${escapeHtml(normalizeDateInputValue(assignment.start_date || ''))}">
                     </div>
                     <div class="col-md-1 d-grid">
                         <button type="button" class="btn btn-outline-danger" onclick="removeEditAssignmentRow(${index})">
@@ -660,7 +706,7 @@ function buildEditAssignmentRow(index, assignment = {}) {
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">End Date (Optional)</label>
-                        <input type="date" class="form-control" name="assignments[${index}][end_date]" value="${escapeHtml(assignment.end_date || '')}">
+                        <input type="date" class="form-control" name="assignments[${index}][end_date]" value="${escapeHtml(normalizeDateInputValue(assignment.end_date || ''))}">
                     </div>
                 </div>
                 <div class="assignment-responsibilities mt-3" data-edit-assignment-preview="${index}"></div>
@@ -822,10 +868,11 @@ function openEditAssignments(userId) {
     const container = document.getElementById('editAssignmentsContainer');
     container.innerHTML = '<div class="text-center py-5"><div class="spinner-border" role="status"></div></div>';
     document.getElementById('editAssignmentsUserId').value = userId;
+    setAssignmentsFeedback('');
     modal.show();
 
     fetch(`/users/${userId}?format=json`, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(response => response.json())
+        .then(response => parseJsonResponse(response, 'Unable to load user assignments right now.'))
         .then(payload => {
             if (!payload.success) {
                 throw new Error(payload.message || 'Failed to load user assignments');
@@ -851,6 +898,7 @@ function openEditAssignments(userId) {
 
 document.getElementById('userAssignmentsForm').addEventListener('submit', function (event) {
     event.preventDefault();
+    setAssignmentsFeedback('');
 
     const submitButton = this.querySelector('button[type="submit"]');
     const originalHtml = submitButton.innerHTML;
@@ -864,7 +912,7 @@ document.getElementById('userAssignmentsForm').addEventListener('submit', functi
         body: formData,
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
-        .then(response => response.json())
+        .then(response => parseJsonResponse(response, 'The server returned an invalid response while updating assignments.'))
         .then(payload => {
             if (!payload.success) {
                 throw new Error(payload.message || 'Failed to update assignments');
@@ -873,7 +921,7 @@ document.getElementById('userAssignmentsForm').addEventListener('submit', functi
             window.location.href = '/users?success=' + encodeURIComponent('assignments_updated');
         })
         .catch(error => {
-            alert(error.message || 'Unable to update assignments.');
+            setAssignmentsFeedback(error.message || 'Unable to update assignments.');
         })
         .finally(() => {
             submitButton.disabled = false;
@@ -924,5 +972,21 @@ if (userPageParams.has('edit')) {
 
 .responsibility-preview {
     border-left: 4px solid #0d6efd;
+}
+
+#userAssignmentsModal .modal-body {
+    max-height: min(78vh, 900px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+#editAssignmentsContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.assignment-editor-row {
+    scroll-margin-top: 5rem;
 }
 </style>

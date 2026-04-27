@@ -391,35 +391,39 @@ class UserLeaderRegistrationController extends BaseController
         }
 
         try {
-            $userId = $_POST['user_id'] ?? null;
+            $userId = (int) ($_POST['user_id'] ?? 0);
             $assignments = $_POST['assignments'] ?? [];
 
-            if (!$userId) {
+            if ($userId <= 0) {
                 return $this->jsonResponse(['success' => false, 'message' => 'User ID required']);
             }
 
             // Validate user exists
-            $user = $this->userModel->findById($userId);
+            $user = User::find($userId);
             if (!$user) {
                 return $this->jsonResponse(['success' => false, 'message' => 'User not found']);
+            }
+
+            $validAssignments = array_values(array_filter(
+                is_array($assignments) ? $assignments : [],
+                fn (array $assignment): bool => $this->validateAssignmentData($assignment)
+            ));
+
+            if (empty($validAssignments)) {
+                return $this->jsonResponse(['success' => false, 'message' => 'At least one valid assignment is required']);
             }
 
             $this->db->beginTransaction();
 
             try {
-                // Deactivate current assignments
-                $this->db->query(
-                    "UPDATE user_assignments SET status = 'inactive', updated_at = NOW() WHERE user_id = ?",
-                    [$userId]
-                );
+                $this->deactivateUserAssignments($userId);
+                $this->deactivateResponsibilityAssignments($userId);
 
                 // Create new assignments
                 $newAssignments = [];
-                foreach ($assignments as $assignment) {
-                    if ($this->validateAssignmentData($assignment)) {
-                        $assignmentId = $this->createUserAssignment($userId, $assignment);
-                        $newAssignments[] = $assignmentId;
-                    }
+                foreach ($validAssignments as $assignment) {
+                    $assignmentId = $this->createUserAssignment($userId, $assignment);
+                    $newAssignments[] = $assignmentId;
                 }
 
                 $this->db->commit();
@@ -436,7 +440,13 @@ class UserLeaderRegistrationController extends BaseController
             }
 
         } catch (Exception $e) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Error updating assignments']);
+            $this->getLogger()->error('Error updating user assignments', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId ?? null,
+                'admin_user_id' => $_SESSION['user']['id'] ?? null,
+            ]);
+
+            return $this->jsonResponse(['success' => false, 'message' => 'Error updating assignments: ' . $e->getMessage()]);
         }
     }
 
@@ -683,6 +693,41 @@ class UserLeaderRegistrationController extends BaseController
         $this->syncResponsibilitiesForAssignment($userId, $assignment);
 
         return $assignmentId;
+    }
+
+    private function deactivateUserAssignments(int $userId): void
+    {
+        $payload = $this->filterTableData('user_assignments', [
+            'status' => 'inactive',
+            'updated_at' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d'),
+            'term_end' => date('Y-m-d'),
+        ]);
+
+        if (empty($payload)) {
+            return;
+        }
+
+        $this->db->update('user_assignments', $payload, ['user_id' => $userId, 'status' => 'active']);
+    }
+
+    private function deactivateResponsibilityAssignments(int $userId): void
+    {
+        if (!$this->db->tableExists('responsibility_assignments')) {
+            return;
+        }
+
+        $payload = $this->filterTableData('responsibility_assignments', [
+            'status' => 'cancelled',
+            'updated_at' => date('Y-m-d H:i:s'),
+            'notes' => 'Superseded by updated user leadership assignments.',
+        ]);
+
+        if (empty($payload)) {
+            return;
+        }
+
+        $this->db->update('responsibility_assignments', $payload, ['user_id' => $userId]);
     }
 
     private function provisionUserInternalEmails(int $userId, array $userData, array $positionData): array
