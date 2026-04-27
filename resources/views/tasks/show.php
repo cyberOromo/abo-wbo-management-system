@@ -158,21 +158,13 @@ $formatDate = static function (?string $value, string $fallback = 'Not set'): st
             <div class="module-panel mb-4">
                 <div class="module-panel-header"><h2 class="module-panel-title"><i class="bi bi-paperclip me-2"></i>Attachments</h2></div>
                 <div class="module-panel-body">
-                    <?php if (!empty($attachments)): ?>
-                        <div class="module-stack-list">
-                            <?php foreach ($attachments as $attachment): ?>
-                                <div class="module-stack-item">
-                                    <div>
-                                        <div class="module-row-title"><?= htmlspecialchars((string) ($attachment['original_name'] ?? $attachment['stored_name'] ?? 'Attachment')) ?></div>
-                                        <div class="module-row-meta">Stored with this standalone task record</div>
-                                    </div>
-                                    <div class="module-stack-value"><?= !empty($attachment['size']) ? htmlspecialchars(number_format(((int) $attachment['size']) / 1024, 1) . ' KB') : 'File' ?></div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="module-empty py-4"><i class="bi bi-paperclip"></i><p class="mb-0 mt-2">No attachments uploaded yet.</p></div>
-                    <?php endif; ?>
+                    <?php
+                    $resource = 'tasks';
+                    $resourceId = (int) ($task['id'] ?? 0);
+                    $contextLabel = 'Task attachment';
+                    $emptyMessage = 'No attachments uploaded yet.';
+                    require dirname(__DIR__) . '/partials/attachment_list.php';
+                    ?>
                 </div>
             </div>
 
@@ -208,6 +200,18 @@ $formatDate = static function (?string $value, string $fallback = 'Not set'): st
                                         <div class="module-row-title"><?= htmlspecialchars(trim((string) (($comment['first_name'] ?? '') . ' ' . ($comment['last_name'] ?? '')))) ?: 'Unknown user' ?></div>
                                         <div class="module-row-meta mb-2"><?= htmlspecialchars((string) ($comment['created_at'] ?? '')) ?></div>
                                         <div><?= nl2br(htmlspecialchars((string) ($comment['comment'] ?? ''))) ?></div>
+                                        <?php if (!empty($comment['attachments']) && is_array($comment['attachments'])): ?>
+                                            <div class="mt-3">
+                                                <?php
+                                                $attachments = $comment['attachments'];
+                                                $resource = 'task-comments';
+                                                $resourceId = (int) ($comment['id'] ?? 0);
+                                                $contextLabel = 'Comment attachment';
+                                                $emptyMessage = 'No comment attachments uploaded.';
+                                                require dirname(__DIR__) . '/partials/attachment_list.php';
+                                                ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             <?php endforeach; ?>

@@ -20,6 +20,16 @@ $router->get('/dashboard', 'DashboardController@index')
     ->middleware('auth')
     ->name('dashboard');
 
+$router->get('/attachments/{resource}/{id}/{index}', 'AttachmentController@show')
+    ->middleware('auth')
+    ->name('attachments.show');
+$router->get('/attachments/{resource}/{id}/{index}/stream', 'AttachmentController@stream')
+    ->middleware('auth')
+    ->name('attachments.stream');
+$router->get('/attachments/{resource}/{id}/{index}/download', 'AttachmentController@download')
+    ->middleware('auth')
+    ->name('attachments.download');
+
 // Authentication routes
 $router->group(['prefix' => 'auth'], function() use ($router) {
     // Login routes
