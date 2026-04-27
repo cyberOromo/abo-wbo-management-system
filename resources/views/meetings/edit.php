@@ -5,14 +5,14 @@ $meeting = $meeting ?? [];
 $meetingTypeOptions = ['regular' => 'Regular', 'emergency' => 'Emergency', 'training' => 'Training', 'social' => 'Social', 'planning' => 'Planning'];
 $platformOptions = ['in_person' => 'In Person', 'virtual' => 'Virtual', 'zoom' => 'Zoom', 'hybrid' => 'Hybrid'];
 $currentMeetingType = (string) ($meeting['meeting_type'] ?? 'regular');
-$currentPlatform = (string) ($meeting['platform'] ?? 'in_person');
+$currentPlatform = (string) ($meeting['platform'] ?? (!empty($meeting['is_virtual']) ? 'virtual' : 'in_person'));
 
 if (!isset($meetingTypeOptions[$currentMeetingType])) {
     $meetingTypeOptions[$currentMeetingType] = ucfirst(str_replace('_', ' ', $currentMeetingType));
 }
 
 if (!isset($platformOptions[$currentPlatform])) {
-    $platformOptions[$currentPlatform] = ucfirst(str_replace('_', ' ', $currentPlatform));
+    $currentPlatform = 'in_person';
 }
 
 $agendaItems = $meeting['agenda'] ?? [];

@@ -140,6 +140,20 @@ class Meeting extends Model
      */
     public function updateMeeting(int $meetingId, array $data): bool
     {
+        if (isset($data['platform'])) {
+            $normalizedPlatform = (string) $data['platform'];
+
+            if (!in_array($normalizedPlatform, ['in_person', 'virtual', 'zoom', 'hybrid'], true)) {
+                $normalizedPlatform = 'in_person';
+            }
+
+            $data['platform'] = $normalizedPlatform;
+
+            if ($this->db->columnExists($this->table, 'is_virtual')) {
+                $data['is_virtual'] = in_array($normalizedPlatform, ['virtual', 'zoom', 'hybrid'], true) ? 1 : 0;
+            }
+        }
+
         $filteredData = [];
 
         foreach ($data as $field => $value) {
