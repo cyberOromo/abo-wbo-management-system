@@ -104,6 +104,30 @@ try {
         echo '<p style="color:red;"><strong>render(admin/user_leader_registration)</strong>: ' . htmlspecialchars($renderError->getMessage()) . '</p>';
         echo '<p><strong>File:</strong> ' . htmlspecialchars($renderError->getFile()) . ' <strong>Line:</strong> ' . (int) $renderError->getLine() . '</p>';
     }
+
+    $lookupEmail = trim((string) ($_GET['email'] ?? ''));
+    if ($lookupEmail !== '') {
+        $lookupUser = $db->fetch(
+            'SELECT id, first_name, last_name, email, internal_email, metadata FROM users WHERE email = ? OR internal_email = ? LIMIT 1',
+            [$lookupEmail, $lookupEmail]
+        );
+
+        echo '<hr><h3>Email Lookup</h3>';
+
+        if ($lookupUser) {
+            $metadata = json_decode((string) ($lookupUser['metadata'] ?? ''), true);
+            echo '<pre>' . htmlspecialchars(print_r([
+                'id' => $lookupUser['id'],
+                'name' => trim(($lookupUser['first_name'] ?? '') . ' ' . ($lookupUser['last_name'] ?? '')),
+                'email' => $lookupUser['email'] ?? null,
+                'internal_email' => $lookupUser['internal_email'] ?? null,
+                'temporary_password' => $metadata['temporary_password'] ?? $metadata['temp_password'] ?? null,
+                'metadata' => $metadata,
+            ], true)) . '</pre>';
+        } else {
+            echo '<p>No user found for lookup.</p>';
+        }
+    }
 } catch (\Throwable $e) {
     if (ob_get_level() > 0) {
         ob_end_clean();
