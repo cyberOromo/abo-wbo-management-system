@@ -463,9 +463,26 @@ class UserLeaderRegistrationController extends BaseController
                 return $this->jsonResponse(['success' => false, 'message' => 'User assignments table is unavailable']);
             }
 
+            $assignmentColumns = [
+                'id',
+                'user_id',
+                'position_id',
+                'level_scope',
+                'organizational_unit_id',
+                'global_id',
+                'godina_id',
+                'gamta_id',
+                'gurmu_id',
+            ];
+
+            foreach (['start_date', 'term_start', 'end_date', 'term_end', 'notes'] as $optionalColumn) {
+                if ($this->db->columnExists('user_assignments', $optionalColumn)) {
+                    $assignmentColumns[] = $optionalColumn;
+                }
+            }
+
             $assignments = $this->db->fetchAll(
-                "SELECT id, user_id, position_id, level_scope, organizational_unit_id, global_id, godina_id, gamta_id, gurmu_id,
-                        start_date, end_date, notes
+                "SELECT " . implode(', ', $assignmentColumns) . "
                  FROM user_assignments
                  WHERE status = 'active'
                  ORDER BY user_id ASC, id ASC"
@@ -479,8 +496,8 @@ class UserLeaderRegistrationController extends BaseController
                     'position_id' => (int) ($assignment['position_id'] ?? 0),
                     'hierarchy_level' => (string) ($assignment['level_scope'] ?? 'global'),
                     'hierarchy_id' => $this->resolveAssignmentHierarchyId($assignment),
-                    'start_date' => $assignment['start_date'] ?? null,
-                    'end_date' => $assignment['end_date'] ?? null,
+                    'start_date' => $assignment['start_date'] ?? $assignment['term_start'] ?? date('Y-m-d'),
+                    'end_date' => $assignment['end_date'] ?? $assignment['term_end'] ?? null,
                     'notes' => $assignment['notes'] ?? 'Legacy assignment responsibility backfill',
                 ];
 
