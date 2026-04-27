@@ -15,9 +15,18 @@ if (!isset($platformOptions[$currentPlatform])) {
     $platformOptions[$currentPlatform] = ucfirst(str_replace('_', ' ', $currentPlatform));
 }
 
-$agendaValue = $meeting['agenda'] ?? [];
-if (is_array($agendaValue)) {
-    $agendaValue = implode(PHP_EOL, array_map(static fn($item) => is_array($item) ? (string) ($item['title'] ?? json_encode($item)) : (string) $item, $agendaValue));
+$agendaItems = $meeting['agenda'] ?? [];
+if (!is_array($agendaItems)) {
+    $agendaItems = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string) $agendaItems)));
+}
+
+$agendaItems = array_values(array_map(
+    static fn($item) => is_array($item) ? (string) ($item['title'] ?? json_encode($item)) : (string) $item,
+    $agendaItems
+));
+
+if ($agendaItems === []) {
+    $agendaItems = [''];
 }
 
 $tagValue = $meeting['tags'] ?? [];
@@ -98,7 +107,11 @@ $formatDateTimeLocal = static function ($value): string {
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Agenda</label>
-                    <textarea name="agenda[]" rows="4" class="form-control" placeholder="One agenda item per line"><?= htmlspecialchars((string) $agendaValue) ?></textarea>
+                    <div class="d-grid gap-2">
+                        <?php foreach ($agendaItems as $index => $agendaItem): ?>
+                            <input type="text" name="agenda[]" class="form-control" value="<?= htmlspecialchars($agendaItem) ?>" placeholder="Agenda item <?= $index + 1 ?>">
+                        <?php endforeach; ?>
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Tags</label>

@@ -9,12 +9,6 @@ $currentEventType = (string) ($event['event_type'] ?? 'social');
 $currentRegistrationType = (string) ($event['registration_type'] ?? 'open');
 $currentStatus = (string) ($event['status'] ?? 'planning');
 
-foreach ([[$eventTypeOptions, $currentEventType], [$registrationTypeOptions, $currentRegistrationType], [$statusOptions, $currentStatus]] as [$options, $current]) {
-    if (!isset($options[$current])) {
-        $options[$current] = ucfirst(str_replace('_', ' ', $current));
-    }
-}
-
 if (!isset($eventTypeOptions[$currentEventType])) {
     $eventTypeOptions[$currentEventType] = ucfirst(str_replace('_', ' ', $currentEventType));
 }
@@ -39,9 +33,15 @@ if (is_array($tagsValue)) {
     $tagsValue = implode(', ', array_map('strval', $tagsValue));
 }
 
-$requirementsValue = $event['requirements'] ?? [];
-if (is_array($requirementsValue)) {
-    $requirementsValue = implode(PHP_EOL, array_map('strval', $requirementsValue));
+$requirementsItems = $event['requirements'] ?? [];
+if (!is_array($requirementsItems)) {
+    $requirementsItems = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string) $requirementsItems)));
+}
+
+$requirementsItems = array_values(array_map('strval', $requirementsItems));
+
+if ($requirementsItems === []) {
+    $requirementsItems = [''];
 }
 ?>
 
@@ -140,7 +140,11 @@ if (is_array($requirementsValue)) {
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Requirements</label>
-                    <textarea name="requirements[]" rows="4" class="form-control" placeholder="One requirement per line"><?= htmlspecialchars((string) $requirementsValue) ?></textarea>
+                    <div class="d-grid gap-2">
+                        <?php foreach ($requirementsItems as $index => $requirementItem): ?>
+                            <input type="text" name="requirements[]" class="form-control" value="<?= htmlspecialchars($requirementItem) ?>" placeholder="Requirement <?= $index + 1 ?>">
+                        <?php endforeach; ?>
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Tags</label>
