@@ -841,7 +841,7 @@ class UserLeaderRegistrationController extends BaseController
             LEFT JOIN positions p ON ua.position_id = p.id
                         WHERE JSON_VALID(u.metadata)
                             AND CAST(JSON_UNQUOTE(JSON_EXTRACT(u.metadata, '$.registered_by')) AS UNSIGNED) = ?
-            GROUP BY u.id
+            GROUP BY u.id, u.first_name, u.last_name, u.email, u.internal_email, u.role, u.status, u.created_at
             ORDER BY u.created_at DESC
             LIMIT 10
         ", [$_SESSION['user']['id']]);
