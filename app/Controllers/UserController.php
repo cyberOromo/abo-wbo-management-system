@@ -436,9 +436,23 @@ class UserController extends Controller
 
     private function getManagedUserPayload(int $userId): ?array
     {
+        $userColumns = [
+            'id',
+            'first_name',
+            'last_name',
+            'email',
+            'user_type',
+            'status',
+        ];
+
+        foreach (['middle_name', 'internal_email', 'phone', 'last_login_at', 'created_at', 'email_verified_at', 'metadata'] as $optionalColumn) {
+            if ($this->db->columnExists('users', $optionalColumn)) {
+                $userColumns[] = $optionalColumn;
+            }
+        }
+
         $user = $this->db->fetch(
-            "SELECT id, first_name, middle_name, last_name, email, internal_email, phone, user_type, status,
-                    last_login_at, created_at, email_verified_at, metadata
+            "SELECT " . implode(', ', $userColumns) . "
              FROM users
              WHERE id = ?
              LIMIT 1",
@@ -449,25 +463,39 @@ class UserController extends Controller
             return null;
         }
 
+        $assignmentColumns = ['ua.id', 'ua.position_id'];
+        foreach (['level_scope', 'organizational_unit_id', 'godina_id', 'gamta_id', 'gurmu_id', 'start_date', 'end_date', 'notes'] as $optionalColumn) {
+            if ($this->db->columnExists('user_assignments', $optionalColumn)) {
+                $assignmentColumns[] = 'ua.' . $optionalColumn;
+            }
+        }
+
+        $positionKeyExpression = $this->db->columnExists('positions', 'key_name') ? 'p.key_name' : 'NULL';
+        $levelScopeExpression = $this->db->columnExists('user_assignments', 'level_scope') ? 'ua.level_scope' : "'global'";
+        $godinaExpression = $this->db->columnExists('user_assignments', 'godina_id') ? 'ua.godina_id' : 'NULL';
+        $gamtaExpression = $this->db->columnExists('user_assignments', 'gamta_id') ? 'ua.gamta_id' : 'NULL';
+        $gurmuExpression = $this->db->columnExists('user_assignments', 'gurmu_id') ? 'ua.gurmu_id' : 'NULL';
+        $startDateExpression = $this->db->columnExists('user_assignments', 'start_date') ? 'ua.start_date' : 'ua.created_at';
+        $assignmentStatusClause = $this->db->columnExists('user_assignments', 'status') ? " AND ua.status = 'active'" : '';
+
         $assignments = $this->db->fetchAll(
-            "SELECT ua.id, ua.position_id, ua.level_scope, ua.organizational_unit_id, ua.godina_id, ua.gamta_id, ua.gurmu_id,
-                    ua.start_date, ua.end_date, ua.notes,
+            "SELECT " . implode(', ', $assignmentColumns) . ",
                     " . $this->getPositionNameExpression('p') . " AS position_name,
-                    p.key_name AS position_key,
+                    {$positionKeyExpression} AS position_key,
                     CASE
-                        WHEN ua.level_scope = 'global' THEN 'Global'
-                        WHEN ua.level_scope = 'godina' THEN COALESCE(god.name, 'Godina')
-                        WHEN ua.level_scope = 'gamta' THEN COALESCE(gam.name, 'Gamta')
-                        WHEN ua.level_scope = 'gurmu' THEN COALESCE(gur.name, 'Gurmu')
-                        ELSE COALESCE(ua.level_scope, 'Unscoped')
+                        WHEN {$levelScopeExpression} = 'global' THEN 'Global'
+                        WHEN {$levelScopeExpression} = 'godina' THEN COALESCE(god.name, 'Godina')
+                        WHEN {$levelScopeExpression} = 'gamta' THEN COALESCE(gam.name, 'Gamta')
+                        WHEN {$levelScopeExpression} = 'gurmu' THEN COALESCE(gur.name, 'Gurmu')
+                        ELSE COALESCE({$levelScopeExpression}, 'Unscoped')
                     END AS organizational_unit_name
              FROM user_assignments ua
              LEFT JOIN positions p ON ua.position_id = p.id
-             LEFT JOIN godinas god ON ua.godina_id = god.id
-             LEFT JOIN gamtas gam ON ua.gamta_id = gam.id
-             LEFT JOIN gurmus gur ON ua.gurmu_id = gur.id
-             WHERE ua.user_id = ? AND ua.status = 'active'
-             ORDER BY FIELD(ua.level_scope, 'global', 'godina', 'gamta', 'gurmu'), ua.start_date DESC",
+             LEFT JOIN godinas god ON {$godinaExpression} = god.id
+             LEFT JOIN gamtas gam ON {$gamtaExpression} = gam.id
+             LEFT JOIN gurmus gur ON {$gurmuExpression} = gur.id
+             WHERE ua.user_id = ?{$assignmentStatusClause}
+             ORDER BY FIELD({$levelScopeExpression}, 'global', 'godina', 'gamta', 'gurmu'), {$startDateExpression} DESC",
             [$userId]
         );
 
