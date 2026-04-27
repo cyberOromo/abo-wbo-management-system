@@ -684,6 +684,8 @@ class TaskController extends BaseController
     private function getAvailableUsersForScope(array $userScope): array
     {
         try {
+            $currentUser = $this->getAuthUser() ?? [];
+            $currentRole = (string) ($currentUser['role'] ?? $currentUser['user_type'] ?? '');
             $scopeLevel = (string) ($userScope['level_scope'] ?? $userScope['scope'] ?? '');
             $params = [];
             $sql = "SELECT DISTINCT u.id, u.first_name, u.last_name, u.internal_email, ua.level_scope,
@@ -691,6 +693,11 @@ class TaskController extends BaseController
                     FROM user_assignments ua
                     INNER JOIN users u ON u.id = ua.user_id
                     WHERE ua.status = 'active' AND COALESCE(u.status, 'active') = 'active'";
+
+            if (in_array($currentRole, ['admin', 'system_admin', 'super_admin'], true) && $scopeLevel === '') {
+                $sql .= ' ORDER BY u.first_name ASC, u.last_name ASC';
+                return $this->db->fetchAll($sql, $params);
+            }
 
             if ($scopeLevel !== 'global') {
                 $scopeColumn = $this->getHierarchyScopeColumn($scopeLevel);
