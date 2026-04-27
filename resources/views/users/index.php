@@ -386,7 +386,7 @@ $breadcrumbs = [
             </div>
             <form id="userAssignmentsForm">
                 <div class="modal-body">
-                    <input type="hidden" name="_token" value="<?= $_SESSION['_token'] ?? '' ?>">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="user_id" id="editAssignmentsUserId" value="">
                     <div id="userAssignmentsFeedback" class="d-none"></div>
                     <div class="row g-3 align-items-end mb-3">
