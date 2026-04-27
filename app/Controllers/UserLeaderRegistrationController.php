@@ -573,6 +573,7 @@ class UserLeaderRegistrationController extends BaseController
     {
         // Generate temporary password
         $temporaryPassword = $this->generateTemporaryPassword();
+        $passwordHash = password_hash($temporaryPassword, PASSWORD_DEFAULT);
 
         $storageRole = match ($userData['role']) {
             'admin', 'system_admin' => 'admin',
@@ -580,27 +581,33 @@ class UserLeaderRegistrationController extends BaseController
             default => 'member',
         };
         
-        $userRecord = [
+        $userRecord = $this->filterTableData('users', [
             'first_name' => $userData['first_name'],
+            'middle_name' => $userData['middle_name'] ?: null,
             'last_name' => $userData['last_name'],
             'email' => $userData['email'],
             'personal_email' => $userData['email'],
             'phone' => $userData['phone'],
             'personal_phone' => $userData['phone'] ?: null,
-            'password_hash' => password_hash($temporaryPassword, PASSWORD_DEFAULT),
+            'password_hash' => $passwordHash,
+            'password' => $passwordHash,
             'user_type' => $storageRole,
             'status' => 'active',
+            'date_of_birth' => $userData['date_of_birth'] ?: null,
             'birth_date' => $userData['date_of_birth'] ?: null,
+            'gender' => $userData['gender'] ?: null,
             'address' => $userData['address'],
             'emergency_contact' => !empty($userData['emergency_contact'])
                 ? json_encode(['details' => $userData['emergency_contact']])
                 : null,
+            'language_preference' => $userData['language_preference'] ?: 'en',
             'language' => $userData['language_preference'] ?: 'en',
             'registration_source' => 'admin_created',
             'account_type' => 'internal_only',
             'email_verified_at' => date('Y-m-d H:i:s'),
             'personal_email_verified' => 1,
             'onboarding_completed' => 0,
+            'created_by' => $_SESSION['user']['id'],
             'metadata' => json_encode([
                 'middle_name' => $userData['middle_name'] ?: null,
                 'gender' => $userData['gender'] ?: null,
@@ -611,7 +618,7 @@ class UserLeaderRegistrationController extends BaseController
                 'temporary_password' => $temporaryPassword,
                 'requires_password_change' => true
             ])
-        ];
+        ]);
 
         $userId = $this->db->insert('users', $userRecord);
         
@@ -714,11 +721,15 @@ class UserLeaderRegistrationController extends BaseController
             }
         }
 
-        $this->db->update('users', [
+        $userUpdate = $this->filterTableData('users', [
             'internal_email' => $primaryEmail,
             'internal_account_created_at' => date('Y-m-d H:i:s'),
             'internal_credentials_sent_at' => date('Y-m-d H:i:s')
-        ], ['id' => $userId]);
+        ]);
+
+        if (!empty($userUpdate)) {
+            $this->db->update('users', $userUpdate, ['id' => $userId]);
+        }
 
         $this->tempUserData['internal_email'] = $primaryEmail;
         $this->tempUserData['role_aliases'] = $aliases;
@@ -869,6 +880,19 @@ class UserLeaderRegistrationController extends BaseController
         }
 
         return 'level';
+    }
+
+    private function filterTableData(string $table, array $data): array
+    {
+        $filtered = [];
+
+        foreach ($data as $column => $value) {
+            if ($this->db->columnExists($table, $column)) {
+                $filtered[$column] = $value;
+            }
+        }
+
+        return $filtered;
     }
 
     /**
