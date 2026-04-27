@@ -244,7 +244,7 @@ class UserLeaderRegistrationController extends BaseController
 
             // Get positions for the specified level
             $positions = $this->db->fetchAll(
-                "SELECT id, name, description, is_executive, hierarchy_type 
+                "SELECT id, name, is_executive, hierarchy_type 
                  FROM positions 
                  WHERE hierarchy_type = ? 
                  ORDER BY is_executive DESC, name",
@@ -813,7 +813,7 @@ class UserLeaderRegistrationController extends BaseController
     private function getPositions(): array
     {
         return $this->db->fetchAll("
-            SELECT id, name, description, hierarchy_type, is_executive 
+            SELECT id, name, hierarchy_type, is_executive 
             FROM positions 
             ORDER BY hierarchy_type, is_executive DESC, name
         ");
