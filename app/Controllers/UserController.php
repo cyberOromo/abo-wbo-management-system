@@ -400,10 +400,29 @@ class UserController extends Controller
         }
         
         try {
-            $success = $this->userModel->softDelete($id, auth_user()['id'] ?? null);
+            $deleteData = [
+                'status' => 'deleted'
+            ];
+
+            if ($this->db->columnExists('users', 'deleted_at')) {
+                $deleteData['deleted_at'] = date('Y-m-d H:i:s');
+            }
+
+            $deletedBy = auth_user()['id'] ?? null;
+            if ($deletedBy !== null && $this->db->columnExists('users', 'deleted_by')) {
+                $deleteData['deleted_by'] = $deletedBy;
+            }
+
+            $affectedRows = $this->db->update('users', $deleteData, ['id' => (int) $id]);
+            $success = $affectedRows > 0;
             
             if ($success) {
-                log_activity('user.deleted', "Deleted user: {$user['email']}", ['user_id' => $id]);
+                try {
+                    log_activity('user.deleted', "Deleted user: {$user['email']}", ['user_id' => $id]);
+                } catch (\Throwable $logError) {
+                    log_error('User deletion activity log failed: ' . $logError->getMessage());
+                }
+
                 if ($this->wantsJsonResponse()) {
                     $this->success(null, 'User deleted successfully!');
                 }
@@ -415,7 +434,7 @@ class UserController extends Controller
                 $this->redirectWithMessage('/users', 'Failed to delete user.', 'error');
             }
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             log_error('User deletion error: ' . $e->getMessage());
             if ($this->wantsJsonResponse()) {
                 $this->error('An error occurred while deleting the user.', null, 500);
