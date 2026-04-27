@@ -75,7 +75,7 @@ class AttachmentController extends BaseController
     private function resolveMeetingAttachment(int $meetingId, int $index): array
     {
         $meeting = $this->db->fetch(
-            'SELECT id, title, organized_by, is_public, level_scope, scope_id, attachments FROM meetings WHERE id = ?',
+            'SELECT id, title, organized_by, attachments FROM meetings WHERE id = ?',
             [$meetingId]
         );
 
@@ -274,11 +274,7 @@ class AttachmentController extends BaseController
             return;
         }
 
-        if (!empty($meeting['is_public'])) {
-            return;
-        }
-
-        if ($this->recordMatchesScope($meeting, $this->getTaskUserScope($userId))) {
+        if ($userId > 0 && $ownerUserId > 0 && $this->creatorMatchesScope($ownerUserId, $this->getTaskUserScope($userId))) {
             return;
         }
 
