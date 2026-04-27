@@ -73,9 +73,9 @@ class Task extends Model
         'assigned_to' => 'json'
     ];
 
-    public function __construct()
+    public function __construct(array $attributes = [])
     {
-        parent::__construct();
+        parent::__construct($attributes);
     }
 
     /**
@@ -88,6 +88,7 @@ class Task extends Model
             $data['uuid'] = $this->generateUUID();
             $data['created_at'] = date('Y-m-d H:i:s');
             $data['updated_at'] = date('Y-m-d H:i:s');
+            $data = $this->prepareTaskAttributesForSchema($data);
             
             // Ensure JSON fields are properly encoded
             if (isset($data['tags']) && is_array($data['tags'])) {
@@ -100,11 +101,15 @@ class Task extends Model
                 $data['assigned_to'] = json_encode($data['assigned_to']);
             }
 
-            $taskId = $this->create($data);
+            $task = $this->create($data);
             
-            if ($taskId) {
+            if ($task) {
+                $taskId = (int) ($task->id ?? 0);
+
                 // Log task creation
-                $this->logTaskActivity($taskId, 'created', 'Task created', $data['created_by']);
+                if ($taskId > 0) {
+                    $this->logTaskActivity($taskId, 'created', 'Task created', $data['created_by']);
+                }
                 
                 return [
                     'success' => true,
@@ -124,12 +129,51 @@ class Task extends Model
         }
     }
 
+    private function prepareTaskAttributesForSchema(array $data): array
+    {
+        $scopeId = isset($data['scope_id']) ? (int) $data['scope_id'] : null;
+        $levelScope = (string) ($data['level_scope'] ?? '');
+
+        if (!$this->db->columnExists($this->table, 'scope_id')) {
+            unset($data['scope_id']);
+
+            if ($this->db->columnExists($this->table, 'target_audience') && !isset($data['target_audience']) && $scopeId) {
+                $data['target_audience'] = [sprintf('%s_%d', $levelScope, $scopeId)];
+            }
+        }
+
+        if (!$this->db->columnExists($this->table, 'completion_percentage') && isset($data['completion_percentage'])) {
+            if ($this->db->columnExists($this->table, 'progress_percentage')) {
+                $data['progress_percentage'] = $data['completion_percentage'];
+            }
+
+            unset($data['completion_percentage']);
+        }
+
+        if (!$this->db->columnExists($this->table, 'completed_date') && isset($data['completed_date'])) {
+            if ($this->db->columnExists($this->table, 'completed_at')) {
+                $data['completed_at'] = $data['completed_date'];
+            }
+
+            unset($data['completed_date']);
+        }
+
+        foreach (['uuid', 'project_id', 'event_id', 'meeting_id', 'tags', 'attachments', 'metadata', 'target_audience'] as $column) {
+            if (array_key_exists($column, $data) && !$this->db->columnExists($this->table, $column)) {
+                unset($data[$column]);
+            }
+        }
+
+        return $data;
+    }
+
     /**
      * Get tasks by hierarchical scope
      */
     public function getTasksByScope(string $scope, int $scopeId = null, array $filters = []): array
     {
         try {
+            $scopeColumn = $this->db->columnExists($this->table, 'scope_id') ? 't.scope_id' : null;
             $query = "SELECT t.*, 
                              u.first_name as creator_first_name, 
                              u.last_name as creator_last_name,
@@ -141,13 +185,13 @@ class Task extends Model
             
             $params = ['scope' => $scope];
             
-            if ($scopeId) {
-                $query .= " AND t.scope_id = :scope_id";
+            if ($scopeId && $scopeColumn !== null) {
+                $query .= " AND {$scopeColumn} = :scope_id";
                 $params['scope_id'] = $scopeId;
             }
             
             // Apply filters
-            if (!empty($filters['status'])) {
+            if (!empty($filters['status']) && is_string($filters['status'])) {
                 $query .= " AND t.status = :status";
                 $params['status'] = $filters['status'];
             }
@@ -187,10 +231,7 @@ class Task extends Model
                        t.due_date ASC,
                        t.created_at DESC";
 
-            $stmt = $this->db->prepare($query);
-            $stmt->execute($params);
-            
-            $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $tasks = $this->db->fetchAll($query, $params);
             
             // Decode JSON fields
             foreach ($tasks as &$task) {
@@ -239,10 +280,7 @@ class Task extends Model
                        END,
                        t.due_date ASC";
 
-            $stmt = $this->db->prepare($query);
-            $stmt->execute($params);
-            
-            $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $tasks = $this->db->fetchAll($query, $params);
             
             // Decode JSON fields
             foreach ($tasks as &$task) {
@@ -358,6 +396,10 @@ class Task extends Model
     public function getTaskStatistics(string $scope, int $scopeId = null): array
     {
         try {
+            $taskProgressColumn = $this->db->columnExists($this->table, 'completion_percentage')
+                ? 'completion_percentage'
+                : ($this->db->columnExists($this->table, 'progress_percentage') ? 'progress_percentage' : '0');
+            $scopeColumn = $this->db->columnExists($this->table, 'scope_id') ? 'scope_id' : null;
             $query = "SELECT 
                         COUNT(*) as total_tasks,
                         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_tasks,
@@ -367,21 +409,18 @@ class Task extends Model
                         SUM(CASE WHEN priority = 'urgent' THEN 1 ELSE 0 END) as urgent_tasks,
                         SUM(CASE WHEN priority = 'high' THEN 1 ELSE 0 END) as high_priority_tasks,
                         SUM(CASE WHEN due_date < CURDATE() AND status NOT IN ('completed', 'cancelled') THEN 1 ELSE 0 END) as overdue_tasks,
-                        AVG(completion_percentage) as avg_completion
+                        AVG({$taskProgressColumn}) as avg_completion
                       FROM {$this->table}
                       WHERE level_scope = :scope";
             
             $params = ['scope' => $scope];
             
-            if ($scopeId) {
-                $query .= " AND scope_id = :scope_id";
+            if ($scopeId && $scopeColumn !== null) {
+                $query .= " AND {$scopeColumn} = :scope_id";
                 $params['scope_id'] = $scopeId;
             }
 
-            $stmt = $this->db->prepare($query);
-            $stmt->execute($params);
-            
-            $stats = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stats = $this->db->fetch($query, $params) ?: [];
             
             // Calculate completion rate
             $stats['completion_rate'] = $stats['total_tasks'] > 0 
@@ -402,11 +441,11 @@ class Task extends Model
     private function logTaskActivity(int $taskId, string $action, string $description, int $userId): void
     {
         try {
-            $query = "INSERT INTO task_activities (task_id, user_id, action, description, created_at) 
-                     VALUES (:task_id, :user_id, :action, :description, :created_at)";
-            
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([
+            if (!$this->db->tableExists('task_activities')) {
+                return;
+            }
+
+            $this->db->insert('task_activities', [
                 'task_id' => $taskId,
                 'user_id' => $userId,
                 'action' => $action,
@@ -433,10 +472,7 @@ class Task extends Model
                       WHERE ta.task_id = :task_id
                       ORDER BY ta.created_at DESC";
 
-            $stmt = $this->db->prepare($query);
-            $stmt->execute(['task_id' => $taskId]);
-            
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return $this->db->fetchAll($query, ['task_id' => $taskId]);
             
         } catch (\Exception $e) {
             error_log("Get task history error: " . $e->getMessage());
@@ -473,10 +509,7 @@ class Task extends Model
                       WHERE t.parent_task_id = :parent_task_id
                       ORDER BY t.created_at ASC";
 
-            $stmt = $this->db->prepare($query);
-            $stmt->execute(['parent_task_id' => $parentTaskId]);
-            
-            $subtasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $subtasks = $this->db->fetchAll($query, ['parent_task_id' => $parentTaskId]);
             
             // Decode JSON fields
             foreach ($subtasks as &$task) {

@@ -3,6 +3,8 @@
 namespace App\Controllers;
 
 use App\Core\BaseController;
+use App\Models\Task;
+use App\Models\User;
 use App\Utils\Database;
 
 /**
@@ -17,9 +19,16 @@ use App\Utils\Database;
  */
 class TaskController extends BaseController
 {
+    protected $db;
+    protected $taskModel;
+    protected $userModel;
+
     public function __construct()
     {
         parent::__construct();
+        $this->db = Database::getInstance();
+        $this->taskModel = new Task();
+        $this->userModel = new User();
     }
 
     /**
@@ -60,47 +69,38 @@ class TaskController extends BaseController
     {
         try {
             $user = $this->getAuthUser();
-            $userScope = $this->getUserScope($user);
-            
-            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                return $this->handleTaskCreation($user, $userScope);
+            if (!$user) {
+                $this->redirect('/auth/login');
+                return;
             }
-            
-            // GET request - show enhanced create form
+
+            $userScope = $this->getUserScope($user);
+
             $availableUsers = $this->getAvailableUsersForScope($userScope);
-            $organizationHierarchy = $this->getOrganizationHierarchy($user);
-            $taskTemplates = $this->taskService->getTaskTemplates();
-            $parentTasks = $this->taskService->getAvailableParentTasks($userScope);
-            
-            // Get assignment options for Global events
-            $assignmentLevels = $this->getAssignmentLevels($user);
-            $globalUsers = $this->getGlobalAssignmentUsers($user);
-            
-            // Get categories and priority options
-            $categories = $this->taskService->getTaskCategories();
-            $priorities = $this->taskService->getPriorityLevels();
-            $scopes = $this->getAvailableScopes($user);
-            
-            $this->view('tasks/create', [
+            $parentTasks = $this->getVisibleParentTasks($userScope);
+
+            $this->render('tasks.create', [
+                'title' => 'Create Task',
                 'user' => $user,
                 'userScope' => $userScope,
                 'availableUsers' => $availableUsers,
-                'organizationHierarchy' => $organizationHierarchy,
-                'taskTemplates' => $taskTemplates,
                 'parentTasks' => $parentTasks,
-                'assignmentLevels' => $assignmentLevels,
-                'globalUsers' => $globalUsers,
-                'categories' => $categories,
-                'priorities' => $priorities,
-                'scopes' => $scopes,
-                'csrf_token' => $this->generateCsrfToken(),
-                'max_file_size' => $this->fileUploadService->getMaxFileSize(),
-                'allowed_file_types' => $this->fileUploadService->getAllowedFileTypes()
+                'task' => [
+                    'level_scope' => $userScope['level_scope'] ?? '',
+                    'status' => Task::STATUS_PENDING,
+                    'priority' => Task::PRIORITY_MEDIUM,
+                    'category' => Task::CATEGORY_ADMINISTRATIVE,
+                ],
+                'categories' => $this->getTaskCategoryOptions(),
+                'priorities' => $this->getTaskPriorityOptions(),
+                'scopes' => $this->getAvailableScopes($userScope),
+                'formAction' => '/tasks',
+                'submitLabel' => 'Create Task',
             ]);
+            return;
             
         } catch (\Exception $e) {
-            error_log("Enhanced task create form error: " . $e->getMessage());
-            $this->auditService->logError('task_create_form_error', $e->getMessage(), $user['id'] ?? null);
+            error_log("Task create form error: " . $e->getMessage());
             $this->redirect('/tasks?error=create_form_failed');
         }
     }
@@ -114,28 +114,33 @@ class TaskController extends BaseController
             $user = $this->getAuthUser();
             $userScope = $this->getUserScope($user);
             
-            // Validate CSRF token
-            if (!$this->validateCSRFToken()) {
-                $this->redirect('/tasks/create?error=invalid_token');
-                return;
-            }
+            $this->requireCsrf();
             
             // Get form data
             $data = [
                 'title' => trim($_POST['title'] ?? ''),
                 'description' => trim($_POST['description'] ?? ''),
-                'level_scope' => $userScope['scope'],
+                'level_scope' => $_POST['level_scope'] ?? $userScope['scope'],
                 'scope_id' => $userScope['scope_id'],
                 'parent_task_id' => !empty($_POST['parent_task_id']) ? (int)$_POST['parent_task_id'] : null,
                 'category' => $_POST['category'] ?? Task::CATEGORY_ADMINISTRATIVE,
                 'priority' => $_POST['priority'] ?? Task::PRIORITY_MEDIUM,
+                'status' => $_POST['status'] ?? Task::STATUS_PENDING,
                 'start_date' => !empty($_POST['start_date']) ? $_POST['start_date'] : null,
                 'due_date' => !empty($_POST['due_date']) ? $_POST['due_date'] : null,
                 'estimated_hours' => !empty($_POST['estimated_hours']) ? (int)$_POST['estimated_hours'] : null,
+                'actual_hours' => !empty($_POST['actual_hours']) ? (int)$_POST['actual_hours'] : null,
+                'completion_percentage' => isset($_POST['completion_percentage']) ? (int) $_POST['completion_percentage'] : 0,
                 'tags' => !empty($_POST['tags']) ? explode(',', $_POST['tags']) : [],
                 'assigned_to' => !empty($_POST['assigned_to']) ? $_POST['assigned_to'] : [],
+                'attachments' => $this->uploadTaskAttachments($_FILES['attachments'] ?? []),
                 'created_by' => $user['id']
             ];
+
+            if ($data['status'] === Task::STATUS_COMPLETED) {
+                $data['completed_date'] = date('Y-m-d H:i:s');
+                $data['completion_percentage'] = 100;
+            }
             
             // Validate required fields
             $validation = $this->validateTaskData($data);
@@ -148,7 +153,7 @@ class TaskController extends BaseController
             $result = $this->taskModel->createTask($data);
             
             if ($result['success']) {
-                $this->redirect('/tasks?success=task_created');
+                $this->redirect('/tasks/' . (int) ($result['task_id'] ?? 0) . '?success=task_created');
             } else {
                 $this->redirect('/tasks/create?error=' . urlencode($result['message']));
             }
@@ -203,14 +208,18 @@ class TaskController extends BaseController
                 }
             }
             
-            $this->view('tasks/show', [
+            $this->render('tasks.show', [
+                'title' => 'Task Details',
                 'task' => $task,
                 'history' => $history,
                 'subtasks' => $subtasks,
+                'comments' => $this->getTaskComments($id),
                 'assignedUsers' => $assignedUsers,
                 'user' => $user,
-                'userScope' => $userScope
+                'userScope' => $userScope,
+                'availableUsers' => $this->getAvailableUsersForScope($userScope)
             ]);
+            return;
             
         } catch (\Exception $e) {
             error_log("Task show error: " . $e->getMessage());
@@ -253,14 +262,21 @@ class TaskController extends BaseController
                 $userScope['scope_id'],
                 ['status' => ['pending', 'in_progress']]
             );
-            
-            $this->view('tasks/edit', [
+
+            $this->render('tasks.edit', [
+                'title' => 'Edit Task',
                 'task' => $task,
                 'availableUsers' => $availableUsers,
                 'parentTasks' => $parentTasks,
                 'user' => $user,
-                'userScope' => $userScope
+                'userScope' => $userScope,
+                'categories' => $this->getTaskCategoryOptions(),
+                'priorities' => $this->getTaskPriorityOptions(),
+                'scopes' => $this->getAvailableScopes($userScope),
+                'formAction' => '/tasks/' . $id . '/update',
+                'submitLabel' => 'Update Task',
             ]);
+            return;
             
         } catch (\Exception $e) {
             error_log("Task edit form error: " . $e->getMessage());
@@ -277,11 +293,7 @@ class TaskController extends BaseController
             $user = $this->getAuthUser();
             $userScope = $this->getUserScope($user);
             
-            // Validate CSRF token
-            if (!$this->validateCSRFToken()) {
-                $this->redirect('/tasks/' . $id . '/edit?error=invalid_token');
-                return;
-            }
+            $this->requireCsrf();
             
             // Get task
             $task = $this->taskModel->find($id);
@@ -307,6 +319,14 @@ class TaskController extends BaseController
                 'assigned_to' => !empty($_POST['assigned_to']) ? $_POST['assigned_to'] : [],
                 'updated_at' => date('Y-m-d H:i:s')
             ];
+
+            $existingAttachments = json_decode((string) ($task['attachments'] ?? '[]'), true);
+            if (!is_array($existingAttachments)) {
+                $existingAttachments = [];
+            }
+
+            $newAttachments = $this->uploadTaskAttachments($_FILES['attachments'] ?? []);
+            $data['attachments'] = array_values(array_merge($existingAttachments, $newAttachments));
             
             // Set completion date if completed
             if ($data['status'] === Task::STATUS_COMPLETED && $task['status'] !== Task::STATUS_COMPLETED) {
@@ -319,6 +339,7 @@ class TaskController extends BaseController
             // Encode JSON fields
             $data['tags'] = json_encode($data['tags']);
             $data['assigned_to'] = json_encode($data['assigned_to']);
+            $data['attachments'] = json_encode($data['attachments']);
             
             // Validate data
             $validation = $this->validateTaskData($data, true);
@@ -331,8 +352,7 @@ class TaskController extends BaseController
             $result = $this->taskModel->update($id, $data);
             
             if ($result) {
-                // Log activity
-                $this->taskModel->logTaskActivity($id, 'updated', 'Task updated', $user['id']);
+                $this->recordTaskActivity($id, (int) $user['id'], 'updated', 'Task updated');
                 $this->redirect('/tasks/' . $id . '?success=task_updated');
             } else {
                 $this->redirect('/tasks/' . $id . '/edit?error=update_failed');
@@ -353,9 +373,8 @@ class TaskController extends BaseController
             $user = $this->getAuthUser();
             $userScope = $this->getUserScope($user);
             
-            // Get JSON input
-            $input = json_decode(file_get_contents('php://input'), true);
-            $status = $input['status'] ?? '';
+            $input = json_decode(file_get_contents('php://input'), true) ?: [];
+            $status = (string) ($input['status'] ?? ($_POST['status'] ?? ''));
             
             if (empty($status)) {
                 http_response_code(400);
@@ -373,7 +392,13 @@ class TaskController extends BaseController
             
             // Update status
             $result = $this->taskModel->updateTaskStatus($id, $status, $user['id']);
-            
+
+            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                $redirectTarget = '/tasks/' . $id . ($result['success'] ? '?success=task_status_updated' : '?error=' . urlencode($result['message'] ?? 'status_update_failed'));
+                $this->redirect($redirectTarget);
+                return;
+            }
+
             http_response_code($result['success'] ? 200 : 400);
             header('Content-Type: application/json');
             echo json_encode($result);
@@ -382,6 +407,107 @@ class TaskController extends BaseController
             error_log("Update task status error: " . $e->getMessage());
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Internal server error']);
+        }
+    }
+
+    public function updateProgress(int $id): void
+    {
+        try {
+            $user = $this->getAuthUser();
+            $userScope = $this->getUserScope($user);
+            $this->requireCsrf();
+
+            $task = $this->taskModel->find($id);
+            if (!$task || !$this->canEditTask($task, $user, $userScope)) {
+                $this->redirect('/tasks?error=progress_access_denied');
+                return;
+            }
+
+            $progress = max(0, min(100, (int) ($_POST['completion_percentage'] ?? 0)));
+            $status = $progress >= 100
+                ? Task::STATUS_COMPLETED
+                : (($task['status'] ?? Task::STATUS_PENDING) === Task::STATUS_COMPLETED ? Task::STATUS_IN_PROGRESS : ($task['status'] ?? Task::STATUS_PENDING));
+
+            $updated = $this->taskModel->update($id, $this->buildProgressPayload($progress, $status));
+
+            if ($updated) {
+                $this->recordTaskActivity($id, (int) $user['id'], 'updated', 'Task progress updated to ' . $progress . '%');
+                $this->redirect('/tasks/' . $id . '?success=task_progress_updated');
+                return;
+            }
+
+            $this->redirect('/tasks/' . $id . '?error=task_progress_update_failed');
+        } catch (\Exception $e) {
+            error_log('Task progress update error: ' . $e->getMessage());
+            $this->redirect('/tasks/' . $id . '?error=task_progress_update_failed');
+        }
+    }
+
+    public function assign(int $id): void
+    {
+        try {
+            $user = $this->getAuthUser();
+            $userScope = $this->getUserScope($user);
+            $this->requireCsrf();
+
+            $task = $this->taskModel->find($id);
+            if (!$task || !$this->canEditTask($task, $user, $userScope)) {
+                $this->redirect('/tasks?error=assignment_access_denied');
+                return;
+            }
+
+            $userIds = array_values(array_unique(array_map('intval', (array) ($_POST['assigned_to'] ?? []))));
+            $result = $this->taskModel->assignTask($id, $userIds, (int) $user['id']);
+
+            $redirectTarget = '/tasks/' . $id . ($result['success'] ? '?success=task_assigned' : '?error=' . urlencode((string) ($result['message'] ?? 'task_assignment_failed')));
+            $this->redirect($redirectTarget);
+        } catch (\Exception $e) {
+            error_log('Task assignment error: ' . $e->getMessage());
+            $this->redirect('/tasks/' . $id . '?error=task_assignment_failed');
+        }
+    }
+
+    public function addComment(int $id): void
+    {
+        try {
+            $user = $this->getAuthUser();
+            $userScope = $this->getUserScope($user);
+            $this->requireCsrf();
+
+            $task = $this->taskModel->find($id);
+            if (!$task || !$this->canAccessTask($task, $user, $userScope)) {
+                $this->redirect('/tasks?error=comment_access_denied');
+                return;
+            }
+
+            $comment = trim((string) ($_POST['comment'] ?? ''));
+            if ($comment === '') {
+                $this->redirect('/tasks/' . $id . '?error=comment_required');
+                return;
+            }
+
+            if (!$this->db->tableExists('task_comments')) {
+                $this->redirect('/tasks/' . $id . '?error=task_comments_unavailable');
+                return;
+            }
+
+            $attachments = $this->uploadTaskAttachments($_FILES['comment_attachments'] ?? []);
+            $this->db->insert('task_comments', [
+                'task_id' => $id,
+                'user_id' => $user['id'],
+                'parent_comment_id' => !empty($_POST['parent_comment_id']) ? (int) $_POST['parent_comment_id'] : null,
+                'comment' => $comment,
+                'attachments' => json_encode($attachments),
+                'is_internal' => !empty($_POST['is_internal']) ? 1 : 0,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            $this->recordTaskActivity($id, (int) $user['id'], 'commented', 'Task comment added');
+            $this->redirect('/tasks/' . $id . '?success=task_comment_added');
+        } catch (\Exception $e) {
+            error_log('Task comment error: ' . $e->getMessage());
+            $this->redirect('/tasks/' . $id . '?error=task_comment_failed');
         }
     }
 
@@ -487,8 +613,7 @@ class TaskController extends BaseController
             return true;
         }
         
-        // Check if task is in user's scope
-        if ($task['level_scope'] === $userScope['scope'] && $task['scope_id'] == $userScope['scope_id']) {
+        if ($this->creatorMatchesScope((int) ($task['created_by'] ?? 0), $userScope)) {
             return true;
         }
         
@@ -522,13 +647,32 @@ class TaskController extends BaseController
         }
         
         // Executive in same scope can edit
-        if ($user['role'] === 'executive' && 
-            $task['level_scope'] === $userScope['scope'] && 
-            $task['scope_id'] == $userScope['scope_id']) {
+        if ($user['role'] === 'executive' && $this->creatorMatchesScope((int) ($task['created_by'] ?? 0), $userScope)) {
             return true;
         }
         
         return false;
+    }
+
+    private function creatorMatchesScope(int $creatorUserId, array $userScope): bool
+    {
+        if ($creatorUserId <= 0) {
+            return false;
+        }
+
+        $scopeColumn = $this->getHierarchyScopeColumn((string) ($userScope['level_scope'] ?? ''));
+        $scopeValue = $scopeColumn !== null ? ($userScope[$scopeColumn] ?? null) : null;
+
+        if ($scopeColumn === null || $scopeValue === null) {
+            return false;
+        }
+
+        $assignment = \App\Utils\Database::getInstance()->fetch(
+            "SELECT global_id, godina_id, gamta_id, gurmu_id FROM user_assignments WHERE user_id = ? AND status = 'active' LIMIT 1",
+            [$creatorUserId]
+        );
+
+        return !empty($assignment) && (int) ($assignment[$scopeColumn] ?? 0) === (int) $scopeValue;
     }
 
     /**
@@ -537,22 +681,32 @@ class TaskController extends BaseController
     private function getAvailableUsersForScope(array $userScope): array
     {
         try {
-            switch ($userScope['scope']) {
-                case 'global':
-                    return $this->userModel->getAllActiveUsers();
-                    
-                case 'godina':
-                    return $this->userModel->getUsersByGodina($userScope['scope_id']);
-                    
-                case 'gamta':
-                    return $this->userModel->getUsersByGamta($userScope['scope_id']);
-                    
-                case 'gurmu':
-                    return $this->userModel->getUsersByGurmu($userScope['scope_id']);
-                    
-                default:
+            $scopeLevel = (string) ($userScope['level_scope'] ?? $userScope['scope'] ?? '');
+            $params = [];
+            $sql = "SELECT DISTINCT u.id, u.first_name, u.last_name, u.internal_email, ua.level_scope,
+                           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as full_name
+                    FROM user_assignments ua
+                    INNER JOIN users u ON u.id = ua.user_id
+                    WHERE ua.status = 'active' AND COALESCE(u.status, 'active') = 'active'";
+
+            if ($scopeLevel !== 'global') {
+                $scopeColumn = $this->getHierarchyScopeColumn($scopeLevel);
+                $scopeValue = $scopeColumn !== null ? ($userScope[$scopeColumn] ?? null) : null;
+
+                if ($scopeColumn === null || $scopeValue === null) {
                     return [];
+                }
+
+                $sql .= sprintf(' AND ua.%s = ?', $scopeColumn);
+                $params[] = $scopeValue;
+            } elseif (!empty($userScope['global_id'])) {
+                $sql .= ' AND ua.global_id = ?';
+                $params[] = $userScope['global_id'];
             }
+
+            $sql .= ' ORDER BY u.first_name ASC, u.last_name ASC';
+
+            return $this->db->fetchAll($sql, $params);
         } catch (\Exception $e) {
             error_log("Get available users error: " . $e->getMessage());
             return [];
@@ -993,7 +1147,177 @@ class TaskController extends BaseController
      */
     private function getAvailableScopes(array $user): array
     {
-        return $this->getAssignmentLevels($user);
+        $levelScope = (string) ($user['level_scope'] ?? $user['scope'] ?? '');
+
+        return match ($levelScope) {
+            'global' => ['global', 'godina', 'gamta', 'gurmu'],
+            'godina' => ['godina', 'gamta', 'gurmu'],
+            'gamta' => ['gamta', 'gurmu'],
+            'gurmu' => ['gurmu'],
+            default => [],
+        };
+    }
+
+    protected function getUserScope(array $user): array
+    {
+        return $this->getUserHierarchicalScope((int) ($user['id'] ?? 0));
+    }
+
+    private function getTaskCategoryOptions(): array
+    {
+        return [
+            Task::CATEGORY_ADMINISTRATIVE => 'Administrative',
+            Task::CATEGORY_FINANCIAL => 'Financial',
+            Task::CATEGORY_EDUCATIONAL => 'Educational',
+            Task::CATEGORY_SOCIAL => 'Social',
+            Task::CATEGORY_TECHNICAL => 'Technical',
+        ];
+    }
+
+    private function getTaskPriorityOptions(): array
+    {
+        return [
+            Task::PRIORITY_LOW => 'Low',
+            Task::PRIORITY_MEDIUM => 'Medium',
+            Task::PRIORITY_HIGH => 'High',
+            Task::PRIORITY_URGENT => 'Urgent',
+        ];
+    }
+
+    private function getVisibleParentTasks(array $userScope): array
+    {
+        $sql = "SELECT t.id, t.title
+                FROM tasks t
+                LEFT JOIN user_assignments task_scope_ua ON task_scope_ua.user_id = t.created_by AND task_scope_ua.status = 'active'
+                WHERE t.parent_task_id IS NULL";
+        $params = [];
+
+        $sql = $this->applyTaskVisibilityFilter($sql, $params, $userScope, true);
+        $sql .= ' ORDER BY t.created_at DESC LIMIT 100';
+
+        return $this->db->fetchAll($sql, $params);
+    }
+
+    private function uploadTaskAttachments(array $files): array
+    {
+        if (empty($files) || empty($files['name'])) {
+            return [];
+        }
+
+        $uploadDir = storage_path('uploads/task-attachments');
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0775, true);
+        }
+
+        $attachments = [];
+        $fileNames = is_array($files['name']) ? $files['name'] : [$files['name']];
+        $tmpNames = is_array($files['tmp_name']) ? $files['tmp_name'] : [$files['tmp_name'] ?? ''];
+        $types = is_array($files['type']) ? $files['type'] : [$files['type'] ?? 'application/octet-stream'];
+        $sizes = is_array($files['size']) ? $files['size'] : [$files['size'] ?? 0];
+        $errors = is_array($files['error']) ? $files['error'] : [$files['error'] ?? UPLOAD_ERR_NO_FILE];
+
+        foreach ($fileNames as $index => $originalName) {
+            if (($errors[$index] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || empty($tmpNames[$index])) {
+                continue;
+            }
+
+            $safeName = preg_replace('/[^A-Za-z0-9._-]/', '-', basename((string) $originalName));
+            $storedName = date('YmdHis') . '-' . bin2hex(random_bytes(4)) . '-' . $safeName;
+            $destination = $uploadDir . DIRECTORY_SEPARATOR . $storedName;
+
+            if (!move_uploaded_file($tmpNames[$index], $destination)) {
+                continue;
+            }
+
+            $attachments[] = [
+                'original_name' => (string) $originalName,
+                'stored_name' => $storedName,
+                'relative_path' => 'uploads/task-attachments/' . $storedName,
+                'mime_type' => (string) ($types[$index] ?? 'application/octet-stream'),
+                'size' => (int) ($sizes[$index] ?? 0),
+                'uploaded_at' => date('Y-m-d H:i:s'),
+            ];
+        }
+
+        return $attachments;
+    }
+
+    private function getTaskComments(int $taskId): array
+    {
+        if (!$this->db->tableExists('task_comments')) {
+            return [];
+        }
+
+        $comments = $this->db->fetchAll(
+            "SELECT tc.*, u.first_name, u.last_name, u.internal_email
+             FROM task_comments tc
+             INNER JOIN users u ON u.id = tc.user_id
+             WHERE tc.task_id = ?
+             ORDER BY tc.created_at ASC",
+            [$taskId]
+        );
+
+        foreach ($comments as &$comment) {
+            $comment['attachments'] = json_decode($comment['attachments'] ?? '[]', true) ?: [];
+        }
+
+        return $comments;
+    }
+
+    private function buildProgressPayload(int $progress, string $status): array
+    {
+        $payload = [
+            'status' => $status,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        if ($this->db->columnExists('tasks', 'completion_percentage')) {
+            $payload['completion_percentage'] = $progress;
+        }
+
+        if ($this->db->columnExists('tasks', 'progress_percentage')) {
+            $payload['progress_percentage'] = $progress;
+        }
+
+        if ($status === Task::STATUS_COMPLETED) {
+            if ($this->db->columnExists('tasks', 'completed_date')) {
+                $payload['completed_date'] = date('Y-m-d H:i:s');
+            }
+
+            if ($this->db->columnExists('tasks', 'completed_at')) {
+                $payload['completed_at'] = date('Y-m-d H:i:s');
+            }
+        }
+
+        return $payload;
+    }
+
+    private function recordTaskActivity(int $taskId, int $userId, string $action, string $description): void
+    {
+        if (!$this->db->tableExists('task_activities')) {
+            return;
+        }
+
+        $payload = [
+            'task_id' => $taskId,
+            'user_id' => $userId,
+            'description' => $description,
+            'created_at' => date('Y-m-d H:i:s'),
+        ];
+
+        if ($this->db->columnExists('task_activities', 'action')) {
+            $payload['action'] = $action;
+        }
+
+        if ($this->db->columnExists('task_activities', 'activity_type')) {
+            $payload['activity_type'] = $action;
+        }
+
+        if ($this->db->columnExists('task_activities', 'new_value')) {
+            $payload['new_value'] = $description;
+        }
+
+        $this->db->insert('task_activities', $payload);
     }
 
     /**
@@ -1022,145 +1346,143 @@ class TaskController extends BaseController
         $db = \App\Utils\Database::getInstance();
         
         $sql = "SELECT ua.*, p.name as position_name, p.hierarchy_type,
-                       go.name as godina_name, ga.name as gamta_name, gu.name as gurmu_name
+                       gl.name as global_name, gd.name as godina_name, ga.name as gamta_name, gu.name as gurmu_name
                 FROM user_assignments ua
                 LEFT JOIN positions p ON ua.position_id = p.id
-                LEFT JOIN godinas go ON ua.godina_id = go.id
+                LEFT JOIN globals gl ON ua.global_id = gl.id
+                LEFT JOIN godinas gd ON ua.godina_id = gd.id
                 LEFT JOIN gamtas ga ON ua.gamta_id = ga.id
                 LEFT JOIN gurmus gu ON ua.gurmu_id = gu.id
                 WHERE ua.user_id = ? AND ua.status = 'active'
                 LIMIT 1";
-        
-        return $db->fetch($sql, [$userId]) ?: [];
+
+        $scope = $db->fetch($sql, [$userId]) ?: [];
+
+        if (!empty($scope)) {
+            $scope['user_id'] = (int) $userId;
+            $scope['scope'] = $scope['level_scope'] ?? null;
+            $scope['scope_id'] = match ($scope['level_scope'] ?? null) {
+                'global' => $scope['global_id'] ?? null,
+                'godina' => $scope['godina_id'] ?? null,
+                'gamta' => $scope['gamta_id'] ?? null,
+                'gurmu' => $scope['gurmu_id'] ?? null,
+                default => null,
+            };
+            $scope['scope_name'] = $scope['gurmu_name']
+                ?? $scope['gamta_name']
+                ?? $scope['godina_name']
+                ?? $scope['global_name']
+                ?? 'Current hierarchy scope';
+        }
+
+        return $scope;
     }
     
     protected function getTasksForUserScope($userScope)
     {
         $db = \App\Utils\Database::getInstance();
-        $hasScopeId = $db->columnExists('tasks', 'scope_id');
-        $hasGodinaId = $db->columnExists('tasks', 'godina_id');
-        $hasGamtaId = $db->columnExists('tasks', 'gamta_id');
-        $hasGurmuId = $db->columnExists('tasks', 'gurmu_id');
+        $user = $this->getAuthUser() ?? [];
+        $progressColumn = $db->columnExists('tasks', 'completion_percentage')
+            ? 't.completion_percentage'
+            : ($db->columnExists('tasks', 'progress_percentage') ? 't.progress_percentage' : '0');
         
         $sql = "SELECT t.*, u.first_name, u.last_name,
-                       au.first_name as assigned_first_name, au.last_name as assigned_last_name
+                       {$progressColumn} as progress
                 FROM tasks t
                 LEFT JOIN users u ON t.created_by = u.id
-                LEFT JOIN users au ON t.assigned_to = au.id
+                LEFT JOIN user_assignments task_scope_ua ON task_scope_ua.user_id = t.created_by AND task_scope_ua.status = 'active'
                 WHERE 1=1";
         
         $params = [];
         
-        // Apply hierarchy filtering based on user scope
-        if (!empty($userScope)) {
-            $userId = $userScope['user_id'] ?? null;
-            $scopeLevel = $userScope['level_scope'] ?? null;
-            $scopeId = null;
-
-            if ($scopeLevel === 'gurmu') {
-                $scopeId = $userScope['gurmu_id'] ?? null;
-            } elseif ($scopeLevel === 'gamta') {
-                $scopeId = $userScope['gamta_id'] ?? null;
-            } elseif ($scopeLevel === 'godina') {
-                $scopeId = $userScope['godina_id'] ?? null;
-            }
-
-            if ($scopeLevel && $scopeId !== null && $userId && $hasScopeId) {
-                $sql .= " AND ((t.level_scope = ? AND t.scope_id = ?) OR t.assigned_to = ?)";
-                $params[] = $scopeLevel;
-                $params[] = $scopeId;
-                $params[] = $userId;
-            } elseif ($scopeLevel === 'gurmu' && $scopeId !== null && $userId && $hasGurmuId) {
-                $sql .= " AND (t.gurmu_id = ? OR t.assigned_to = ?)";
-                $params[] = $scopeId;
-                $params[] = $userId;
-            } elseif ($scopeLevel === 'gamta' && $scopeId !== null && $userId && $hasGamtaId) {
-                $sql .= " AND (t.gamta_id = ? OR t.assigned_to = ?)";
-                $params[] = $scopeId;
-                $params[] = $userId;
-            } elseif ($scopeLevel === 'godina' && $scopeId !== null && $userId && $hasGodinaId) {
-                $sql .= " AND (t.godina_id = ? OR t.assigned_to = ?)";
-                $params[] = $scopeId;
-                $params[] = $userId;
-            } elseif ($scopeLevel && $userId) {
-                $sql .= " AND (t.level_scope = ? OR t.assigned_to = ? OR t.created_by = ?)";
-                $params[] = $scopeLevel;
-                $params[] = $userId;
-                $params[] = $userId;
-            } elseif ($userId) {
-                $sql .= " AND (t.assigned_to = ? OR t.created_by = ?)";
-                $params[] = $userId;
-                $params[] = $userId;
-            }
+        if (($user['role'] ?? null) !== 'admin') {
+            $sql = $this->applyTaskVisibilityFilter($sql, $params, $userScope, true);
         }
         
         $sql .= " ORDER BY t.created_at DESC LIMIT 100";
         
-        return $db->fetchAll($sql, $params);
+        $tasks = $db->fetchAll($sql, $params);
+
+        foreach ($tasks as &$task) {
+            $task['assigned_to'] = json_decode($task['assigned_to'] ?? '[]', true) ?: [];
+            $task['attachments'] = json_decode($task['attachments'] ?? '[]', true) ?: [];
+            $task['tags'] = json_decode($task['tags'] ?? '[]', true) ?: [];
+
+            $assignedNames = [];
+            foreach ($task['assigned_to'] as $assignedUserId) {
+                $assignedUser = $db->fetch('SELECT first_name, last_name FROM users WHERE id = ?', [(int) $assignedUserId]);
+                if ($assignedUser) {
+                    $assignedNames[] = trim((string) (($assignedUser['first_name'] ?? '') . ' ' . ($assignedUser['last_name'] ?? '')));
+                }
+            }
+
+            $task['assignee_names'] = $assignedNames;
+        }
+
+        return $tasks;
     }
     
     protected function getTaskStatistics($userScope)
     {
         $db = \App\Utils\Database::getInstance();
-        $hasScopeId = $db->columnExists('tasks', 'scope_id');
-        $hasGodinaId = $db->columnExists('tasks', 'godina_id');
-        $hasGamtaId = $db->columnExists('tasks', 'gamta_id');
-        $hasGurmuId = $db->columnExists('tasks', 'gurmu_id');
+        $user = $this->getAuthUser() ?? [];
         
         $sql = "SELECT 
                     COUNT(*) as total,
-                    COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress,
-                    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-                    COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-                    COUNT(CASE WHEN due_date < NOW() AND status != 'completed' THEN 1 END) as overdue
+                    COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress,
+                    COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed,
+                    COUNT(CASE WHEN t.status = 'pending' THEN 1 END) as pending,
+                    COUNT(CASE WHEN t.due_date < NOW() AND t.status != 'completed' THEN 1 END) as overdue
                 FROM tasks t
+                LEFT JOIN user_assignments task_scope_ua ON task_scope_ua.user_id = t.created_by AND task_scope_ua.status = 'active'
                 WHERE 1=1";
         
         $params = [];
         
-        // Apply hierarchy filtering
-        if (!empty($userScope)) {
-            $userId = $userScope['user_id'] ?? null;
-            $scopeLevel = $userScope['level_scope'] ?? null;
-            $scopeId = null;
-
-            if ($scopeLevel === 'gurmu') {
-                $scopeId = $userScope['gurmu_id'] ?? null;
-            } elseif ($scopeLevel === 'gamta') {
-                $scopeId = $userScope['gamta_id'] ?? null;
-            } elseif ($scopeLevel === 'godina') {
-                $scopeId = $userScope['godina_id'] ?? null;
-            }
-
-            if ($scopeLevel && $scopeId !== null && $userId && $hasScopeId) {
-                $sql .= " AND ((t.level_scope = ? AND t.scope_id = ?) OR t.assigned_to = ?)";
-                $params[] = $scopeLevel;
-                $params[] = $scopeId;
-                $params[] = $userId;
-            } elseif ($scopeLevel === 'gurmu' && $scopeId !== null && $userId && $hasGurmuId) {
-                $sql .= " AND (t.gurmu_id = ? OR t.assigned_to = ?)";
-                $params[] = $scopeId;
-                $params[] = $userId;
-            } elseif ($scopeLevel === 'gamta' && $scopeId !== null && $userId && $hasGamtaId) {
-                $sql .= " AND (t.gamta_id = ? OR t.assigned_to = ?)";
-                $params[] = $scopeId;
-                $params[] = $userId;
-            } elseif ($scopeLevel === 'godina' && $scopeId !== null && $userId && $hasGodinaId) {
-                $sql .= " AND (t.godina_id = ? OR t.assigned_to = ?)";
-                $params[] = $scopeId;
-                $params[] = $userId;
-            } elseif ($scopeLevel && $userId) {
-                $sql .= " AND (t.level_scope = ? OR t.assigned_to = ? OR t.created_by = ?)";
-                $params[] = $scopeLevel;
-                $params[] = $userId;
-                $params[] = $userId;
-            } elseif ($userId) {
-                $sql .= " AND (t.assigned_to = ? OR t.created_by = ?)";
-                $params[] = $userId;
-                $params[] = $userId;
-            }
+        if (($user['role'] ?? null) !== 'admin') {
+            $sql = $this->applyTaskVisibilityFilter($sql, $params, $userScope, true);
         }
         
         return $db->fetch($sql, $params) ?: [];
+    }
+
+    private function applyTaskVisibilityFilter(string $sql, array &$params, array $userScope, bool $includePersonal): string
+    {
+        $scopeColumn = $this->getHierarchyScopeColumn((string) ($userScope['level_scope'] ?? ''));
+        $scopeValue = $scopeColumn !== null ? ($userScope[$scopeColumn] ?? null) : null;
+        $userId = isset($userScope['user_id']) ? (int) $userScope['user_id'] : null;
+        $clauses = [];
+
+        if ($scopeColumn !== null && $scopeValue !== null) {
+            $clauses[] = "task_scope_ua.{$scopeColumn} = ?";
+            $params[] = (int) $scopeValue;
+        }
+
+        if ($includePersonal && $userId) {
+            $clauses[] = 't.created_by = ?';
+            $params[] = $userId;
+
+            if (\App\Utils\Database::getInstance()->columnExists('tasks', 'assigned_to')) {
+                $clauses[] = "(JSON_VALID(t.assigned_to) AND JSON_CONTAINS(t.assigned_to, ?, '$'))";
+                $params[] = json_encode($userId);
+            }
+        }
+
+        if (!empty($clauses)) {
+            $sql .= ' AND (' . implode(' OR ', $clauses) . ')';
+        }
+
+        return $sql;
+    }
+
+    private function getHierarchyScopeColumn(string $levelScope): ?string
+    {
+        return match ($levelScope) {
+            'global' => 'global_id',
+            'godina' => 'godina_id',
+            'gamta' => 'gamta_id',
+            'gurmu' => 'gurmu_id',
+            default => null,
+        };
     }
 }

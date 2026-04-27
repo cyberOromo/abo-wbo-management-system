@@ -185,10 +185,13 @@ $router->group(['prefix' => 'tasks', 'middleware' => 'auth'], function() use ($r
     $router->post('/', 'TaskController@store')->name('tasks.store');
     $router->get('/{id}', 'TaskController@show')->name('tasks.show');
     $router->get('/{id}/edit', 'TaskController@edit')->name('tasks.edit');
+    $router->post('/{id}/progress', 'TaskController@updateProgress')->name('tasks.progress.post');
+    $router->post('/{id}/update', 'TaskController@update')->name('tasks.update.post');
     $router->put('/{id}', 'TaskController@update')->name('tasks.update');
     $router->delete('/{id}', 'TaskController@destroy')->name('tasks.destroy');
     
     // Task status updates
+    $router->post('/{id}/status', 'TaskController@updateStatus')->name('tasks.status.post');
     $router->put('/{id}/status', 'TaskController@updateStatus')->name('tasks.status');
     $router->post('/{id}/assign', 'TaskController@assign')->name('tasks.assign');
     $router->post('/{id}/comments', 'TaskController@addComment')->name('tasks.comments');
@@ -230,6 +233,19 @@ $router->group(['prefix' => 'events', 'middleware' => 'auth'], function() use ($
     // Event calendar
     $router->get('/calendar/view', 'EventController@calendar')->name('events.calendar');
     $router->get('/calendar/data', 'EventController@calendarData')->name('events.calendar.data');
+});
+
+// Project management routes
+$router->group(['prefix' => 'projects', 'middleware' => ['auth', 'module_access']], function() use ($router) {
+    $router->get('/', 'ProjectController@index')->name('projects.index');
+    $router->get('/create', 'ProjectController@create')->name('projects.create');
+    $router->post('/', 'ProjectController@store')->name('projects.store');
+    $router->get('/{id}/edit', 'ProjectController@edit')->name('projects.edit');
+    $router->post('/{id}/update', 'ProjectController@update')->name('projects.update');
+    $router->post('/{id}/milestones', 'ProjectController@storeMilestone')->name('projects.milestones.store');
+    $router->post('/{id}/tasks', 'ProjectController@storeTask')->name('projects.tasks.store');
+    $router->post('/{id}/archive', 'ProjectController@archive')->name('projects.archive');
+    $router->get('/{id}', 'ProjectController@show')->name('projects.show');
 });
 
 // Internal Email Management routes

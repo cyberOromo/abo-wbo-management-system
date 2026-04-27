@@ -38,9 +38,10 @@ $completionRate = $totalTasks > 0 ? (int) round(($completedTasks / $totalTasks) 
             <div class="d-flex flex-column flex-xl-row justify-content-between gap-4 align-items-xl-center">
                 <div>
                     <h1 class="module-title"><i class="bi bi-list-task me-2"></i><?= htmlspecialchars($title) ?></h1>
-                    <p class="module-subtitle">A unified task workspace for scoped execution, delivery tracking, and reporting. Unsupported mutation flows remain hidden until their backing screens are ready.</p>
+                    <p class="module-subtitle">A unified task workspace for scoped execution, delivery tracking, assignment, progress updates, discussion, and reporting.</p>
                 </div>
                 <div class="module-actions">
+                    <a href="/tasks/create" class="btn btn-success"><i class="bi bi-plus-circle me-1"></i>Create Task</a>
                     <a href="/tasks" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>
                     <a href="/reports/tasks" class="btn btn-outline-primary"><i class="bi bi-graph-up me-1"></i>Task Report</a>
                     <a href="/reports" class="btn btn-primary"><i class="bi bi-grid-1x2 me-1"></i>Reports Hub</a>
@@ -49,13 +50,13 @@ $completionRate = $totalTasks > 0 ? (int) round(($completedTasks / $totalTasks) 
             <div class="module-chip-row">
                 <span class="module-chip"><i class="bi bi-diagram-3"></i><?= htmlspecialchars($userScope['scope_name'] ?? 'Current hierarchy scope') ?></span>
                 <span class="module-chip"><i class="bi bi-layers"></i><?= htmlspecialchars(ucfirst((string) ($userScope['level_scope'] ?? 'all'))) ?> level</span>
-                <span class="module-chip"><i class="bi bi-shield-lock"></i>Read-only task surface</span>
+                <span class="module-chip"><i class="bi bi-lightning-charge"></i>Interactive task surface</span>
             </div>
         </div>
     </section>
 
-    <div class="module-callout warning">
-        <strong>Current staging behavior:</strong> this workspace shows real scoped tasks and direct access to reporting. Create, edit, templates, kanban, and calendar flows stay hidden until the full task interaction path is implemented.
+    <div class="module-callout success">
+        <strong>Current task behavior:</strong> scoped tasks now support direct creation, task detail navigation, assignment changes, progress updates, comments, and attachments from the active module surface.
     </div>
 
     <div class="row g-4 mb-4">
@@ -133,25 +134,26 @@ $completionRate = $totalTasks > 0 ? (int) round(($completedTasks / $totalTasks) 
                                 <tbody>
                                     <?php foreach ($tasks as $task): ?>
                                         <?php
-                                        $assignee = trim((string) (($task['assigned_first_name'] ?? '') . ' ' . ($task['assigned_last_name'] ?? '')));
-                                        if ($assignee === '') {
-                                            $assignee = 'Unassigned';
-                                        }
                                         $status = ucfirst(str_replace('_', ' ', (string) ($task['status'] ?? 'pending')));
                                         $priority = ucfirst((string) ($task['priority'] ?? 'medium'));
                                         $dueDate = !empty($task['due_date']) ? date('M j, Y', strtotime((string) $task['due_date'])) : 'No due date';
                                         $progress = max(0, min(100, (int) ($task['progress'] ?? 0)));
+                                        $assigneeLabel = !empty($task['assignee_names']) ? implode(', ', (array) $task['assignee_names']) : 'Unassigned';
                                         ?>
                                         <tr>
                                             <td>
-                                                <div class="module-row-title"><?= htmlspecialchars($task['title'] ?? 'Untitled task') ?></div>
+                                                <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>" class="module-row-title text-decoration-none d-inline-block"><?= htmlspecialchars($task['title'] ?? 'Untitled task') ?></a>
                                                 <div class="module-row-meta"><?= htmlspecialchars($task['description'] ?? 'No description provided.') ?></div>
+                                                <div class="mt-2 d-flex gap-2 flex-wrap">
+                                                    <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">View</a>
+                                                    <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                                </div>
                                             </td>
                                             <td><span class="module-status <?= $formatStatusClass((string) ($task['status'] ?? 'pending')) ?>"><?= htmlspecialchars($status) ?></span></td>
                                             <td><span class="module-status <?= $formatPriorityClass((string) ($task['priority'] ?? 'medium')) ?>"><?= htmlspecialchars($priority) ?></span></td>
                                             <td>
-                                                <div class="module-row-title"><?= htmlspecialchars($assignee) ?></div>
-                                                <div class="module-row-meta">Hierarchy-visible assignee</div>
+                                                <div class="module-row-title"><?= htmlspecialchars($assigneeLabel) ?></div>
+                                                <div class="module-row-meta">Hierarchy-visible assignee set</div>
                                             </td>
                                             <td>
                                                 <div class="module-row-title"><?= htmlspecialchars($dueDate) ?></div>
