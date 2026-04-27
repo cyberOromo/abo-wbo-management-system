@@ -839,7 +839,8 @@ class UserLeaderRegistrationController extends BaseController
             FROM users u
             LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
             LEFT JOIN positions p ON ua.position_id = p.id
-            WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(u.metadata, '$.registered_by')) AS UNSIGNED) = ?
+                        WHERE JSON_VALID(u.metadata)
+                            AND CAST(JSON_UNQUOTE(JSON_EXTRACT(u.metadata, '$.registered_by')) AS UNSIGNED) = ?
             GROUP BY u.id
             ORDER BY u.created_at DESC
             LIMIT 10
@@ -852,13 +853,15 @@ class UserLeaderRegistrationController extends BaseController
     private function getRegistrationStatistics(): array
     {
         $adminId = $_SESSION['user']['id'];
+        $metadataScope = "JSON_VALID(metadata) AND CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.registered_by')) AS UNSIGNED) = ?";
+        $joinedMetadataScope = "JSON_VALID(u.metadata) AND CAST(JSON_UNQUOTE(JSON_EXTRACT(u.metadata, '$.registered_by')) AS UNSIGNED) = ?";
         
         return [
-            'total_users' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.registered_by')) AS UNSIGNED) = ?", [$adminId]),
-            'this_month' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.registered_by')) AS UNSIGNED) = ? AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())", [$adminId]),
-            'this_week' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.registered_by')) AS UNSIGNED) = ? AND WEEK(created_at) = WEEK(NOW()) AND YEAR(created_at) = YEAR(NOW())", [$adminId]),
-            'today' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.registered_by')) AS UNSIGNED) = ? AND DATE(created_at) = DATE(NOW())", [$adminId]),
-            'active_assignments' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM user_assignments ua JOIN users u ON ua.user_id = u.id WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(u.metadata, '$.registered_by')) AS UNSIGNED) = ? AND ua.status = 'active'", [$adminId])
+            'total_users' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE {$metadataScope}", [$adminId]),
+            'this_month' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE {$metadataScope} AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())", [$adminId]),
+            'this_week' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE {$metadataScope} AND WEEK(created_at) = WEEK(NOW()) AND YEAR(created_at) = YEAR(NOW())", [$adminId]),
+            'today' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM users WHERE {$metadataScope} AND DATE(created_at) = DATE(NOW())", [$adminId]),
+            'active_assignments' => (int) $this->db->fetchColumn("SELECT COUNT(*) FROM user_assignments ua JOIN users u ON ua.user_id = u.id WHERE {$joinedMetadataScope} AND ua.status = 'active'", [$adminId])
         ];
     }
 
