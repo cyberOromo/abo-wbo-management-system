@@ -140,10 +140,24 @@ class Meeting extends Model
      */
     public function updateMeeting(int $meetingId, array $data): bool
     {
+        $filteredData = [];
+
+        foreach ($data as $field => $value) {
+            if ($this->db->columnExists($this->table, (string) $field)) {
+                $filteredData[$field] = $value;
+            }
+        }
+
+        $data = $filteredData;
+
         foreach (['agenda', 'recurring_pattern', 'attachments', 'moderators', 'tags', 'meeting_minutes'] as $field) {
             if (isset($data[$field]) && is_array($data[$field])) {
                 $data[$field] = json_encode($data[$field]);
             }
+        }
+
+        if ($data === []) {
+            return false;
         }
 
         return $this->update($meetingId, $data);

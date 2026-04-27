@@ -156,10 +156,28 @@ class Event extends Model
      */
     public function updateEvent(int $eventId, array $data): bool
     {
+        $filteredData = [];
+
+        foreach ($data as $field => $value) {
+            if ($this->db->columnExists($this->table, (string) $field)) {
+                $filteredData[$field] = $value;
+            }
+        }
+
+        $data = $filteredData;
+
+        if (($data['status'] ?? null) === 'published') {
+            $data['status'] = self::STATUS_OPEN_REGISTRATION;
+        }
+
         foreach (['agenda', 'speakers', 'sponsors', 'social_media_links', 'gallery_images', 'requirements', 'what_to_bring', 'tags', 'custom_fields', 'organizers'] as $field) {
             if (isset($data[$field]) && is_array($data[$field])) {
                 $data[$field] = json_encode($data[$field]);
             }
+        }
+
+        if ($data === []) {
+            return false;
         }
 
         return $this->update($eventId, $data);
