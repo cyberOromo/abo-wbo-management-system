@@ -16,6 +16,9 @@ $priority = (string) ($task['priority'] ?? 'medium');
 $category = (string) ($task['category'] ?? 'administrative');
 $scopeName = (string) ($userScope['scope_name'] ?? ucfirst((string) ($task['level_scope'] ?? 'scope')));
 $selectedAssignees = array_map('intval', (array) ($task['assigned_to'] ?? []));
+$isArchived = !empty($task['archived_at'] ?? null);
+$currentUser = $user ?? [];
+$canDeleteCompletedTask = in_array((string) ($currentUser['user_type'] ?? $currentUser['role'] ?? ''), ['system_admin', 'super_admin'], true);
 
 $statusClass = match ($status) {
     'completed' => 'status-success',
@@ -51,11 +54,24 @@ $formatDate = static function (?string $value, string $fallback = 'Not set'): st
                     <p class="module-subtitle"><?= htmlspecialchars((string) ($task['description'] ?? 'No description provided.')) ?></p>
                 </div>
                 <div class="module-actions">
+                    <?php if ($isArchived): ?>
+                        <form method="POST" action="/tasks/<?= (int) ($task['id'] ?? 0) ?>/unarchive" class="d-inline">
+                            <input type="hidden" name="_token" value="<?= csrf_token() ?>">
+                            <button type="submit" class="btn btn-outline-success"><i class="bi bi-arrow-counterclockwise me-1"></i>Unarchive Task</button>
+                        </form>
+                    <?php else: ?>
+                        <form method="POST" action="/tasks/<?= (int) ($task['id'] ?? 0) ?>/archive" onsubmit="return confirm('Archive this task? You can restore it later.');" class="d-inline">
+                            <input type="hidden" name="_token" value="<?= csrf_token() ?>">
+                            <button type="submit" class="btn btn-outline-warning"><i class="bi bi-archive me-1"></i>Archive Task</button>
+                        </form>
+                    <?php endif; ?>
                     <form method="POST" action="/tasks/<?= (int) ($task['id'] ?? 0) ?>/delete" onsubmit="return confirm('Delete this task and its subtasks? This cannot be undone.');" class="d-inline">
                         <input type="hidden" name="_token" value="<?= csrf_token() ?>">
-                        <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete Task</button>
+                        <button type="submit" class="btn btn-outline-danger" <?= $status === 'completed' && !$canDeleteCompletedTask ? 'disabled title="Only system administrators can delete completed tasks."' : '' ?>><i class="bi bi-trash me-1"></i>Delete Task</button>
                     </form>
-                    <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>/edit" class="btn btn-outline-primary"><i class="bi bi-pencil-square me-1"></i>Edit Task</a>
+                    <?php if (!$isArchived): ?>
+                        <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>/edit" class="btn btn-outline-primary"><i class="bi bi-pencil-square me-1"></i>Edit Task</a>
+                    <?php endif; ?>
                     <a href="/tasks" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Tasks</a>
                 </div>
             </div>
@@ -63,9 +79,22 @@ $formatDate = static function (?string $value, string $fallback = 'Not set'): st
                 <span class="module-chip"><i class="bi bi-diagram-3"></i><?= htmlspecialchars($scopeName) ?></span>
                 <span class="module-chip"><i class="bi bi-flag"></i><?= htmlspecialchars(ucfirst($category)) ?></span>
                 <span class="module-chip"><i class="bi bi-calendar3"></i>Due <?= htmlspecialchars($formatDate($task['due_date'] ?? null, 'No deadline')) ?></span>
+                <?php if ($isArchived): ?>
+                    <span class="module-chip"><i class="bi bi-archive"></i>Archived</span>
+                <?php endif; ?>
             </div>
         </div>
     </section>
+
+    <?php if ($isArchived): ?>
+        <div class="module-callout warning mb-4">
+            <strong>Archived task:</strong> this task is soft-retired from the active queue. Unarchive it to resume normal edits, status updates, assignments, and discussion.
+        </div>
+    <?php elseif ($status === 'completed' && !$canDeleteCompletedTask): ?>
+        <div class="module-callout warning mb-4">
+            <strong>Completed task protection:</strong> only a system administrator can permanently delete completed tasks.
+        </div>
+    <?php endif; ?>
 
     <div class="row g-4 mb-4">
         <div class="col-lg-3 col-md-6">
@@ -118,6 +147,7 @@ $formatDate = static function (?string $value, string $fallback = 'Not set'): st
                 </div>
             </div>
 
+            <?php if (!$isArchived): ?>
             <div class="row g-4 mb-4">
                 <div class="col-lg-6">
                     <div class="module-panel h-100">
@@ -158,6 +188,7 @@ $formatDate = static function (?string $value, string $fallback = 'Not set'): st
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
 
             <div class="module-panel mb-4">
                 <div class="module-panel-header"><h2 class="module-panel-title"><i class="bi bi-paperclip me-2"></i>Attachments</h2></div>
@@ -224,6 +255,7 @@ $formatDate = static function (?string $value, string $fallback = 'Not set'): st
                         <p class="module-muted-note">No comments yet.</p>
                     <?php endif; ?>
 
+                    <?php if (!$isArchived): ?>
                     <form method="POST" action="/tasks/<?= (int) ($task['id'] ?? 0) ?>/comments" enctype="multipart/form-data" class="row g-3">
                         <input type="hidden" name="_token" value="<?= csrf_token() ?>">
                         <div class="col-12">
@@ -244,11 +276,13 @@ $formatDate = static function (?string $value, string $fallback = 'Not set'): st
                             <button type="submit" class="btn btn-primary"><i class="bi bi-chat-square-text me-1"></i>Post Comment</button>
                         </div>
                     </form>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
 
         <div class="col-xl-4">
+            <?php if (!$isArchived): ?>
             <div class="module-panel mb-4">
                 <div class="module-panel-header"><h2 class="module-panel-title"><i class="bi bi-people me-2"></i>Assigned Users</h2></div>
                 <div class="module-panel-body">
@@ -280,6 +314,7 @@ $formatDate = static function (?string $value, string $fallback = 'Not set'): st
                     </form>
                 </div>
             </div>
+            <?php endif; ?>
 
             <div class="module-panel mb-4">
                 <div class="module-panel-header"><h2 class="module-panel-title"><i class="bi bi-eye me-2"></i>Available Assignees In Scope</h2></div>

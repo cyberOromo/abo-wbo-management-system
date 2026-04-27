@@ -115,6 +115,7 @@ class UserLeaderRegistrationController extends BaseController
             // Extract and validate input data
             $userData = $this->extractUserData();
             $positionData = $this->extractPositionData();
+            $primaryPlacement = $this->resolvePrimaryPlacement($userData, $positionData);
             
             // Validate required data
             $validation = $this->validateRegistrationData($userData, $positionData);
@@ -127,13 +128,15 @@ class UserLeaderRegistrationController extends BaseController
 
             try {
                 // Create user account
-                $userId = $this->createUserAccount($userData, $positionData[0]);
+                $userId = $this->createUserAccount($userData, $primaryPlacement);
                 
-                // Assign positions to user
-                $assignmentResults = $this->assignPositionsToUser($userId, $positionData);
+                // Assign positions only for roles that can hold leadership offices.
+                $assignmentResults = $this->roleRequiresLeadershipAssignments($userData['role'])
+                    ? $this->assignPositionsToUser($userId, $positionData)
+                    : [];
 
                 // Provision immutable primary email plus office aliases.
-                $emailProvisioning = $this->provisionUserInternalEmails($userId, $userData, $positionData);
+                $emailProvisioning = $this->provisionUserInternalEmails($userId, $userData, $assignmentResults === [] ? [] : $positionData);
                 
                 // Send welcome email with credentials
                 $this->sendWelcomeEmail($userId, $userData, $assignmentResults, $emailProvisioning);
@@ -146,7 +149,9 @@ class UserLeaderRegistrationController extends BaseController
                 
                 return $this->jsonResponse([
                     'success' => true,
-                    'message' => 'User registered successfully with leadership positions assigned',
+                    'message' => $assignmentResults === []
+                        ? 'User registered successfully'
+                        : 'User registered successfully with leadership positions assigned',
                     'data' => [
                         'user_id' => $userId,
                         'assignments' => $assignmentResults,
@@ -583,13 +588,15 @@ class UserLeaderRegistrationController extends BaseController
      */
     private function extractUserData(): array
     {
+        $role = $this->normalizeRegistrationRole((string) ($_POST['role'] ?? 'member'));
+
         return [
             'first_name' => trim($_POST['first_name'] ?? ''),
             'middle_name' => trim($_POST['middle_name'] ?? ''),
             'last_name' => trim($_POST['last_name'] ?? ''),
             'email' => trim($_POST['email'] ?? ''),
             'phone' => trim($_POST['phone'] ?? ''),
-            'role' => trim($_POST['role'] ?? 'user'),
+            'role' => $role,
             'date_of_birth' => trim($_POST['date_of_birth'] ?? ''),
             'gender' => trim($_POST['gender'] ?? ''),
             'address' => trim($_POST['address'] ?? ''),
@@ -609,6 +616,17 @@ class UserLeaderRegistrationController extends BaseController
         // Handle multiple position assignments
         if (isset($_POST['assignments']) && is_array($_POST['assignments'])) {
             foreach ($_POST['assignments'] as $assignment) {
+                $hasInput = !empty($assignment['position_id'])
+                    || !empty($assignment['hierarchy_level'])
+                    || !empty($assignment['hierarchy_id'])
+                    || !empty($assignment['notes'])
+                    || !empty($assignment['start_date'])
+                    || !empty($assignment['end_date']);
+
+                if (!$hasInput) {
+                    continue;
+                }
+
                 $assignments[] = [
                     'position_id' => $assignment['position_id'] ?? null,
                     'hierarchy_level' => $assignment['hierarchy_level'] ?? null,
@@ -628,6 +646,10 @@ class UserLeaderRegistrationController extends BaseController
      */
     private function validateRegistrationData(array $userData, array $positionData): array
     {
+        $role = $userData['role'] ?? 'member';
+        $hasLeadershipAssignments = $this->hasLeadershipAssignments($positionData);
+        $hasPlacement = $this->hasPlacementSelection($positionData);
+
         // Validate required user fields
         if (empty($userData['first_name'])) {
             return ['valid' => false, 'message' => 'First name is required'];
@@ -648,20 +670,31 @@ class UserLeaderRegistrationController extends BaseController
         }
 
         // Validate role
-        $allowedRoles = ['user', 'leader', 'admin', 'system_admin'];
+        $allowedRoles = ['member', 'executive', 'admin', 'system_admin'];
         if (!in_array($userData['role'], $allowedRoles)) {
             return ['valid' => false, 'message' => 'Invalid user role'];
         }
 
-        // Validate position assignments
-        if (empty($positionData)) {
-            return ['valid' => false, 'message' => 'At least one position assignment is required'];
+        if (!$hasPlacement) {
+            return ['valid' => false, 'message' => 'At least one organizational placement is required'];
         }
 
         foreach ($positionData as $assignment) {
-            if (empty($assignment['position_id']) || empty($assignment['hierarchy_level'])) {
-                return ['valid' => false, 'message' => 'Position and hierarchy level are required for all assignments'];
+            if (empty($assignment['hierarchy_level'])) {
+                return ['valid' => false, 'message' => 'Hierarchy level is required for all placements'];
             }
+
+            if (($assignment['hierarchy_level'] ?? '') !== 'global' && empty($assignment['hierarchy_id'])) {
+                return ['valid' => false, 'message' => 'Organizational unit is required for non-global placements'];
+            }
+        }
+
+        if ($this->roleRequiresLeadershipAssignments($role) && !$hasLeadershipAssignments) {
+            return ['valid' => false, 'message' => 'At least one leadership position assignment is required for this role'];
+        }
+
+        if (!$this->roleRequiresLeadershipAssignments($role) && $hasLeadershipAssignments) {
+            return ['valid' => false, 'message' => 'Members cannot be assigned leadership positions or responsibilities. Change the role to Executive to add assignments.'];
         }
 
         return ['valid' => true, 'message' => 'Validation passed'];
@@ -678,8 +711,9 @@ class UserLeaderRegistrationController extends BaseController
         $resolvedScope = $this->resolveUserScopeData($primaryAssignment);
 
         $storageRole = match ($userData['role']) {
-            'admin', 'system_admin' => 'admin',
-            'leader' => 'executive',
+            'system_admin' => 'system_admin',
+            'admin' => 'admin',
+            'executive' => 'executive',
             default => 'member',
         };
         
@@ -1029,6 +1063,71 @@ class UserLeaderRegistrationController extends BaseController
         return $this->getAssignmentPositionsForLevel('global');
     }
 
+    private function normalizeRegistrationRole(string $role): string
+    {
+        return match (trim(strtolower($role))) {
+            'user', 'member' => 'member',
+            'leader', 'executive' => 'executive',
+            'admin', 'administrator' => 'admin',
+            'system_admin', 'system administrator', 'super_admin' => 'system_admin',
+            default => trim(strtolower($role)),
+        };
+    }
+
+    private function roleRequiresLeadershipAssignments(string $role): bool
+    {
+        return in_array($role, ['executive', 'admin', 'system_admin'], true);
+    }
+
+    private function hasLeadershipAssignments(array $assignments): bool
+    {
+        foreach ($assignments as $assignment) {
+            if (!empty($assignment['position_id']) && !empty($assignment['hierarchy_level'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function hasPlacementSelection(array $assignments): bool
+    {
+        foreach ($assignments as $assignment) {
+            if (empty($assignment['hierarchy_level'])) {
+                continue;
+            }
+
+            if (($assignment['hierarchy_level'] ?? '') === 'global' || !empty($assignment['hierarchy_id'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function resolvePrimaryPlacement(array $userData, array $assignments): array
+    {
+        foreach ($assignments as $assignment) {
+            if (empty($assignment['hierarchy_level'])) {
+                continue;
+            }
+
+            if (($assignment['hierarchy_level'] ?? '') !== 'global' && empty($assignment['hierarchy_id'])) {
+                continue;
+            }
+
+            if (!$this->roleRequiresLeadershipAssignments($userData['role'] ?? 'member')) {
+                return $assignment;
+            }
+
+            if (!empty($assignment['position_id'])) {
+                return $assignment;
+            }
+        }
+
+        return [];
+    }
+
     private function getAssignmentPositionsForLevel(string $level): array
     {
         $nameColumn = $this->getPositionNameColumn();
@@ -1359,7 +1458,7 @@ class UserLeaderRegistrationController extends BaseController
 
     private function resolveUserScopeData(array $assignment): array
     {
-        $levelScope = $assignment['hierarchy_level'] ?? 'gurmu';
+        $levelScope = $assignment['hierarchy_level'] ?? 'global';
         $hierarchyId = isset($assignment['hierarchy_id']) ? (int) $assignment['hierarchy_id'] : 0;
 
         $gurmuId = match ($levelScope) {

@@ -20,6 +20,10 @@ use App\Utils\Database;
  */
 class TaskController extends BaseController
 {
+    private const ARCHIVE_VIEW_ACTIVE = 'active';
+    private const ARCHIVE_VIEW_ARCHIVED = 'archived';
+    private const ARCHIVE_VIEW_ALL = 'all';
+
     protected $db;
     protected $taskModel;
     protected $userModel;
@@ -46,17 +50,19 @@ class TaskController extends BaseController
             }
             
             $userScope = $this->getUserHierarchicalScope($user['id']);
+            $archiveView = $this->getArchiveViewFilter();
             
             // Get basic task data
-            $tasks = $this->getTasksForUserScope($userScope);
-            $taskStats = $this->getTaskStatistics($userScope);
+            $tasks = $this->getTasksForUserScope($userScope, $archiveView);
+            $taskStats = $this->getTaskStatistics($userScope, $archiveView);
             
             return $this->render('tasks/index_shell', [
                 'title' => 'Tasks Management',
                 'tasks' => $tasks,
                 'task_stats' => $taskStats,
                 'user_scope' => $userScope,
-                'can_create' => true
+                'can_create' => true,
+                'archive_view' => $archiveView,
             ]);
             
         } catch (\Exception $e) {
@@ -518,7 +524,7 @@ class TaskController extends BaseController
     {
         try {
             $this->requirePost();
-            $this->validateCsrfToken();
+            $this->requireCsrf();
 
             $user = $this->getAuthUser();
             $userScope = $this->getUserScope($user);
@@ -526,6 +532,11 @@ class TaskController extends BaseController
 
             if (!$task || !$this->canEditTask($task, $user, $userScope)) {
                 $this->redirect('/tasks?error=delete_access_denied');
+                return;
+            }
+
+            if (!$this->canDeleteTask($task, $user)) {
+                $this->redirect('/tasks/' . $id . '?error=completed_task_delete_requires_system_admin');
                 return;
             }
 
@@ -552,6 +563,16 @@ class TaskController extends BaseController
             error_log('Task delete error: ' . $e->getMessage());
             $this->redirect('/tasks/' . $id . '?error=task_delete_failed');
         }
+    }
+
+    public function archive(int $id): void
+    {
+        $this->handleArchiveStateChange($id, true);
+    }
+
+    public function unarchive(int $id): void
+    {
+        $this->handleArchiveStateChange($id, false);
     }
 
     /**
@@ -695,6 +716,104 @@ class TaskController extends BaseController
         }
         
         return false;
+    }
+
+    private function canDeleteTask(array $task, array $user): bool
+    {
+        if ((string) ($task['status'] ?? '') !== Task::STATUS_COMPLETED) {
+            return true;
+        }
+
+        return $this->isSystemAdminUser($user);
+    }
+
+    private function isSystemAdminUser(array $user): bool
+    {
+        $userType = (string) ($user['user_type'] ?? '');
+        $role = (string) ($user['role'] ?? '');
+
+        return in_array($userType, ['system_admin', 'super_admin'], true)
+            || in_array($role, ['system_admin', 'super_admin'], true);
+    }
+
+    private function handleArchiveStateChange(int $id, bool $archive): void
+    {
+        try {
+            $this->requirePost();
+            $this->requireCsrf();
+
+            $user = $this->getAuthUser();
+            $userScope = $this->getUserScope($user);
+            $task = $this->loadTaskRecord($id);
+
+            if (!$task || !$this->canEditTask($task, $user, $userScope)) {
+                $this->redirect('/tasks?error=archive_access_denied');
+                return;
+            }
+
+            $this->ensureTaskArchiveColumn();
+
+            $updated = $this->db->update('tasks', [
+                'archived_at' => $archive ? date('Y-m-d H:i:s') : null,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ], ['id' => $id]);
+
+            if ($updated) {
+                $this->recordTaskActivity(
+                    $id,
+                    (int) ($user['id'] ?? 0),
+                    $archive ? 'archived' : 'unarchived',
+                    $archive ? 'Task archived' : 'Task restored from archive'
+                );
+                $this->redirect('/tasks/' . $id . '?success=' . ($archive ? 'task_archived' : 'task_unarchived'));
+                return;
+            }
+
+            $this->redirect('/tasks/' . $id . '?error=' . ($archive ? 'task_archive_failed' : 'task_unarchive_failed'));
+        } catch (\Exception $e) {
+            error_log('Task archive error: ' . $e->getMessage());
+            $this->redirect('/tasks/' . $id . '?error=' . ($archive ? 'task_archive_failed' : 'task_unarchive_failed'));
+        }
+    }
+
+    private function ensureTaskArchiveColumn(): void
+    {
+        if ($this->db->columnExists('tasks', 'archived_at')) {
+            return;
+        }
+
+        $this->db->exec('ALTER TABLE tasks ADD COLUMN archived_at DATETIME NULL AFTER updated_at');
+    }
+
+    private function getArchiveViewFilter(): string
+    {
+        $requested = (string) ($_GET['archive'] ?? self::ARCHIVE_VIEW_ACTIVE);
+
+        return in_array($requested, [self::ARCHIVE_VIEW_ACTIVE, self::ARCHIVE_VIEW_ARCHIVED, self::ARCHIVE_VIEW_ALL], true)
+            ? $requested
+            : self::ARCHIVE_VIEW_ACTIVE;
+    }
+
+    private function applyArchiveVisibilityFilter(string $sql, array &$params, string $archiveView): string
+    {
+        if (!$this->db->columnExists('tasks', 'archived_at')) {
+            if ($archiveView === self::ARCHIVE_VIEW_ARCHIVED) {
+                $sql .= ' AND 1 = 0';
+            }
+
+            return $sql;
+        }
+
+        if ($archiveView === self::ARCHIVE_VIEW_ARCHIVED) {
+            $sql .= ' AND t.archived_at IS NOT NULL';
+            return $sql;
+        }
+
+        if ($archiveView === self::ARCHIVE_VIEW_ACTIVE) {
+            $sql .= ' AND t.archived_at IS NULL';
+        }
+
+        return $sql;
     }
 
     private function creatorMatchesScope(int $creatorUserId, array $userScope): bool
@@ -1272,6 +1391,10 @@ class TaskController extends BaseController
                 WHERE t.parent_task_id IS NULL";
         $params = [];
 
+        if ($this->db->columnExists('tasks', 'archived_at')) {
+            $sql .= ' AND t.archived_at IS NULL';
+        }
+
         $sql = $this->applyTaskVisibilityFilter($sql, $params, $userScope, true);
         $sql .= ' ORDER BY t.created_at DESC LIMIT 100';
 
@@ -1495,7 +1618,7 @@ class TaskController extends BaseController
         return $scope;
     }
     
-    protected function getTasksForUserScope($userScope)
+    protected function getTasksForUserScope($userScope, string $archiveView = self::ARCHIVE_VIEW_ACTIVE)
     {
         $db = \App\Utils\Database::getInstance();
         $user = $this->getAuthUser() ?? [];
@@ -1511,6 +1634,7 @@ class TaskController extends BaseController
                 WHERE 1=1";
         
         $params = [];
+        $sql = $this->applyArchiveVisibilityFilter($sql, $params, $archiveView);
         
         if (($user['role'] ?? null) !== 'admin') {
             $sql = $this->applyTaskVisibilityFilter($sql, $params, $userScope, true);
@@ -1539,7 +1663,7 @@ class TaskController extends BaseController
         return $tasks;
     }
     
-    protected function getTaskStatistics($userScope)
+    protected function getTaskStatistics($userScope, string $archiveView = self::ARCHIVE_VIEW_ACTIVE)
     {
         $db = \App\Utils\Database::getInstance();
         $user = $this->getAuthUser() ?? [];
@@ -1555,6 +1679,7 @@ class TaskController extends BaseController
                 WHERE 1=1";
         
         $params = [];
+        $sql = $this->applyArchiveVisibilityFilter($sql, $params, $archiveView);
         
         if (($user['role'] ?? null) !== 'admin') {
             $sql = $this->applyTaskVisibilityFilter($sql, $params, $userScope, true);

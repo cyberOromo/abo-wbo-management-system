@@ -5,11 +5,13 @@ $title = $title ?? 'Tasks Management';
 $tasks = $tasks ?? [];
 $taskStats = $task_stats ?? [];
 $userScope = $user_scope ?? [];
+$archiveView = $archive_view ?? 'active';
 
 $formatStatusClass = static function (?string $value): string {
     return match ((string) $value) {
         'completed' => 'status-success',
         'in_progress', 'under_review' => 'status-info',
+        'archived' => 'status-neutral',
         'pending' => 'status-warning',
         'cancelled', 'overdue' => 'status-danger',
         default => 'status-neutral',
@@ -43,7 +45,12 @@ $viewMode = (($_GET['view'] ?? 'table') === 'cards') ? 'cards' : 'table';
                 </div>
                 <div class="module-actions">
                     <a href="/tasks/create" class="btn btn-success"><i class="bi bi-plus-circle me-1"></i>Create Task</a>
-                    <a href="/tasks" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>
+                    <div class="btn-group" role="group" aria-label="Archive view filter">
+                        <a href="/tasks?archive=active&view=<?= urlencode($viewMode) ?>" class="btn <?= $archiveView === 'active' ? 'btn-primary' : 'btn-outline-primary' ?>"><i class="bi bi-list-task me-1"></i>Active</a>
+                        <a href="/tasks?archive=archived&view=<?= urlencode($viewMode) ?>" class="btn <?= $archiveView === 'archived' ? 'btn-primary' : 'btn-outline-primary' ?>"><i class="bi bi-archive me-1"></i>Archived</a>
+                        <a href="/tasks?archive=all&view=<?= urlencode($viewMode) ?>" class="btn <?= $archiveView === 'all' ? 'btn-primary' : 'btn-outline-primary' ?>"><i class="bi bi-collection me-1"></i>All</a>
+                    </div>
+                    <a href="/tasks?archive=<?= urlencode($archiveView) ?>&view=<?= urlencode($viewMode) ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>
                     <a href="/reports/tasks" class="btn btn-outline-primary"><i class="bi bi-graph-up me-1"></i>Task Report</a>
                     <a href="/reports" class="btn btn-primary"><i class="bi bi-grid-1x2 me-1"></i>Reports Hub</a>
                 </div>
@@ -119,8 +126,8 @@ $viewMode = (($_GET['view'] ?? 'table') === 'cards') ? 'cards' : 'table';
                     <div class="module-toolbar">
                         <span class="module-soft-badge"><i class="bi bi-eye"></i><?= number_format(count($tasks)) ?> loaded</span>
                         <div class="module-view-toggle" role="group" aria-label="Task list view">
-                            <a href="/tasks?view=table" class="btn btn-sm <?= $viewMode === 'table' ? 'active' : '' ?>"><i class="bi bi-table me-1"></i>Table</a>
-                            <a href="/tasks?view=cards" class="btn btn-sm <?= $viewMode === 'cards' ? 'active' : '' ?>"><i class="bi bi-grid-3x2-gap me-1"></i>Cards</a>
+                            <a href="/tasks?view=table&archive=<?= urlencode($archiveView) ?>" class="btn btn-sm <?= $viewMode === 'table' ? 'active' : '' ?>"><i class="bi bi-table me-1"></i>Table</a>
+                            <a href="/tasks?view=cards&archive=<?= urlencode($archiveView) ?>" class="btn btn-sm <?= $viewMode === 'cards' ? 'active' : '' ?>"><i class="bi bi-grid-3x2-gap me-1"></i>Cards</a>
                         </div>
                     </div>
                 </div>
@@ -131,7 +138,8 @@ $viewMode = (($_GET['view'] ?? 'table') === 'cards') ? 'cards' : 'table';
                                 <div class="module-resource-grid">
                                     <?php foreach ($tasks as $task): ?>
                                         <?php
-                                        $status = ucfirst(str_replace('_', ' ', (string) ($task['status'] ?? 'pending')));
+                                        $isArchived = !empty($task['archived_at'] ?? null);
+                                        $status = $isArchived ? 'Archived' : ucfirst(str_replace('_', ' ', (string) ($task['status'] ?? 'pending')));
                                         $priority = ucfirst((string) ($task['priority'] ?? 'medium'));
                                         $dueDate = !empty($task['due_date']) ? date('M j, Y', strtotime((string) $task['due_date'])) : 'No due date';
                                         $progress = max(0, min(100, (int) ($task['progress'] ?? 0)));
@@ -139,7 +147,7 @@ $viewMode = (($_GET['view'] ?? 'table') === 'cards') ? 'cards' : 'table';
                                         ?>
                                         <article class="module-resource-card d-flex flex-column">
                                             <div class="module-card-eyebrow">
-                                                <span class="module-status <?= $formatStatusClass((string) ($task['status'] ?? 'pending')) ?>"><?= htmlspecialchars($status) ?></span>
+                                                <span class="module-status <?= $formatStatusClass($isArchived ? 'archived' : (string) ($task['status'] ?? 'pending')) ?>"><?= htmlspecialchars($status) ?></span>
                                                 <span class="module-status <?= $formatPriorityClass((string) ($task['priority'] ?? 'medium')) ?>"><?= htmlspecialchars($priority) ?></span>
                                             </div>
                                             <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>" class="module-row-title fs-5"><?= htmlspecialchars($task['title'] ?? 'Untitled task') ?></a>
@@ -176,7 +184,8 @@ $viewMode = (($_GET['view'] ?? 'table') === 'cards') ? 'cards' : 'table';
                                     <tbody>
                                         <?php foreach ($tasks as $task): ?>
                                             <?php
-                                            $status = ucfirst(str_replace('_', ' ', (string) ($task['status'] ?? 'pending')));
+                                            $isArchived = !empty($task['archived_at'] ?? null);
+                                            $status = $isArchived ? 'Archived' : ucfirst(str_replace('_', ' ', (string) ($task['status'] ?? 'pending')));
                                             $priority = ucfirst((string) ($task['priority'] ?? 'medium'));
                                             $dueDate = !empty($task['due_date']) ? date('M j, Y', strtotime((string) $task['due_date'])) : 'No due date';
                                             $progress = max(0, min(100, (int) ($task['progress'] ?? 0)));
@@ -191,7 +200,7 @@ $viewMode = (($_GET['view'] ?? 'table') === 'cards') ? 'cards' : 'table';
                                                         <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
                                                     </div>
                                                 </td>
-                                                <td><span class="module-status <?= $formatStatusClass((string) ($task['status'] ?? 'pending')) ?>"><?= htmlspecialchars($status) ?></span></td>
+                                                <td><span class="module-status <?= $formatStatusClass($isArchived ? 'archived' : (string) ($task['status'] ?? 'pending')) ?>"><?= htmlspecialchars($status) ?></span></td>
                                                 <td><span class="module-status <?= $formatPriorityClass((string) ($task['priority'] ?? 'medium')) ?>"><?= htmlspecialchars($priority) ?></span></td>
                                                 <td>
                                                     <div class="module-row-title"><?= htmlspecialchars($assigneeLabel) ?></div>

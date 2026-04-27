@@ -86,7 +86,9 @@ class BaseController extends Controller
      */
     protected function validateCsrfToken(): bool
     {
-        $token = $_POST['_token'] ?? $_POST['csrf_token'] ?? '';
+        $token = $_POST['_token']
+            ?? $_POST['csrf_token']
+            ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
 
         if (function_exists('csrf_verify')) {
             if (!csrf_verify($token)) {
@@ -96,7 +98,9 @@ class BaseController extends Controller
             return true;
         }
 
-        if ($token === '' || $token !== ($_SESSION['csrf_token'] ?? null)) {
+        $sessionToken = $_SESSION['_csrf_token'] ?? ($_SESSION['csrf_token'] ?? null);
+
+        if ($token === '' || $token !== $sessionToken) {
             throw new \Exception('Invalid CSRF token');
         }
 

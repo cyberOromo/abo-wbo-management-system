@@ -158,7 +158,7 @@ $current_user = $current_user ?? [];
                                                 $roleClass = match($user['role']) {
                                                     'system_admin' => 'danger',
                                                     'admin' => 'warning',
-                                                    'leader' => 'info',
+                                                    'executive' => 'info',
                                                     default => 'secondary'
                                                 };
                                                 ?>
@@ -224,7 +224,7 @@ $current_user = $current_user ?? [];
             </div>
             <form id="registerUserForm">
                 <div class="modal-body">
-                    <input type="hidden" name="_token" value="<?= $_SESSION['_token'] ?? '' ?>">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>">
                     
                     <!-- Personal Information -->
                     <div class="row mb-3">
@@ -275,11 +275,12 @@ $current_user = $current_user ?? [];
                             <div class="mb-3">
                                 <label for="role" class="form-label">User Role *</label>
                                 <select class="form-control" id="role" name="role" required>
-                                    <option value="user">Regular User</option>
-                                    <option value="leader">Leader</option>
+                                    <option value="member">Member</option>
+                                    <option value="executive">Executive</option>
                                     <option value="admin">Administrator</option>
                                     <option value="system_admin">System Administrator</option>
                                 </select>
+                                <div class="form-text" id="roleGuidanceText">Executives and administrators require a leadership position assignment. Members can only receive an organizational placement.</div>
                             </div>
                         </div>
                         <div class="col-md-3">
@@ -330,7 +331,7 @@ $current_user = $current_user ?? [];
                     <div class="row mb-3">
                         <div class="col-12">
                             <h6 class="border-bottom pb-2">Position Assignments</h6>
-                            <p class="text-muted">Assign leadership positions to this user. At least one position is required.</p>
+                            <p class="text-muted" id="assignmentSectionHelp">Assign leadership positions to this user. At least one position is required for Executive, Administrator, and System Administrator roles.</p>
                         </div>
                     </div>
                     
@@ -391,6 +392,9 @@ $current_user = $current_user ?? [];
                             <i class="bi bi-plus"></i> Add Another Position
                         </button>
                     </div>
+                    <div class="alert alert-info d-none" id="memberAssignmentNotice">
+                        Members can be placed in an organizational unit, but they cannot receive leadership positions or responsibility assignments unless the role is changed to Executive.
+                    </div>
                     
                     <!-- Additional Notes -->
                     <div class="row mb-3">
@@ -447,8 +451,12 @@ let positionsData = <?= json_encode($positions) ?>;
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize CSRF token
     if (!window.csrfToken) {
-        window.csrfToken = '<?= $_SESSION['_token'] ?? '' ?>';
+        window.csrfToken = '<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>';
     }
+
+    const roleSelect = document.getElementById('role');
+    roleSelect.addEventListener('change', () => syncAssignmentMode(roleSelect.value));
+    syncAssignmentMode(roleSelect.value);
     
     // Handle form submission
     document.getElementById('registerUserForm').addEventListener('submit', function(e) {
@@ -465,7 +473,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         fetch('/admin/user-leader-registration/register', {
             method: 'POST',
-            body: formData
+            headers: {
+                'X-CSRF-Token': window.csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData,
+            credentials: 'same-origin'
         })
         .then(response => response.json())
         .then(data => {
@@ -474,9 +487,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('registerUserModal').querySelector('.btn-close').click();
                 this.reset();
                 resetAssignments();
+                syncAssignmentMode(document.getElementById('role').value);
                 
                 // Show success message
-                showAlert('User registered successfully with position assignments! Login credentials have been sent via email.', 'success');
+                showAlert(data.message + ' Login credentials have been sent via email.', 'success');
                 
                 // Refresh the page to show new registration
                 setTimeout(() => {
@@ -502,6 +516,7 @@ function loadHierarchyOptions(index) {
     const levelSelect = document.querySelector(`select[name="assignments[${index}][hierarchy_level]"]`);
     const hierarchySelect = document.querySelector(`select[name="assignments[${index}][hierarchy_id]"]`);
     const positionSelect = document.querySelector(`select[name="assignments[${index}][position_id]"]`);
+    const role = document.getElementById('role')?.value || 'member';
     
     const level = levelSelect.value;
     
@@ -514,7 +529,12 @@ function loadHierarchyOptions(index) {
     if (level === 'global') {
         // Global level doesn't need hierarchy selection
         hierarchySelect.disabled = true;
-        loadPositionsForLevel(index, 'global', null);
+        if (role === 'member') {
+            positionSelect.innerHTML = '<option value="">Not applicable for members</option>';
+            positionSelect.disabled = true;
+        } else {
+            loadPositionsForLevel(index, 'global', null);
+        }
     } else if (level) {
         // Load hierarchy options based on level
         hierarchySelect.disabled = false;
@@ -529,13 +549,81 @@ function loadHierarchyOptions(index) {
         // When hierarchy is selected, load positions
         hierarchySelect.onchange = function() {
             if (this.value) {
-                loadPositionsForLevel(index, level, this.value);
+                if (role === 'member') {
+                    positionSelect.innerHTML = '<option value="">Not applicable for members</option>';
+                    positionSelect.disabled = true;
+                    renderResponsibilityPreview(index, null);
+                } else {
+                    loadPositionsForLevel(index, level, this.value);
+                }
             } else {
                 positionSelect.innerHTML = '<option value="">Select Position</option>';
                 positionSelect.disabled = true;
             }
         };
     }
+}
+
+function syncAssignmentMode(role) {
+    const isMember = role === 'member';
+    const addButton = document.querySelector('button[onclick="addAssignment()"]');
+    const memberNotice = document.getElementById('memberAssignmentNotice');
+    const sectionHelp = document.getElementById('assignmentSectionHelp');
+    const roleGuidanceText = document.getElementById('roleGuidanceText');
+
+    if (sectionHelp) {
+        sectionHelp.textContent = isMember
+            ? 'Members must still be placed in an organizational unit, but they cannot hold leadership positions or receive responsibility assignments.'
+            : 'Assign leadership positions to this user. At least one position is required for Executive, Administrator, and System Administrator roles.';
+    }
+
+    if (roleGuidanceText) {
+        roleGuidanceText.textContent = isMember
+            ? 'Members can only receive an organizational placement. Switch to Executive to enable positions and responsibilities.'
+            : 'Executives and administrators require a leadership position assignment.';
+    }
+
+    if (memberNotice) {
+        memberNotice.classList.toggle('d-none', !isMember);
+    }
+
+    if (addButton) {
+        addButton.classList.toggle('d-none', isMember);
+    }
+
+    document.querySelectorAll('.assignment-row').forEach((row, index) => {
+        const hierarchyField = row.querySelector(`select[name="assignments[${index}][hierarchy_level]"]`);
+        const unitField = row.querySelector(`select[name="assignments[${index}][hierarchy_id]"]`);
+        const positionField = row.querySelector(`select[name="assignments[${index}][position_id]"]`);
+        const preview = row.querySelector(`[data-assignment-preview="${index}"]`);
+
+        if (hierarchyField) {
+            hierarchyField.required = true;
+        }
+
+        if (unitField) {
+            unitField.required = hierarchyField?.value !== 'global' && hierarchyField?.value !== '';
+        }
+
+        if (positionField) {
+            positionField.required = !isMember;
+
+            if (isMember) {
+                positionField.value = '';
+                positionField.disabled = true;
+                positionField.innerHTML = '<option value="">Not applicable for members</option>';
+            } else if (positionField.options.length <= 1) {
+                positionField.innerHTML = '<option value="">Select Position</option>';
+                if (hierarchyField?.value) {
+                    loadHierarchyOptions(index);
+                }
+            }
+        }
+
+        if (preview && isMember) {
+            preview.innerHTML = '';
+        }
+    });
 }
 
 function loadPositionsForLevel(index, level, hierarchyId) {
@@ -796,6 +884,7 @@ function resetAssignments() {
         </div>
     `;
     assignmentCount = 1;
+    syncAssignmentMode(document.getElementById('role')?.value || 'member');
 }
 
 function refreshStats() {
@@ -855,7 +944,7 @@ function displayUsersList(data) {
     data.users.forEach(user => {
         const roleClass = user.role === 'system_admin' ? 'danger' : 
                          user.role === 'admin' ? 'warning' : 
-                         user.role === 'leader' ? 'info' : 'secondary';
+                         user.role === 'executive' ? 'info' : 'secondary';
         
         const statusClass = user.status === 'active' ? 'success' : 
                            user.status === 'inactive' ? 'secondary' : 'danger';
