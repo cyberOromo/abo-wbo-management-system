@@ -66,6 +66,42 @@ class BaseController extends Controller
     {
         $this->json($data, $statusCode);
     }
+
+    /**
+     * Require a non-GET state-changing request.
+     */
+    protected function requirePost(): bool
+    {
+        $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+
+        if (!in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+            throw new \Exception('Invalid request method');
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate a CSRF token from common form field names.
+     */
+    protected function validateCsrfToken(): bool
+    {
+        $token = $_POST['_token'] ?? $_POST['csrf_token'] ?? '';
+
+        if (function_exists('csrf_verify')) {
+            if (!csrf_verify($token)) {
+                throw new \Exception('Invalid CSRF token');
+            }
+
+            return true;
+        }
+
+        if ($token === '' || $token !== ($_SESSION['csrf_token'] ?? null)) {
+            throw new \Exception('Invalid CSRF token');
+        }
+
+        return true;
+    }
     
     /**
      * Flash an error message for the next response.
