@@ -81,6 +81,7 @@ class TaskController extends BaseController
 
             $availableUsers = $this->getAvailableUsersForScope($userScope);
             $parentTasks = $this->getVisibleParentTasks($userScope);
+            $defaultScope = $this->resolveTaskFormScope($user, $userScope);
 
             $this->render('tasks.create', [
                 'title' => 'Create Task',
@@ -89,14 +90,14 @@ class TaskController extends BaseController
                 'availableUsers' => $availableUsers,
                 'parentTasks' => $parentTasks,
                 'task' => [
-                    'level_scope' => $userScope['level_scope'] ?? '',
+                    'level_scope' => $defaultScope,
                     'status' => Task::STATUS_PENDING,
                     'priority' => Task::PRIORITY_MEDIUM,
                     'category' => Task::CATEGORY_ADMINISTRATIVE,
                 ],
                 'categories' => $this->getTaskCategoryOptions(),
                 'priorities' => $this->getTaskPriorityOptions(),
-                'scopes' => $this->getAvailableScopes($userScope),
+                'scopes' => $this->getAvailableScopes($userScope, $defaultScope, $user),
                 'formAction' => '/tasks',
                 'submitLabel' => 'Create Task',
             ]);
@@ -274,7 +275,7 @@ class TaskController extends BaseController
                 'userScope' => $userScope,
                 'categories' => $this->getTaskCategoryOptions(),
                 'priorities' => $this->getTaskPriorityOptions(),
-                'scopes' => $this->getAvailableScopes($userScope, (string) ($task['level_scope'] ?? '')),
+                'scopes' => $this->getAvailableScopes($userScope, (string) ($task['level_scope'] ?? ''), $user),
                 'formAction' => '/tasks/' . $id . '/update',
                 'submitLabel' => 'Update Task',
             ]);
@@ -1147,20 +1148,25 @@ class TaskController extends BaseController
     /**
      * Get available scopes for task creation
      */
-    private function getAvailableScopes(array $user, string $preferredScope = ''): array
+    private function getAvailableScopes(array $userScope, string $preferredScope = '', array $user = []): array
     {
-        $levelScope = (string) ($user['level_scope'] ?? $user['scope'] ?? '');
-        $scopes = [];
+        return [$this->resolveTaskFormScope($user, $userScope, $preferredScope)];
+    }
 
-        if ($preferredScope !== '') {
-            $scopes[] = $preferredScope;
+    private function resolveTaskFormScope(array $user, array $userScope, string $preferredScope = ''): string
+    {
+        foreach ([$preferredScope, (string) ($userScope['level_scope'] ?? ''), (string) ($userScope['scope'] ?? '')] as $candidate) {
+            if ($candidate !== '') {
+                return $candidate;
+            }
         }
 
-        if ($levelScope !== '') {
-            $scopes[] = $levelScope;
+        $role = (string) ($user['role'] ?? $user['user_type'] ?? '');
+        if (in_array($role, ['admin', 'system_admin'], true)) {
+            return 'global';
         }
 
-        return array_values(array_unique($scopes));
+        return 'gurmu';
     }
 
     protected function getUserScope(array $user): array
