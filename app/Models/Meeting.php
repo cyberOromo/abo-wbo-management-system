@@ -556,11 +556,7 @@ class Meeting extends Model
                 return;
             }
 
-            $query = "INSERT INTO meeting_activities (meeting_id, user_id, action, description, created_at) 
-                     VALUES (:meeting_id, :user_id, :action, :description, :created_at)";
-            
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([
+            $this->db->insert('meeting_activities', [
                 'meeting_id' => $meetingId,
                 'user_id' => $userId,
                 'action' => $action,
@@ -568,7 +564,7 @@ class Meeting extends Model
                 'created_at' => date('Y-m-d H:i:s')
             ]);
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             error_log("Log meeting activity error: " . $e->getMessage());
         }
     }

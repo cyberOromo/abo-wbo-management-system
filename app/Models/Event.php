@@ -792,11 +792,7 @@ class Event extends Model
                 return;
             }
 
-            $query = "INSERT INTO event_activities (event_id, user_id, action, description, created_at) 
-                     VALUES (:event_id, :user_id, :action, :description, :created_at)";
-            
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([
+            $this->db->insert('event_activities', [
                 'event_id' => $eventId,
                 'user_id' => $userId,
                 'action' => $action,
@@ -804,7 +800,7 @@ class Event extends Model
                 'created_at' => date('Y-m-d H:i:s')
             ]);
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             error_log("Log event activity error: " . $e->getMessage());
         }
     }

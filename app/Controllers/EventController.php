@@ -317,6 +317,7 @@ class EventController extends BaseController
     {
         try {
             $this->requireAuth();
+            $this->syncCurrentUser();
             $this->requirePost();
             $this->validateCsrfToken();
             
@@ -344,7 +345,7 @@ class EventController extends BaseController
                 throw new Exception('Failed to update event');
             }
             
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             $this->setError('Failed to update event: ' . $e->getMessage());
             echo $this->render('events/edit', ['event' => array_merge($event, $_POST), 'isEdit' => true]);
         }
