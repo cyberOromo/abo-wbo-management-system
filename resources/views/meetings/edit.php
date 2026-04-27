@@ -53,10 +53,9 @@ $formatDateTimeLocal = static function ($value): string {
         <a href="/meetings/<?= (int) ($meeting['id'] ?? 0) ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Meeting</a>
     </div>
 
-    <form method="POST" action="/meetings/<?= (int) ($meeting['id'] ?? 0) ?>" class="card shadow-sm border-0">
+    <form method="POST" action="/meetings/<?= (int) ($meeting['id'] ?? 0) ?>/update" class="card shadow-sm border-0">
         <div class="card-body p-4">
             <input type="hidden" name="_token" value="<?= csrf_token() ?>">
-            <input type="hidden" name="_method" value="PUT">
             <input type="hidden" name="level_scope" value="<?= htmlspecialchars((string) ($meeting['level_scope'] ?? '')) ?>">
             <input type="hidden" name="scope_id" value="<?= htmlspecialchars((string) ($meeting['scope_id'] ?? '')) ?>">
 

@@ -204,6 +204,7 @@ $router->group(['prefix' => 'meetings', 'middleware' => 'auth'], function() use 
     $router->post('/', 'MeetingController@store')->name('meetings.store');
     $router->get('/{id}', 'MeetingController@show')->name('meetings.show');
     $router->get('/{id}/edit', 'MeetingController@edit')->name('meetings.edit');
+    $router->post('/{id}/update', 'MeetingController@update')->name('meetings.update.post');
     $router->put('/{id}', 'MeetingController@update')->name('meetings.update');
     $router->delete('/{id}', 'MeetingController@destroy')->name('meetings.destroy');
     
@@ -223,6 +224,7 @@ $router->group(['prefix' => 'events', 'middleware' => 'auth'], function() use ($
     $router->post('/', 'EventController@store')->name('events.store');
     $router->get('/{id}', 'EventController@show')->name('events.show');
     $router->get('/{id}/edit', 'EventController@edit')->name('events.edit');
+    $router->post('/{id}/update', 'EventController@update')->name('events.update.post');
     $router->put('/{id}', 'EventController@update')->name('events.update');
     $router->delete('/{id}', 'EventController@destroy')->name('events.destroy');
     
