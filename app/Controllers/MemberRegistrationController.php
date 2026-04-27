@@ -280,16 +280,23 @@ class MemberRegistrationController extends Controller
     {
         // Generate temporary password
         $tempPassword = $this->generateTempPassword();
+        $passwordHash = password_hash($tempPassword, PASSWORD_DEFAULT);
         
-        $memberData = [
+        $memberData = $this->filterTableData('users', [
             'first_name' => $data['first_name'],
+            'middle_name' => $data['middle_name'] ?? null,
             'last_name' => $data['last_name'],
             'email' => $data['email'],
-            'password_hash' => password_hash($tempPassword, PASSWORD_DEFAULT),
+            'password_hash' => $passwordHash,
+            'password' => $passwordHash,
             'phone' => $data['phone'] ?? null,
+            'date_of_birth' => $data['date_of_birth'] ?? null,
             'birth_date' => $data['date_of_birth'] ?? null,
             'gurmu_id' => $data['gurmu_id'],
+            'level_scope' => 'gurmu',
+            'user_type' => 'member',
             'role' => 'member',
+            'language_preference' => $data['language_preference'] ?? 'en',
             'language' => $data['language_preference'] ?? 'en',
             'status' => 'active',
             'address' => $data['address'] ?? null,
@@ -299,6 +306,7 @@ class MemberRegistrationController extends Controller
             'registration_source' => 'admin_created',
             'account_type' => 'internal_only',
             'onboarding_completed' => 0,
+            'created_by' => $createdBy,
             'metadata' => json_encode([
                 'middle_name' => $data['middle_name'] ?? null,
                 'gender' => $data['gender'] ?? null,
@@ -309,7 +317,7 @@ class MemberRegistrationController extends Controller
                 'temp_password' => $tempPassword, // Store for initial email
                 'requires_password_change' => true
             ])
-        ];
+        ]);
 
         $memberId = $this->db->insert('users', $memberData);
         $internalEmail = $this->provisionMemberInternalEmail($memberId, $data, $createdBy, $tempPassword);
@@ -352,11 +360,15 @@ class MemberRegistrationController extends Controller
 
         $this->emailGenerator->createCPanelEmailAccount($internalEmail, $tempPassword, 1024);
 
-        $this->db->update('users', [
+        $userUpdate = $this->filterTableData('users', [
             'internal_email' => $internalEmail,
             'internal_account_created_at' => date('Y-m-d H:i:s'),
             'internal_credentials_sent_at' => date('Y-m-d H:i:s')
-        ], ['id' => $memberId]);
+        ]);
+
+        if (!empty($userUpdate)) {
+            $this->db->update('users', $userUpdate, ['id' => $memberId]);
+        }
 
         return $internalEmail;
     }
@@ -599,6 +611,19 @@ class MemberRegistrationController extends Controller
         );
 
         return (int) $count > 0;
+    }
+
+    private function filterTableData(string $table, array $data): array
+    {
+        $filtered = [];
+
+        foreach ($data as $column => $value) {
+            if ($this->db->columnExists($table, $column)) {
+                $filtered[$column] = $value;
+            }
+        }
+
+        return $filtered;
     }
     
     /**
