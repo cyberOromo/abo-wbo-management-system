@@ -66,8 +66,53 @@ class AttachmentController extends BaseController
         return match ($resource) {
             'tasks' => $this->resolveTaskAttachment($id, $index),
             'task-comments' => $this->resolveTaskCommentAttachment($id, $index),
+            'meetings' => $this->resolveMeetingAttachment($id, $index),
+            'projects' => $this->resolveProjectAttachment($id, $index),
             default => throw new Exception('Unsupported attachment resource.'),
         };
+    }
+
+    private function resolveMeetingAttachment(int $meetingId, int $index): array
+    {
+        $meeting = $this->db->fetch(
+            'SELECT id, title, created_by, organized_by, is_public, level_scope, scope_id, attachments FROM meetings WHERE id = ?',
+            [$meetingId]
+        );
+
+        if (!$meeting) {
+            throw new Exception('Meeting not found.');
+        }
+
+        $this->assertMeetingAccess($meeting);
+
+        $attachments = json_decode((string) ($meeting['attachments'] ?? '[]'), true);
+        if (!is_array($attachments) || !isset($attachments[$index])) {
+            throw new Exception('Attachment not found.');
+        }
+
+        return $this->hydrateAttachment($attachments[$index], 'meetings', $meetingId, $index, (string) ($meeting['title'] ?? 'Meeting attachment'));
+    }
+
+    private function resolveProjectAttachment(int $projectId, int $index): array
+    {
+        $project = $this->db->fetch(
+            'SELECT id, title, owner_user_id, created_by, level_scope, global_id, godina_id, gamta_id, gurmu_id, metadata FROM projects WHERE id = ?',
+            [$projectId]
+        );
+
+        if (!$project) {
+            throw new Exception('Project not found.');
+        }
+
+        $this->assertProjectAccess($project);
+
+        $metadata = json_decode((string) ($project['metadata'] ?? '[]'), true);
+        $attachments = is_array($metadata['attachments'] ?? null) ? $metadata['attachments'] : [];
+        if (!isset($attachments[$index])) {
+            throw new Exception('Attachment not found.');
+        }
+
+        return $this->hydrateAttachment($attachments[$index], 'projects', $projectId, $index, (string) ($project['title'] ?? 'Project attachment'));
     }
 
     private function resolveTaskAttachment(int $taskId, int $index): array
@@ -213,6 +258,63 @@ class AttachmentController extends BaseController
         throw new Exception('You do not have access to this attachment.');
     }
 
+    private function assertMeetingAccess(array $meeting): void
+    {
+        $user = auth_user() ?? [];
+        $normalizedRole = function_exists('normalized_user_role') ? normalized_user_role($user) : ($user['role'] ?? null);
+
+        if ($normalizedRole === 'admin') {
+            return;
+        }
+
+        $userId = (int) ($user['id'] ?? 0);
+        $ownerUserId = (int) ($meeting['organized_by'] ?? $meeting['created_by'] ?? 0);
+
+        if ($userId > 0 && $ownerUserId === $userId) {
+            return;
+        }
+
+        if (!empty($meeting['is_public'])) {
+            return;
+        }
+
+        if ($this->recordMatchesScope($meeting, $this->getTaskUserScope($userId))) {
+            return;
+        }
+
+        throw new Exception('You do not have access to this attachment.');
+    }
+
+    private function assertProjectAccess(array $project): void
+    {
+        $user = auth_user() ?? [];
+        $normalizedRole = function_exists('normalized_user_role') ? normalized_user_role($user) : ($user['role'] ?? null);
+
+        if ($normalizedRole === 'admin') {
+            return;
+        }
+
+        $userId = (int) ($user['id'] ?? 0);
+        if ($userId > 0 && in_array($userId, [(int) ($project['owner_user_id'] ?? 0), (int) ($project['created_by'] ?? 0)], true)) {
+            return;
+        }
+
+        $assignment = $this->db->fetch(
+            'SELECT id FROM project_assignments WHERE project_id = ? AND user_id = ? LIMIT 1',
+            [(int) ($project['id'] ?? 0), $userId]
+        );
+
+        if ($assignment) {
+            return;
+        }
+
+        if ($this->recordMatchesScope($project, $this->getTaskUserScope($userId))) {
+            return;
+        }
+
+        throw new Exception('You do not have access to this attachment.');
+    }
+
     private function getTaskUserScope(int $userId): array
     {
         if ($userId <= 0) {
@@ -256,6 +358,22 @@ class AttachmentController extends BaseController
         );
 
         return !empty($assignment) && (int) ($assignment[$scopeColumn] ?? 0) === (int) $scopeValue;
+    }
+
+    private function recordMatchesScope(array $record, array $userScope): bool
+    {
+        $scopeColumn = $this->getHierarchyScopeColumn((string) ($userScope['level_scope'] ?? ''));
+        $scopeValue = $scopeColumn !== null ? ($userScope[$scopeColumn] ?? null) : null;
+        if ($scopeColumn === null || $scopeValue === null) {
+            return false;
+        }
+
+        if (array_key_exists('scope_id', $record)) {
+            return (string) ($record['level_scope'] ?? '') === (string) ($userScope['level_scope'] ?? '')
+                && (int) ($record['scope_id'] ?? 0) === (int) $scopeValue;
+        }
+
+        return (int) ($record[$scopeColumn] ?? 0) === (int) $scopeValue;
     }
 
     private function getHierarchyScopeColumn(string $levelScope): ?string

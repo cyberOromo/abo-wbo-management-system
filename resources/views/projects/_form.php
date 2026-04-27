@@ -1,4 +1,6 @@
 <?php
+use App\Services\AttachmentUploadService;
+
 $project = $project ?? [];
 $scope = $scope ?? [];
 $availableUsers = $availableUsers ?? [];
@@ -6,11 +8,16 @@ $selectedTeamUserIds = $selectedTeamUserIds ?? [];
 $formAction = $formAction ?? '/projects';
 $submitLabel = $submitLabel ?? 'Save Project';
 $ownerUserId = (int) ($project['owner_user_id'] ?? 0);
+$attachments = $project['attachments'] ?? [];
+if (!is_array($attachments)) {
+    $decodedAttachments = json_decode((string) $attachments, true);
+    $attachments = is_array($decodedAttachments) ? $decodedAttachments : [];
+}
 ?>
 
 <div class="card shadow-sm">
     <div class="card-body p-4">
-        <form method="POST" action="<?= htmlspecialchars($formAction) ?>">
+        <form method="POST" action="<?= htmlspecialchars($formAction) ?>" enctype="multipart/form-data">
             <input type="hidden" name="_token" value="<?= csrf_token() ?>">
             <div class="row g-3">
                 <div class="col-md-8">
@@ -103,6 +110,22 @@ $ownerUserId = (int) ($project['owner_user_id'] ?? 0);
                 <div class="col-12">
                     <label class="form-label">Delivery Notes</label>
                     <textarea name="delivery_notes" class="form-control" rows="3" placeholder="Milestones, dependencies, execution details"><?= htmlspecialchars((string) ($project['delivery_notes'] ?? '')) ?></textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Project Attachments</label>
+                    <input type="file" name="attachments[]" class="form-control" multiple>
+                    <div class="form-text">Upload up to <?= AttachmentUploadService::getMaxFileSizeLabel() ?> per file. Allowed formats: <?= htmlspecialchars(AttachmentUploadService::getAllowedExtensionsLabel()) ?>.</div>
+                    <?php if (!empty($attachments) && !empty($project['id'])): ?>
+                        <div class="mt-3">
+                            <?php
+                            $resource = 'projects';
+                            $resourceId = (int) ($project['id'] ?? 0);
+                            $contextLabel = 'Project attachment';
+                            $emptyMessage = 'No project attachments uploaded yet.';
+                            require dirname(__DIR__) . '/partials/attachment_list.php';
+                            ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-4">

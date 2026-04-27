@@ -4,16 +4,19 @@ namespace App\Controllers;
 
 use App\Core\BaseController;
 use App\Models\Project;
+use App\Services\AttachmentUploadService;
 use Exception;
 
 class ProjectController extends BaseController
 {
     private Project $projectModel;
+    private AttachmentUploadService $attachmentUploadService;
 
     public function __construct()
     {
         parent::__construct();
         $this->projectModel = new Project();
+        $this->attachmentUploadService = new AttachmentUploadService();
     }
 
     public function index()
@@ -78,6 +81,7 @@ class ProjectController extends BaseController
 
             $ownerUserId = (int) ($_POST['owner_user_id'] ?? ($user['id'] ?? 0));
             $teamUserIds = $this->extractUserIds($_POST['team_user_ids'] ?? []);
+            $attachments = $this->attachmentUploadService->uploadMany($_FILES['attachments'] ?? [], 'project-attachments');
 
             $payload = [
                 'title' => $title,
@@ -104,6 +108,7 @@ class ProjectController extends BaseController
                 'metadata' => [
                     'source' => 'projects_module_v1',
                     'scope_name' => $scope['scope_name'] ?? null,
+                    'attachments' => $attachments,
                 ],
                 'created_at' => date('Y-m-d H:i:s'),
                 'updated_at' => date('Y-m-d H:i:s'),
@@ -129,6 +134,8 @@ class ProjectController extends BaseController
                 $this->redirectWithMessage('/projects', 'Project not found in your current scope.', 'error');
                 return;
             }
+
+            $project = $this->hydrateProjectForView($project);
 
             $assignments = $this->projectModel->getProjectAssignments($projectId);
             $milestones = $this->projectModel->getProjectMilestones($projectId);
@@ -167,6 +174,8 @@ class ProjectController extends BaseController
                 return;
             }
 
+            $project = $this->hydrateProjectForView($project);
+
             $assignments = $this->projectModel->getProjectAssignments($projectId);
             $selectedTeamUserIds = [];
             foreach ($assignments as $assignment) {
@@ -200,10 +209,17 @@ class ProjectController extends BaseController
                 throw new Exception('Project not found in your current scope.');
             }
 
+            $project = $this->hydrateProjectForView($project);
+
             $title = trim((string) ($_POST['title'] ?? ''));
             if ($title === '') {
                 throw new Exception('Project title is required.');
             }
+
+            $existingMetadata = is_array($project['metadata'] ?? null) ? $project['metadata'] : [];
+            $existingAttachments = is_array($project['attachments'] ?? null) ? $project['attachments'] : [];
+            $newAttachments = $this->attachmentUploadService->uploadMany($_FILES['attachments'] ?? [], 'project-attachments');
+            $existingMetadata['attachments'] = array_values(array_merge($existingAttachments, $newAttachments));
 
             $payload = [
                 'title' => $title,
@@ -221,6 +237,7 @@ class ProjectController extends BaseController
                 'success_metrics' => trim((string) ($_POST['success_metrics'] ?? '')),
                 'delivery_notes' => trim((string) ($_POST['delivery_notes'] ?? '')),
                 'status_notes' => trim((string) ($_POST['status_notes'] ?? '')),
+                'metadata' => $existingMetadata,
                 'updated_at' => date('Y-m-d H:i:s'),
             ];
 
@@ -328,5 +345,20 @@ class ProjectController extends BaseController
         }
 
         return array_values(array_unique($userIds));
+    }
+
+    private function hydrateProjectForView(array $project): array
+    {
+        $metadata = $project['metadata'] ?? [];
+
+        if (is_string($metadata)) {
+            $decodedMetadata = json_decode($metadata, true);
+            $metadata = is_array($decodedMetadata) ? $decodedMetadata : [];
+        }
+
+        $project['metadata'] = $metadata;
+        $project['attachments'] = is_array($metadata['attachments'] ?? null) ? $metadata['attachments'] : [];
+
+        return $project;
     }
 }

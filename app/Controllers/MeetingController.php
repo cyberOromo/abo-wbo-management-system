@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Core\BaseController;
 use App\Models\Meeting;
+use App\Services\AttachmentUploadService;
 use App\Services\NotificationService;
 use Exception;
 
@@ -11,6 +12,7 @@ class MeetingController extends BaseController
 {
     private $meetingModel;
     private $notificationService;
+    private AttachmentUploadService $attachmentUploadService;
     private array $user = [];
 
     public function __construct()
@@ -18,6 +20,7 @@ class MeetingController extends BaseController
         parent::__construct();
         $this->meetingModel = new Meeting();
         $this->notificationService = new NotificationService();
+        $this->attachmentUploadService = new AttachmentUploadService();
         $this->user = $this->getAuthUser() ?? [];
     }
     
@@ -335,6 +338,12 @@ class MeetingController extends BaseController
             }
             
             $data = $this->validateMeetingData($_POST);
+
+            $existingAttachments = is_array($meeting['attachments'] ?? null) ? $meeting['attachments'] : [];
+            $newAttachments = $this->attachmentUploadService->uploadMany($_FILES['attachments'] ?? [], 'meeting-attachments');
+            if ($existingAttachments !== [] || $newAttachments !== []) {
+                $data['attachments'] = array_values(array_merge($existingAttachments, $newAttachments));
+            }
             
             $success = $this->meetingModel->updateMeeting($id, $data);
             

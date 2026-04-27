@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Core\BaseController;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\AttachmentUploadService;
 use App\Utils\Database;
 
 /**
@@ -22,6 +23,7 @@ class TaskController extends BaseController
     protected $db;
     protected $taskModel;
     protected $userModel;
+    protected AttachmentUploadService $attachmentUploadService;
 
     public function __construct()
     {
@@ -29,6 +31,7 @@ class TaskController extends BaseController
         $this->db = Database::getInstance();
         $this->taskModel = new Task();
         $this->userModel = new User();
+        $this->attachmentUploadService = new AttachmentUploadService();
     }
 
     /**
@@ -1222,46 +1225,7 @@ class TaskController extends BaseController
 
     private function uploadTaskAttachments(array $files): array
     {
-        if (empty($files) || empty($files['name'])) {
-            return [];
-        }
-
-        $uploadDir = storage_path('uploads/task-attachments');
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0775, true);
-        }
-
-        $attachments = [];
-        $fileNames = is_array($files['name']) ? $files['name'] : [$files['name']];
-        $tmpNames = is_array($files['tmp_name']) ? $files['tmp_name'] : [$files['tmp_name'] ?? ''];
-        $types = is_array($files['type']) ? $files['type'] : [$files['type'] ?? 'application/octet-stream'];
-        $sizes = is_array($files['size']) ? $files['size'] : [$files['size'] ?? 0];
-        $errors = is_array($files['error']) ? $files['error'] : [$files['error'] ?? UPLOAD_ERR_NO_FILE];
-
-        foreach ($fileNames as $index => $originalName) {
-            if (($errors[$index] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || empty($tmpNames[$index])) {
-                continue;
-            }
-
-            $safeName = preg_replace('/[^A-Za-z0-9._-]/', '-', basename((string) $originalName));
-            $storedName = date('YmdHis') . '-' . bin2hex(random_bytes(4)) . '-' . $safeName;
-            $destination = $uploadDir . DIRECTORY_SEPARATOR . $storedName;
-
-            if (!move_uploaded_file($tmpNames[$index], $destination)) {
-                continue;
-            }
-
-            $attachments[] = [
-                'original_name' => (string) $originalName,
-                'stored_name' => $storedName,
-                'relative_path' => 'uploads/task-attachments/' . $storedName,
-                'mime_type' => (string) ($types[$index] ?? 'application/octet-stream'),
-                'size' => (int) ($sizes[$index] ?? 0),
-                'uploaded_at' => date('Y-m-d H:i:s'),
-            ];
-        }
-
-        return $attachments;
+        return $this->attachmentUploadService->uploadMany($files, 'task-attachments');
     }
 
     private function getTaskComments(int $taskId): array

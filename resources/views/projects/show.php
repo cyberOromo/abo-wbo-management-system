@@ -11,6 +11,7 @@ $activity = $activity ?? [];
 $availableUsers = $availableUsers ?? [];
 $taskScopeOptions = $taskScopeOptions ?? [];
 $taskParentOptions = $taskParentOptions ?? [];
+$attachments = is_array($project['attachments'] ?? null) ? $project['attachments'] : [];
 
 $status = (string) ($project['status'] ?? 'proposed');
 $priority = (string) ($project['priority'] ?? 'medium');
@@ -139,6 +140,19 @@ $renderTasks = function (array $nodes) use (&$renderTasks): void {
                 <div class="module-panel-header"><h2 class="module-panel-title"><i class="bi bi-truck me-2"></i>Delivery Notes</h2></div>
                 <div class="module-panel-body">
                     <p class="mb-0"><?= nl2br(htmlspecialchars((string) ($project['delivery_notes'] ?? 'No delivery notes captured yet.'))) ?></p>
+                </div>
+            </div>
+
+            <div class="module-panel mb-4">
+                <div class="module-panel-header"><h2 class="module-panel-title"><i class="bi bi-paperclip me-2"></i>Attachments</h2></div>
+                <div class="module-panel-body">
+                    <?php
+                    $resource = 'projects';
+                    $resourceId = (int) ($project['id'] ?? 0);
+                    $contextLabel = 'Project attachment';
+                    $emptyMessage = 'No project attachments uploaded yet.';
+                    require dirname(__DIR__) . '/partials/attachment_list.php';
+                    ?>
                 </div>
             </div>
 

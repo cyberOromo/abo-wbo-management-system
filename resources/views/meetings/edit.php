@@ -1,4 +1,6 @@
 <?php
+use App\Services\AttachmentUploadService;
+
 $title = $title ?? 'Edit Meeting';
 $meeting = $meeting ?? [];
 
@@ -34,6 +36,12 @@ if (is_array($tagValue)) {
     $tagValue = implode(', ', array_map('strval', $tagValue));
 }
 
+$attachments = $meeting['attachments'] ?? [];
+if (!is_array($attachments)) {
+    $decodedAttachments = json_decode((string) $attachments, true);
+    $attachments = is_array($decodedAttachments) ? $decodedAttachments : [];
+}
+
 $formatDateTimeLocal = static function ($value): string {
     if (empty($value)) {
         return '';
@@ -53,7 +61,7 @@ $formatDateTimeLocal = static function ($value): string {
         <a href="/meetings/<?= (int) ($meeting['id'] ?? 0) ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Meeting</a>
     </div>
 
-    <form method="POST" action="/meetings/<?= (int) ($meeting['id'] ?? 0) ?>/update" class="card shadow-sm border-0">
+    <form method="POST" action="/meetings/<?= (int) ($meeting['id'] ?? 0) ?>/update" enctype="multipart/form-data" class="card shadow-sm border-0">
         <div class="card-body p-4">
             <input type="hidden" name="_token" value="<?= csrf_token() ?>">
             <input type="hidden" name="level_scope" value="<?= htmlspecialchars((string) ($meeting['level_scope'] ?? '')) ?>">
@@ -115,6 +123,7 @@ $formatDateTimeLocal = static function ($value): string {
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Tags</label>
                     <input type="text" name="tags" class="form-control" value="<?= htmlspecialchars((string) $tagValue) ?>" placeholder="comma,separated,tags">
+                    <div class="form-text">Upload up to <?= AttachmentUploadService::getMaxFileSizeLabel() ?> per file. Allowed formats: <?= htmlspecialchars(AttachmentUploadService::getAllowedExtensionsLabel()) ?>.</div>
                     <div class="form-check mt-3">
                         <input class="form-check-input" type="checkbox" name="is_public" value="1" id="meeting-is-public" <?= !empty($meeting['is_public']) ? 'checked' : '' ?>>
                         <label class="form-check-label" for="meeting-is-public">Visible to scoped audience</label>
@@ -123,6 +132,21 @@ $formatDateTimeLocal = static function ($value): string {
                         <input class="form-check-input" type="checkbox" name="requires_approval" value="1" id="meeting-requires-approval" <?= !empty($meeting['requires_approval']) ? 'checked' : '' ?>>
                         <label class="form-check-label" for="meeting-requires-approval">Requires approval before join</label>
                     </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Meeting Attachments</label>
+                    <input type="file" name="attachments[]" class="form-control" multiple>
+                    <?php if (!empty($attachments)): ?>
+                        <div class="mt-3">
+                            <?php
+                            $resource = 'meetings';
+                            $resourceId = (int) ($meeting['id'] ?? 0);
+                            $contextLabel = 'Meeting attachment';
+                            $emptyMessage = 'No meeting attachments uploaded yet.';
+                            require dirname(__DIR__) . '/partials/attachment_list.php';
+                            ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

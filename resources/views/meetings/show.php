@@ -12,6 +12,7 @@ $platform = (string) ($meeting['platform'] ?? ($meeting['is_virtual'] ?? false ?
 $agenda = $meeting['agenda'] ?? [];
 $minutes = $meeting['meeting_minutes'] ?? [];
 $tags = $meeting['tags'] ?? [];
+$attachments = $meeting['attachments'] ?? [];
 
 if (is_string($agenda)) {
     $decodedAgenda = json_decode($agenda, true);
@@ -26,6 +27,11 @@ if (is_string($minutes)) {
 if (is_string($tags)) {
     $decodedTags = json_decode($tags, true);
     $tags = is_array($decodedTags) ? $decodedTags : array_filter(array_map('trim', explode(',', $tags)));
+}
+
+if (is_string($attachments)) {
+    $decodedAttachments = json_decode($attachments, true);
+    $attachments = is_array($decodedAttachments) ? $decodedAttachments : [];
 }
 
 $statusClass = match ($status) {
@@ -138,6 +144,19 @@ if (!empty($meeting['start_datetime']) && !empty($meeting['end_datetime'])) {
                     <?php else: ?>
                         <div class="module-empty py-4"><i class="bi bi-people"></i><p class="mb-0 mt-2">No participants are attached yet.</p></div>
                     <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="module-panel mb-4">
+                <div class="module-panel-header"><h2 class="module-panel-title"><i class="bi bi-paperclip me-2"></i>Attachments</h2></div>
+                <div class="module-panel-body">
+                    <?php
+                    $resource = 'meetings';
+                    $resourceId = (int) ($meeting['id'] ?? 0);
+                    $contextLabel = 'Meeting attachment';
+                    $emptyMessage = 'No meeting attachments uploaded yet.';
+                    require dirname(__DIR__) . '/partials/attachment_list.php';
+                    ?>
                 </div>
             </div>
 
