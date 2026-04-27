@@ -411,7 +411,9 @@ class UserLeaderRegistrationController extends BaseController
                 return $this->jsonResponse(['success' => false, 'message' => 'User not found']);
             }
 
-            $currentRole = $this->normalizeRegistrationRole((string) ($user['user_type'] ?? $user['role'] ?? 'member'));
+            $userRecord = method_exists($user, 'toArray') ? $user->toArray() : (array) $user;
+
+            $currentRole = $this->normalizeRegistrationRole((string) ($userRecord['user_type'] ?? $userRecord['role'] ?? 'member'));
             $requestedRole = $this->normalizeRegistrationRole((string) ($_POST['role'] ?? $currentRole));
 
             if (!in_array($requestedRole, ['member', 'executive', 'admin', 'system_admin'], true)) {
