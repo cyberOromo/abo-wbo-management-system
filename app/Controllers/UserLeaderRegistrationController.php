@@ -243,18 +243,7 @@ class UserLeaderRegistrationController extends BaseController
                 return $this->jsonResponse(['success' => false, 'message' => 'Level required']);
             }
 
-            $nameColumn = $this->getPositionNameColumn();
-            $hierarchyColumn = $this->getPositionHierarchyColumn();
-            $executiveExpression = $this->hasPositionColumn('is_executive') ? 'is_executive' : '0';
-
-            // Get positions for the specified level
-            $positions = $this->db->fetchAll(
-                "SELECT id, {$nameColumn} AS name, {$executiveExpression} AS is_executive, {$hierarchyColumn} AS hierarchy_type 
-                 FROM positions 
-                 WHERE {$hierarchyColumn} = ? 
-                 ORDER BY name",
-                [$level]
-            );
+            $positions = $this->getAssignmentPositionsForLevel((string) $level);
 
             // Check which positions are already occupied for this hierarchy level
             if ($hierarchyId) {
@@ -262,7 +251,7 @@ class UserLeaderRegistrationController extends BaseController
                 
                 // Mark occupied positions
                 foreach ($positions as &$position) {
-                    $position['is_occupied'] = in_array($position['id'], $occupiedPositions);
+                    $position['is_occupied'] = in_array((int) $position['id'], array_map('intval', $occupiedPositions), true);
                 }
             }
 
@@ -690,7 +679,10 @@ class UserLeaderRegistrationController extends BaseController
             'created_at' => date('Y-m-d H:i:s')
         ]) + $this->filterTableData('user_assignments', $scopeColumns);
 
-        return $this->db->insert('user_assignments', $assignmentData);
+        $assignmentId = $this->db->insert('user_assignments', $assignmentData);
+        $this->syncResponsibilitiesForAssignment($userId, $assignment);
+
+        return $assignmentId;
     }
 
     private function provisionUserInternalEmails(int $userId, array $userData, array $positionData): array
@@ -836,15 +828,261 @@ class UserLeaderRegistrationController extends BaseController
      */
     private function getPositions(): array
     {
-        $nameColumn = $this->getPositionNameColumn();
-        $hierarchyColumn = $this->getPositionHierarchyColumn();
-        $executiveExpression = $this->hasPositionColumn('is_executive') ? 'is_executive' : '0';
+        return $this->getAssignmentPositionsForLevel('global');
+    }
 
-        return $this->db->fetchAll("
-            SELECT id, {$nameColumn} AS name, {$hierarchyColumn} AS hierarchy_type, {$executiveExpression} AS is_executive 
-            FROM positions 
-            ORDER BY hierarchy_type, name
-        ");
+    private function getAssignmentPositionsForLevel(string $level): array
+    {
+        $nameColumn = $this->getPositionNameColumn();
+        $nameOmColumn = $this->hasPositionColumn('name_om') ? 'name_om' : $nameColumn;
+        $scopeColumn = $this->getPositionHierarchyColumn();
+        $executiveExpression = $this->hasPositionColumn('is_executive') ? 'is_executive' : '1';
+        $whereClauses = [];
+
+        if ($this->hasPositionColumn('status')) {
+            $whereClauses[] = "status = 'active'";
+        }
+
+        $rows = $this->db->fetchAll(
+            "SELECT id, key_name, {$nameColumn} AS name, {$nameOmColumn} AS name_om, {$scopeColumn} AS scope_value, {$executiveExpression} AS is_executive
+             FROM positions"
+             . (!empty($whereClauses) ? ' WHERE ' . implode(' AND ', $whereClauses) : '')
+             . ' ORDER BY id ASC'
+        );
+
+        $canonicalKeys = $this->getCanonicalExecutivePositionKeys();
+        $positions = [];
+
+        foreach ($rows as $row) {
+            $positionKey = (string) ($row['key_name'] ?? '');
+            if ($positionKey !== '' && !in_array($positionKey, $canonicalKeys, true)) {
+                continue;
+            }
+
+            $scopeValue = (string) ($row['scope_value'] ?? 'all');
+            $appliesToAll = $scopeValue === '' || $scopeValue === 'all';
+            if (!$appliesToAll && $scopeValue !== $level) {
+                continue;
+            }
+
+            $displayName = (string) ($row['name'] ?? $positionKey ?: 'Position');
+            $positions[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'key_name' => $positionKey,
+                'name' => $displayName,
+                'name_om' => (string) ($row['name_om'] ?? $displayName),
+                'hierarchy_type' => $appliesToAll ? 'all' : $scopeValue,
+                'is_executive' => (bool) ((int) ($row['is_executive'] ?? 1)),
+                'responsibility_preview' => $this->buildPositionResponsibilityPreview($positionKey, $displayName, $level),
+            ];
+        }
+
+        usort($positions, function (array $left, array $right) use ($canonicalKeys): int {
+            $leftIndex = array_search($left['key_name'] ?? '', $canonicalKeys, true);
+            $rightIndex = array_search($right['key_name'] ?? '', $canonicalKeys, true);
+
+            return ((int) $leftIndex) <=> ((int) $rightIndex);
+        });
+
+        return $positions;
+    }
+
+    private function buildPositionResponsibilityPreview(string $positionKey, string $positionName, string $levelScope): array
+    {
+        $categories = $this->getCanonicalResponsibilityCategories();
+        $shared = [];
+        $individual = [];
+
+        foreach ($categories as $categoryKey => $category) {
+            $shared[] = [
+                'key_name' => $categoryKey,
+                'category' => $categoryKey,
+                'name_en' => $category['shared_name_en'],
+                'name_om' => $category['shared_name_om'],
+                'description_en' => $category['shared_description_en'],
+                'description_om' => $category['shared_description_om'],
+                'responsibility_type' => 'shared',
+            ];
+
+            $individual[] = [
+                'key_name' => $positionKey . '_' . $categoryKey,
+                'category' => $categoryKey,
+                'name_en' => $positionName . ': ' . $category['individual_name_en'],
+                'name_om' => $positionName . ': ' . $category['individual_name_om'],
+                'description_en' => sprintf('%s responsibilities for %s at %s scope.', $category['individual_name_en'], $positionName, ucfirst($levelScope)),
+                'description_om' => sprintf('%s itti gaafatamummaa %s sadarkaa %s keessatti.', $category['individual_name_om'], $positionName, ucfirst($levelScope)),
+                'responsibility_type' => 'individual',
+                'position_scope' => $positionKey,
+            ];
+        }
+
+        return [
+            'shared' => $shared,
+            'individual' => $individual,
+        ];
+    }
+
+    private function syncResponsibilitiesForAssignment(int $userId, array $assignment): void
+    {
+        if (!$this->db->tableExists('responsibilities') || !$this->db->tableExists('responsibility_assignments')) {
+            return;
+        }
+
+        $position = $this->db->fetch('SELECT * FROM positions WHERE id = ?', [(int) ($assignment['position_id'] ?? 0)]);
+        if (!$position) {
+            return;
+        }
+
+        $positionKey = (string) ($position['key_name'] ?? '');
+        if ($positionKey === '') {
+            return;
+        }
+
+        $positionNameColumn = $this->getPositionNameColumn();
+        $positionName = (string) ($position[$positionNameColumn] ?? $positionKey);
+        $levelScope = (string) ($assignment['hierarchy_level'] ?? 'global');
+        $organizationalUnitId = (int) (($assignment['hierarchy_id'] ?? null) ?: ($levelScope === 'global' ? 1 : 0));
+        if ($organizationalUnitId <= 0) {
+            return;
+        }
+
+        $preview = $this->buildPositionResponsibilityPreview($positionKey, $positionName, $levelScope);
+        $definitions = array_merge($preview['shared'], $preview['individual']);
+
+        foreach ($definitions as $definition) {
+            $responsibilityId = $this->ensureResponsibilityRecord($definition, $levelScope, $positionKey);
+            if ($responsibilityId <= 0) {
+                continue;
+            }
+
+            $existingAssignmentId = (int) ($this->db->fetchColumn(
+                'SELECT id FROM responsibility_assignments WHERE user_id = ? AND responsibility_id = ? AND position_id = ? AND organizational_unit_id = ? LIMIT 1',
+                [$userId, $responsibilityId, (int) $assignment['position_id'], $organizationalUnitId]
+            ) ?? 0);
+
+            if ($existingAssignmentId > 0) {
+                continue;
+            }
+
+            $assignmentPayload = $this->filterTableData('responsibility_assignments', [
+                'user_id' => $userId,
+                'responsibility_id' => $responsibilityId,
+                'position_id' => (int) $assignment['position_id'],
+                'organizational_unit_id' => $organizationalUnitId,
+                'organizational_unit_type' => $levelScope,
+                'level_scope' => $levelScope,
+                'assignment_date' => date('Y-m-d H:i:s'),
+                'priority' => '2',
+                'status' => 'assigned',
+                'completion_percentage' => 0,
+                'notes' => 'Assigned automatically during user leadership registration.',
+                'metadata' => json_encode([
+                    'source' => 'user_leader_registration',
+                    'position_key' => $positionKey,
+                    'responsibility_type' => $definition['responsibility_type'] ?? 'individual',
+                    'category' => $definition['category'] ?? null,
+                ]),
+                'assigned_by' => $_SESSION['user']['id'] ?? null,
+            ]);
+
+            if (!empty($assignmentPayload)) {
+                $this->db->insert('responsibility_assignments', $assignmentPayload);
+            }
+        }
+    }
+
+    private function ensureResponsibilityRecord(array $definition, string $levelScope, string $positionKey): int
+    {
+        $keyName = (string) ($definition['key_name'] ?? '');
+        if ($keyName === '') {
+            return 0;
+        }
+
+        $existingId = (int) ($this->db->fetchColumn('SELECT id FROM responsibilities WHERE key_name = ? LIMIT 1', [$keyName]) ?? 0);
+        if ($existingId > 0) {
+            return $existingId;
+        }
+
+        $payload = $this->filterTableData('responsibilities', [
+            'key_name' => $keyName,
+            'name_en' => (string) ($definition['name_en'] ?? $keyName),
+            'name_om' => (string) ($definition['name_om'] ?? $keyName),
+            'description_en' => (string) ($definition['description_en'] ?? ''),
+            'description_om' => (string) ($definition['description_om'] ?? ''),
+            'responsibility_type' => ($definition['responsibility_type'] ?? 'individual') === 'shared' ? 'shared' : 'individual',
+            'category' => ($definition['responsibility_type'] ?? 'individual') === 'shared' ? 'core' : 'position_specific',
+            'level_scope' => ($definition['responsibility_type'] ?? 'individual') === 'shared' ? $levelScope : 'all',
+            'position_scope' => ($definition['responsibility_type'] ?? 'individual') === 'shared' ? 'all' : $positionKey,
+            'is_shared' => ($definition['responsibility_type'] ?? 'individual') === 'shared' ? 1 : 0,
+            'priority' => ($definition['responsibility_type'] ?? 'individual') === 'shared' ? 1 : 2,
+            'frequency' => 30,
+            'status' => 'active',
+            'metadata' => json_encode([
+                'source' => 'COMPREHENSIVE_POSITIONS_RESPONSIBILITIES_DOCUMENTATION',
+                'category' => $definition['category'] ?? null,
+            ]),
+        ]);
+
+        return !empty($payload) ? (int) $this->db->insert('responsibilities', $payload) : 0;
+    }
+
+    private function getCanonicalExecutivePositionKeys(): array
+    {
+        return [
+            'barreessaa',
+            'dinagdee',
+            'diplomaasii_hawaasummaa',
+            'dura_taa',
+            'ijaarsaa_siyaasa',
+            'mediyaa_sab_quunnamtii',
+            'tohannoo_keessaa',
+        ];
+    }
+
+    private function getCanonicalResponsibilityCategories(): array
+    {
+        return [
+            'gabaasa' => [
+                'shared_name_en' => 'Collective Reporting & Documentation',
+                'shared_name_om' => 'Gabaasa fi Galmee Waliigalaa',
+                'shared_description_en' => 'Joint preparation of comprehensive organizational reports and documentation.',
+                'shared_description_om' => 'Qopheessuu waliigalaa gabaasa fi galmee bal\'aa dhaabbataa.',
+                'individual_name_en' => 'Reporting & Documentation',
+                'individual_name_om' => 'Gabaasa',
+            ],
+            'gamaaggama' => [
+                'shared_name_en' => 'Team Evaluation & Assessment',
+                'shared_name_om' => 'Gamaaggama fi Madaallii Garee',
+                'shared_description_en' => 'Collaborative evaluation and assessment of organizational performance.',
+                'shared_description_om' => 'Gamaaggama fi madaallii tumsaa raawwii dhaabbataa.',
+                'individual_name_en' => 'Evaluation & Assessment',
+                'individual_name_om' => 'Gamaaggama',
+            ],
+            'karoora' => [
+                'shared_name_en' => 'Collaborative Planning & Strategic Development',
+                'shared_name_om' => 'Karoora Tumsaa fi Misooma Tarsiimoo',
+                'shared_description_en' => 'Joint strategic planning development and coordinated decision making.',
+                'shared_description_om' => 'Misooma karoora tarsiimoo waliigalaa fi murtii qindoomina.',
+                'individual_name_en' => 'Planning & Strategic Development',
+                'individual_name_om' => 'Karoora',
+            ],
+            'projektoota' => [
+                'shared_name_en' => 'Joint Projects & Initiatives',
+                'shared_name_om' => 'Pirojektii fi Jalqabni Waliigalaa',
+                'shared_description_en' => 'Cross-functional project and initiative management and implementation.',
+                'shared_description_om' => 'Bulchiinsa pirojektii fi jalqabni hojii-garagar-qaban fi hojiirra oolmaa.',
+                'individual_name_en' => 'Projects & Initiatives',
+                'individual_name_om' => 'Projektoota',
+            ],
+            'qaboo_yaii' => [
+                'shared_name_en' => 'Shared Meetings Management',
+                'shared_name_om' => 'Bulchiinsa Qaboo Ya\'ii Qoodamaa',
+                'shared_description_en' => 'Collective meeting management and coordination.',
+                'shared_description_om' => 'Bulchiinsa fi qindoomina qaboo ya\'ii waliigalaa.',
+                'individual_name_en' => 'Meetings Management',
+                'individual_name_om' => 'Qaboo Ya\'ii',
+            ],
+        ];
     }
 
     private function getPositionColumns(): array

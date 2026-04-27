@@ -61,15 +61,34 @@ class UserController extends Controller
         
         $whereClause = !empty($conditions) ? 'WHERE ' . implode(' AND ', $conditions) : '';
         
-        // Get total count for pagination
-        $countQuery = "SELECT COUNT(*) as total FROM users u {$whereClause}";
-        $totalUsers = $this->db->fetch($countQuery, $params)['total'];
+        $countQuery = "SELECT COUNT(DISTINCT u.id) as total FROM users u {$whereClause}";
+        $totalUsers = (int) ($this->db->fetch($countQuery, $params)['total'] ?? 0);
         $totalPages = ceil($totalUsers / $limit);
-        
-        // Get users with pagination
-        $query = "SELECT u.*
+
+        $positionNameExpression = $this->getPositionNameExpression('p');
+        $query = "SELECT u.id, u.first_name, u.last_name, u.email, u.internal_email, u.phone, u.user_type, u.status,
+                         u.last_login_at, u.created_at, u.email_verified_at,
+                         COUNT(DISTINCT ua.id) AS assignment_count,
+                         GROUP_CONCAT(DISTINCT CONCAT(
+                             {$positionNameExpression},
+                             ' | ',
+                             CASE
+                                 WHEN ua.level_scope = 'global' THEN 'Global'
+                                 WHEN ua.level_scope = 'godina' THEN COALESCE(god.name, 'Godina')
+                                 WHEN ua.level_scope = 'gamta' THEN COALESCE(gam.name, 'Gamta')
+                                 WHEN ua.level_scope = 'gurmu' THEN COALESCE(gur.name, 'Gurmu')
+                                 ELSE COALESCE(ua.level_scope, 'Unscoped')
+                             END
+                         ) ORDER BY FIELD(ua.level_scope, 'global', 'godina', 'gamta', 'gurmu') SEPARATOR '||') AS positions
                   FROM users u
+                  LEFT JOIN user_assignments ua ON u.id = ua.user_id AND ua.status = 'active'
+                  LEFT JOIN positions p ON ua.position_id = p.id
+                  LEFT JOIN godinas god ON ua.godina_id = god.id
+                  LEFT JOIN gamtas gam ON ua.gamta_id = gam.id
+                  LEFT JOIN gurmus gur ON ua.gurmu_id = gur.id
                   {$whereClause}
+                  GROUP BY u.id, u.first_name, u.last_name, u.email, u.internal_email, u.phone, u.user_type, u.status,
+                           u.last_login_at, u.created_at, u.email_verified_at
                   ORDER BY u.created_at DESC
                   LIMIT {$limit} OFFSET {$offset}";
         $users = $this->db->fetchAll($query, $params);
@@ -78,6 +97,9 @@ class UserController extends Controller
             $roleKey = $user['user_type'] ?? 'member';
             $user['role_key'] = $roleKey;
             $user['role_label'] = ucwords(str_replace('_', ' ', $roleKey));
+            $positionSummary = array_values(array_filter(array_map('trim', explode('||', (string) ($user['positions'] ?? '')))));
+            $user['position_summary'] = $positionSummary;
+            $user['primary_position'] = $positionSummary[0] ?? null;
         }
         unset($user);
         
@@ -89,7 +111,11 @@ class UserController extends Controller
             'totalUsers' => $totalUsers,
             'search' => $search,
             'statusFilter' => $status,
-            'roleFilter' => $role
+            'roleFilter' => $role,
+            'positions' => $this->getManagementPositions(),
+            'godinas' => $this->getHierarchyRecords('godinas', 'name'),
+            'gamtas' => $this->getHierarchyRecords('gamtas', 'name', ['godina_id']),
+            'gurmus' => $this->getHierarchyRecords('gurmus', 'name', ['gamta_id'])
         ]);
     }
     
@@ -247,33 +273,21 @@ class UserController extends Controller
     public function show($id)
     {
         $this->requireAuth();
-        
-        $user = $this->userModel->findWithRelations($id);
-        
-        if (!$user) {
+
+        $payload = $this->getManagedUserPayload((int) $id);
+        if (!$payload) {
+            if ($this->wantsJsonResponse()) {
+                $this->error('User not found.', null, 404);
+            }
+
             $this->redirectWithMessage('/users', 'User not found.', 'error');
         }
-        
-        // Get user's activity log
-        $activities = $this->db->fetchAll(
-            "SELECT * FROM activity_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 20",
-            [$id]
-        );
-        
-        // Get user's positions
-        $positions = $this->db->fetchAll(
-            "SELECT p.*, up.assigned_at FROM positions p 
-             JOIN user_positions up ON p.id = up.position_id 
-             WHERE up.user_id = ? AND up.status = 'active'",
-            [$id]
-        );
-        
-        echo $this->render('users.show', [
-            'title' => 'User Details',
-            'user' => $user,
-            'activities' => $activities,
-            'positions' => $positions
-        ]);
+
+        if ($this->wantsJsonResponse()) {
+            $this->success($payload);
+        }
+
+        $this->redirect('/users?view=' . (int) $id);
     }
     
     /**
@@ -283,19 +297,27 @@ class UserController extends Controller
     {
         $this->requireAuth();
         $this->requirePermission('user.edit');
-        
-        $user = $this->userModel->find($id);
-        
-        if (!$user) {
+
+        $payload = $this->getManagedUserPayload((int) $id);
+        if (!$payload) {
+            if ($this->wantsJsonResponse()) {
+                $this->error('User not found.', null, 404);
+            }
+
             $this->redirectWithMessage('/users', 'User not found.', 'error');
         }
-        
-        echo $this->render('users.edit', [
-            'title' => 'Edit User',
-            'user' => $user,
-            'positions' => $this->getAvailablePositions(),
-            'gamtas' => $this->getAvailableGamtas()
-        ]);
+
+        if ($this->wantsJsonResponse()) {
+            $payload['options'] = [
+                'positions' => $this->getManagementPositions(),
+                'godinas' => $this->getHierarchyRecords('godinas', 'name'),
+                'gamtas' => $this->getHierarchyRecords('gamtas', 'name', ['godina_id']),
+                'gurmus' => $this->getHierarchyRecords('gurmus', 'name', ['gamta_id']),
+            ];
+            $this->success($payload);
+        }
+
+        $this->redirect('/users?edit=' . (int) $id);
     }
     
     /**
@@ -387,15 +409,146 @@ class UserController extends Controller
             
             if ($success) {
                 log_activity('user.deleted', "Deleted user: {$user['email']}", ['user_id' => $id]);
+                if ($this->wantsJsonResponse()) {
+                    $this->success(null, 'User deleted successfully!');
+                }
                 $this->redirectWithMessage('/users', 'User deleted successfully!', 'success');
             } else {
+                if ($this->wantsJsonResponse()) {
+                    $this->error('Failed to delete user.', null, 400);
+                }
                 $this->redirectWithMessage('/users', 'Failed to delete user.', 'error');
             }
             
         } catch (\Exception $e) {
             log_error('User deletion error: ' . $e->getMessage());
+            if ($this->wantsJsonResponse()) {
+                $this->error('An error occurred while deleting the user.', null, 500);
+            }
             $this->redirectWithMessage('/users', 'An error occurred while deleting the user.', 'error');
         }
+    }
+
+    private function wantsJsonResponse(): bool
+    {
+        return $this->isAjax() || (($_GET['format'] ?? '') === 'json') || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+    }
+
+    private function getManagedUserPayload(int $userId): ?array
+    {
+        $user = $this->db->fetch(
+            "SELECT id, first_name, middle_name, last_name, email, internal_email, phone, user_type, status,
+                    last_login_at, created_at, email_verified_at, metadata
+             FROM users
+             WHERE id = ?
+             LIMIT 1",
+            [$userId]
+        );
+
+        if (!$user) {
+            return null;
+        }
+
+        $assignments = $this->db->fetchAll(
+            "SELECT ua.id, ua.position_id, ua.level_scope, ua.organizational_unit_id, ua.godina_id, ua.gamta_id, ua.gurmu_id,
+                    ua.start_date, ua.end_date, ua.notes,
+                    " . $this->getPositionNameExpression('p') . " AS position_name,
+                    p.key_name AS position_key,
+                    CASE
+                        WHEN ua.level_scope = 'global' THEN 'Global'
+                        WHEN ua.level_scope = 'godina' THEN COALESCE(god.name, 'Godina')
+                        WHEN ua.level_scope = 'gamta' THEN COALESCE(gam.name, 'Gamta')
+                        WHEN ua.level_scope = 'gurmu' THEN COALESCE(gur.name, 'Gurmu')
+                        ELSE COALESCE(ua.level_scope, 'Unscoped')
+                    END AS organizational_unit_name
+             FROM user_assignments ua
+             LEFT JOIN positions p ON ua.position_id = p.id
+             LEFT JOIN godinas god ON ua.godina_id = god.id
+             LEFT JOIN gamtas gam ON ua.gamta_id = gam.id
+             LEFT JOIN gurmus gur ON ua.gurmu_id = gur.id
+             WHERE ua.user_id = ? AND ua.status = 'active'
+             ORDER BY FIELD(ua.level_scope, 'global', 'godina', 'gamta', 'gurmu'), ua.start_date DESC",
+            [$userId]
+        );
+
+        $responsibilitySummary = ['shared' => 0, 'individual' => 0, 'total' => 0];
+        if ($this->db->tableExists('responsibility_assignments') && $this->db->tableExists('responsibilities')) {
+            $responsibilitySummary = $this->db->fetch(
+                "SELECT
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN r.is_shared = 1 THEN 1 ELSE 0 END) AS shared,
+                    SUM(CASE WHEN r.is_shared = 0 THEN 1 ELSE 0 END) AS individual
+                 FROM responsibility_assignments ra
+                 INNER JOIN responsibilities r ON r.id = ra.responsibility_id
+                 WHERE ra.user_id = ? AND ra.status != 'cancelled'",
+                [$userId]
+            ) ?: $responsibilitySummary;
+        }
+
+        $user['role_key'] = $user['user_type'] ?? 'member';
+        $user['role_label'] = ucwords(str_replace('_', ' ', (string) $user['role_key']));
+
+        return [
+            'user' => $user,
+            'assignments' => $assignments,
+            'responsibility_summary' => [
+                'shared' => (int) ($responsibilitySummary['shared'] ?? 0),
+                'individual' => (int) ($responsibilitySummary['individual'] ?? 0),
+                'total' => (int) ($responsibilitySummary['total'] ?? 0),
+            ],
+        ];
+    }
+
+    private function getPositionNameExpression(string $alias = 'p'): string
+    {
+        $qualified = static fn (string $column) => $alias . '.' . $column;
+
+        if ($this->db->columnExists('positions', 'name_en') && $this->db->columnExists('positions', 'name')) {
+            return 'COALESCE(' . $qualified('name_en') . ', ' . $qualified('name') . ', ' . $qualified('key_name') . ')';
+        }
+
+        if ($this->db->columnExists('positions', 'name_en')) {
+            return 'COALESCE(' . $qualified('name_en') . ', ' . $qualified('key_name') . ')';
+        }
+
+        if ($this->db->columnExists('positions', 'name')) {
+            return 'COALESCE(' . $qualified('name') . ', ' . $qualified('key_name') . ')';
+        }
+
+        return $qualified('key_name');
+    }
+
+    private function getManagementPositions(): array
+    {
+        $nameExpression = $this->getPositionNameExpression('p');
+        $whereClause = $this->db->columnExists('positions', 'status') ? "WHERE p.status = 'active'" : '';
+
+        return $this->db->fetchAll(
+            "SELECT p.id, p.key_name, {$nameExpression} AS name,
+                    " . ($this->db->columnExists('positions', 'level_scope') ? 'p.level_scope' : "'all'") . " AS level_scope
+             FROM positions p
+             {$whereClause}
+             ORDER BY p.id ASC"
+        );
+    }
+
+    private function getHierarchyRecords(string $table, string $displayColumn, array $extraColumns = []): array
+    {
+        if (!$this->db->tableExists($table)) {
+            return [];
+        }
+
+        $columns = array_merge(['id', $displayColumn], $extraColumns);
+        $safeColumns = array_values(array_filter($columns, fn ($column) => $this->db->columnExists($table, $column)));
+        if (empty($safeColumns)) {
+            return [];
+        }
+
+        $orderColumn = in_array('name', $safeColumns, true) ? 'name' : $safeColumns[1];
+
+        return $this->db->fetchAll(
+            'SELECT ' . implode(', ', $safeColumns) . ' FROM ' . $table . ' ORDER BY ' . $orderColumn
+        );
     }
     
     /**

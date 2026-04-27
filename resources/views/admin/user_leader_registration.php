@@ -381,6 +381,7 @@ $current_user = $current_user ?? [];
                                         <input type="date" class="form-control" name="assignments[0][end_date]">
                                     </div>
                                 </div>
+                                <div class="assignment-responsibilities mt-3" data-assignment-preview="0"></div>
                             </div>
                         </div>
                     </div>
@@ -539,20 +540,106 @@ function loadHierarchyOptions(index) {
 
 function loadPositionsForLevel(index, level, hierarchyId) {
     const positionSelect = document.querySelector(`select[name="assignments[${index}][position_id]"]`);
-    
-    // Filter positions by hierarchy level
-    const levelPositions = positionsData.filter(pos => pos.hierarchy_type === level);
-    
-    positionSelect.innerHTML = '<option value="">Select Position</option>';
-    
-    levelPositions.forEach(position => {
-        const option = document.createElement('option');
-        option.value = position.id;
-        option.textContent = position.name + (position.is_executive ? ' (Executive)' : '');
-        positionSelect.appendChild(option);
-    });
-    
-    positionSelect.disabled = false;
+    const previewContainer = document.querySelector(`[data-assignment-preview="${index}"]`);
+
+    positionSelect.innerHTML = '<option value="">Loading positions...</option>';
+    positionSelect.disabled = true;
+    if (previewContainer) {
+        previewContainer.innerHTML = '';
+    }
+
+    const params = new URLSearchParams({ level });
+    if (hierarchyId) {
+        params.set('hierarchy_id', hierarchyId);
+    }
+
+    fetch(`/admin/user-leader-registration/positions-for-level?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to load positions');
+            }
+
+            const levelPositions = Array.isArray(data.data) ? data.data : [];
+            positionSelect._positions = levelPositions;
+            positionSelect.innerHTML = '<option value="">Select Position</option>';
+
+            levelPositions.forEach(position => {
+                const option = document.createElement('option');
+                option.value = position.id;
+
+                const suffix = [];
+                if (position.hierarchy_type === 'all') {
+                    suffix.push('All Levels');
+                }
+                if (position.is_occupied) {
+                    suffix.push('Occupied');
+                    option.disabled = true;
+                }
+
+                option.textContent = suffix.length > 0
+                    ? `${position.name} (${suffix.join(', ')})`
+                    : position.name;
+                positionSelect.appendChild(option);
+            });
+
+            positionSelect.disabled = false;
+            positionSelect.onchange = function() {
+                renderResponsibilityPreview(index, this.value);
+            };
+        })
+        .catch(error => {
+            console.error('Error loading positions:', error);
+            positionSelect._positions = [];
+            positionSelect.innerHTML = '<option value="">No positions available</option>';
+            positionSelect.disabled = true;
+            if (previewContainer) {
+                previewContainer.innerHTML = '<div class="alert alert-danger py-2 mb-0">Unable to load executive positions for the selected scope.</div>';
+            }
+        });
+}
+
+function renderResponsibilityPreview(index, positionId) {
+    const positionSelect = document.querySelector(`select[name="assignments[${index}][position_id]"]`);
+    const previewContainer = document.querySelector(`[data-assignment-preview="${index}"]`);
+    if (!previewContainer) {
+        return;
+    }
+
+    const positions = Array.isArray(positionSelect?._positions) ? positionSelect._positions : [];
+    const selectedPosition = positions.find(position => String(position.id) === String(positionId));
+
+    if (!selectedPosition || !selectedPosition.responsibility_preview) {
+        previewContainer.innerHTML = '';
+        return;
+    }
+
+    const shared = selectedPosition.responsibility_preview.shared || [];
+    const individual = selectedPosition.responsibility_preview.individual || [];
+
+    previewContainer.innerHTML = `
+        <div class="responsibility-preview card border-0 bg-light-subtle">
+            <div class="card-body py-3">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                    <div>
+                        <div class="fw-semibold">Responsibilities Applied to ${selectedPosition.name}</div>
+                        <small class="text-muted">This assignment will attach 5 shared team responsibilities and 5 individual position responsibilities.</small>
+                    </div>
+                    <span class="badge text-bg-primary">${shared.length + individual.length} Total</span>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="small text-uppercase text-muted fw-semibold mb-2">Shared Executive Responsibilities</div>
+                        ${shared.map(item => `<div class="responsibility-pill"><span>${item.name_en}</span><small>${item.name_om}</small></div>`).join('')}
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-uppercase text-muted fw-semibold mb-2">Individual Position Responsibilities</div>
+                        ${individual.map(item => `<div class="responsibility-pill"><span>${item.name_en}</span><small>${item.name_om}</small></div>`).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function getHierarchyOptions(level) {
@@ -631,6 +718,7 @@ function addAssignment() {
                         <i class="bi bi-trash"></i>
                     </button>
                 </div>
+                <div class="assignment-responsibilities mt-3" data-assignment-preview="${assignmentCount}"></div>
             </div>
             <div class="row mt-2">
                 <div class="col-md-8">
@@ -703,6 +791,7 @@ function resetAssignments() {
                         <input type="date" class="form-control" name="assignments[0][end_date]">
                     </div>
                 </div>
+                <div class="assignment-responsibilities mt-3" data-assignment-preview="0"></div>
             </div>
         </div>
     `;
@@ -806,13 +895,11 @@ function displayUsersList(data) {
 }
 
 function viewUser(userId) {
-    // Implement user details view
-    console.log('View user:', userId);
+    window.location.href = '/users?view=' + encodeURIComponent(userId);
 }
 
 function editUserAssignments(userId) {
-    // Implement user assignments editing
-    console.log('Edit user assignments:', userId);
+    window.location.href = '/users?edit=' + encodeURIComponent(userId);
 }
 
 function showAlert(message, type) {
@@ -882,5 +969,28 @@ function showAlert(message, type) {
 
 .position-select option {
     padding: 0.25rem 0;
+}
+
+.responsibility-preview {
+    border-left: 4px solid #0d6efd;
+}
+
+.responsibility-pill {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+    border: 1px solid rgba(13, 110, 253, 0.12);
+    border-radius: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.responsibility-pill span {
+    font-weight: 600;
+}
+
+.responsibility-pill small {
+    color: #6c757d;
 }
 </style>
