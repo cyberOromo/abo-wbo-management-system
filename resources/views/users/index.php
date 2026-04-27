@@ -386,7 +386,7 @@ $breadcrumbs = [
             </div>
             <form id="userAssignmentsForm">
                 <div class="modal-body">
-                    <?= csrf_field() ?>
+                    <input type="hidden" name="_token" id="editAssignmentsCsrfToken" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
                     <input type="hidden" name="user_id" id="editAssignmentsUserId" value="">
                     <div id="userAssignmentsFeedback" class="d-none"></div>
                     <div class="row g-3 align-items-end mb-3">
@@ -547,6 +547,12 @@ function normalizeManagedUserRole(role) {
 
 function roleAllowsAssignmentEditing(role) {
     return ['executive', 'admin', 'system_admin'].includes(normalizeManagedUserRole(role));
+}
+
+function getEditAssignmentsCsrfToken() {
+    return document.getElementById('editAssignmentsCsrfToken')?.value
+        || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        || '';
 }
 
 function syncEditAssignmentsRoleState() {
@@ -953,6 +959,10 @@ function openEditAssignments(userId) {
     container.innerHTML = '<div class="text-center py-5"><div class="spinner-border" role="status"></div></div>';
     document.getElementById('editAssignmentsUserId').value = userId;
     document.getElementById('editAssignmentsRole').value = 'member';
+    const tokenField = document.getElementById('editAssignmentsCsrfToken');
+    if (tokenField && !tokenField.value) {
+        tokenField.value = getEditAssignmentsCsrfToken();
+    }
     setAssignmentsFeedback('');
     modal.show();
 
@@ -999,11 +1009,15 @@ document.getElementById('userAssignmentsForm').addEventListener('submit', functi
     submitButton.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Saving...';
 
     const formData = new FormData(this);
+    formData.set('_token', getEditAssignmentsCsrfToken());
 
     fetch('/admin/user-leader-registration/update-assignments', {
         method: 'POST',
         body: formData,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': getEditAssignmentsCsrfToken()
+        }
     })
         .then(response => parseJsonResponse(response, 'The server returned an invalid response while updating assignments.'))
         .then(payload => {
