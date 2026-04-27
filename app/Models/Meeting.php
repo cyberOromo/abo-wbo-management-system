@@ -136,6 +136,20 @@ class Meeting extends Model
     }
 
     /**
+     * Update an existing meeting record.
+     */
+    public function updateMeeting(int $meetingId, array $data): bool
+    {
+        foreach (['agenda', 'recurring_pattern', 'attachments', 'moderators', 'tags', 'meeting_minutes'] as $field) {
+            if (isset($data[$field]) && is_array($data[$field])) {
+                $data[$field] = json_encode($data[$field]);
+            }
+        }
+
+        return $this->update($meetingId, $data);
+    }
+
+    /**
      * Get meetings by hierarchical scope
      */
     public function getMeetingsByScope(string $scope, int $scopeId = null, array $filters = []): array

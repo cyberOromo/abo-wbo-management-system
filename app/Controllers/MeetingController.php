@@ -348,7 +348,7 @@ class MeetingController extends BaseController
                 throw new Exception('Failed to update meeting');
             }
             
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             $this->setError('Failed to update meeting: ' . $e->getMessage());
             echo $this->render('meetings/edit', ['meeting' => array_merge($meeting, $_POST), 'isEdit' => true]);
         }

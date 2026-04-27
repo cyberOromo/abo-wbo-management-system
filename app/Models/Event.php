@@ -152,6 +152,20 @@ class Event extends Model
     }
 
     /**
+     * Update an existing event record.
+     */
+    public function updateEvent(int $eventId, array $data): bool
+    {
+        foreach (['agenda', 'speakers', 'sponsors', 'social_media_links', 'gallery_images', 'requirements', 'what_to_bring', 'tags', 'custom_fields', 'organizers'] as $field) {
+            if (isset($data[$field]) && is_array($data[$field])) {
+                $data[$field] = json_encode($data[$field]);
+            }
+        }
+
+        return $this->update($eventId, $data);
+    }
+
+    /**
      * Get events by hierarchical scope
      */
     public function getEventsByScope(string $scope, int $scopeId = null, array $filters = []): array
