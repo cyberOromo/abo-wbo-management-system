@@ -31,18 +31,18 @@ class EventController extends BaseController
             // Get events from database directly
             $db = \App\Utils\Database::getInstance();
             $hasCreatedBy = $db->columnExists('events', 'created_by');
-            $hasGodinaId = $db->columnExists('events', 'godina_id');
-            $hasScopeId = $db->columnExists('events', 'scope_id');
-            $hasLevelScope = $db->columnExists('events', 'level_scope');
+            $hasOrganizedBy = $db->columnExists('events', 'organized_by');
+            $ownerColumn = $hasOrganizedBy ? 'organized_by' : ($hasCreatedBy ? 'created_by' : null);
             
             // Simple query for events with hierarchy filtering
             $sql = "SELECT e.*";
 
-            if ($hasCreatedBy) {
+            if ($ownerColumn !== null) {
                 $sql .= ", u.first_name, u.last_name,
                            CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as created_by_name
                         FROM events e
-                        LEFT JOIN users u ON e.created_by = u.id";
+                        LEFT JOIN users u ON e.{$ownerColumn} = u.id
+                        LEFT JOIN user_assignments event_scope_ua ON event_scope_ua.user_id = e.{$ownerColumn} AND event_scope_ua.status = 'active'";
             } else {
                 $sql .= ", NULL as first_name, NULL as last_name, '' as created_by_name
                         FROM events e";
@@ -54,18 +54,10 @@ class EventController extends BaseController
             $params = [];
             
             // Apply hierarchy filtering based on user role and scope
-            $scope = $this->getUserHierarchicalScope($user);
-            
-            if ($scope !== 'all') {
-                if (isset($scope['godina']) && $scope['godina']) {
-                    if ($hasGodinaId) {
-                        $sql .= " AND e.godina_id = ?";
-                        $params[] = $scope['godina'];
-                    } elseif ($hasLevelScope && $hasScopeId) {
-                        $sql .= " AND e.level_scope = 'godina' AND e.scope_id = ?";
-                        $params[] = $scope['godina'];
-                    }
-                }
+            $scope = $this->getResolvedEventUserScope((int) $user['id']);
+
+            if (($user['role'] ?? null) !== 'admin') {
+                $sql = $this->applyEventScopeFilter($sql, $params, $scope);
             }
             
             $sql .= " ORDER BY e.created_at DESC LIMIT 100";
@@ -75,25 +67,24 @@ class EventController extends BaseController
             // Get event statistics
             $statsSql = "SELECT 
                             COUNT(*) as total,
-                            COUNT(CASE WHEN status = 'upcoming' THEN 1 END) as upcoming,
-                            COUNT(CASE WHEN status = 'ongoing' THEN 1 END) as ongoing,
-                            COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-                            COUNT(CASE WHEN created_at > DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as recent
-                        FROM events e
+                            COUNT(CASE WHEN e.status = 'upcoming' THEN 1 END) as upcoming,
+                            COUNT(CASE WHEN e.status = 'ongoing' THEN 1 END) as ongoing,
+                            COUNT(CASE WHEN e.status = 'completed' THEN 1 END) as completed,
+                            COUNT(CASE WHEN e.created_at > DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as recent
+                        FROM events e";
+
+            if ($ownerColumn !== null) {
+                $statsSql .= "
+                        LEFT JOIN user_assignments event_scope_ua ON event_scope_ua.user_id = e.{$ownerColumn} AND event_scope_ua.status = 'active'";
+            }
+
+            $statsSql .= "
                         WHERE 1=1";
-            
-            if ($scope !== 'all' && isset($scope['godina']) && $scope['godina']) {
-                if ($hasGodinaId) {
-                    $statsSql .= " AND e.godina_id = ?";
-                    $statsParams = [$scope['godina']];
-                } elseif ($hasLevelScope && $hasScopeId) {
-                    $statsSql .= " AND e.level_scope = 'godina' AND e.scope_id = ?";
-                    $statsParams = [$scope['godina']];
-                } else {
-                    $statsParams = [];
-                }
-            } else {
-                $statsParams = [];
+
+            $statsParams = [];
+
+            if (($user['role'] ?? null) !== 'admin') {
+                $statsSql = $this->applyEventScopeFilter($statsSql, $statsParams, $scope);
             }
             
             $stats = $db->fetch($statsSql, $statsParams) ?: [];
@@ -111,6 +102,56 @@ class EventController extends BaseController
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to load events: ' . $e->getMessage());
         }
+    }
+
+    private function getResolvedEventUserScope(int $userId): array
+    {
+        $db = \App\Utils\Database::getInstance();
+        $scope = $db->fetch(
+            "SELECT ua.*, go.name as global_name, gd.name as godina_name, ga.name as gamta_name, gu.name as gurmu_name
+             FROM user_assignments ua
+             LEFT JOIN globals go ON ua.global_id = go.id
+             LEFT JOIN godinas gd ON ua.godina_id = gd.id
+             LEFT JOIN gamtas ga ON ua.gamta_id = ga.id
+             LEFT JOIN gurmus gu ON ua.gurmu_id = gu.id
+             WHERE ua.user_id = ? AND ua.status = 'active'
+             LIMIT 1",
+            [$userId]
+        ) ?: [];
+
+        if (!empty($scope)) {
+            $scope['scope_name'] = $scope['gurmu_name']
+                ?? $scope['gamta_name']
+                ?? $scope['godina_name']
+                ?? $scope['global_name']
+                ?? 'Current hierarchy scope';
+        }
+
+        return $scope;
+    }
+
+    private function applyEventScopeFilter(string $sql, array &$params, array $scope): string
+    {
+        $scopeColumn = $this->getEventScopeColumn((string) ($scope['level_scope'] ?? ''));
+        $scopeValue = $scopeColumn !== null ? ($scope[$scopeColumn] ?? null) : null;
+
+        if ($scopeColumn !== null && $scopeValue !== null) {
+            $sql .= " AND event_scope_ua.{$scopeColumn} = ?";
+            $params[] = (int) $scopeValue;
+        }
+
+        return $sql;
+    }
+
+    private function getEventScopeColumn(string $levelScope): ?string
+    {
+        return match ($levelScope) {
+            'global' => 'global_id',
+            'godina' => 'godina_id',
+            'gamta' => 'gamta_id',
+            'gurmu' => 'gurmu_id',
+            default => null,
+        };
     }
 
     /**
@@ -672,16 +713,15 @@ class EventController extends BaseController
     private function canViewEvent($event)
     {
         if ($this->user['role'] === 'admin') return true;
-        if ($event['created_by'] == $this->user['id']) return true;
+        if ($this->getEventOwnerUserId($event) === (int) $this->user['id']) return true;
         
-        // Check if user is in the same scope or parent scope
-        return $this->isInScopeHierarchy($event['level_scope'], $event['scope_id']);
+        return $this->eventMatchesScope($event, $this->getResolvedEventUserScope((int) $this->user['id']));
     }
     
     private function canEditEvent($event)
     {
         if ($this->user['role'] === 'admin') return true;
-        if ($event['created_by'] == $this->user['id']) return true;
+        if ($this->getEventOwnerUserId($event) === (int) $this->user['id']) return true;
         
         return false;
     }
@@ -689,9 +729,36 @@ class EventController extends BaseController
     private function canDeleteEvent($event)
     {
         if ($this->user['role'] === 'admin') return true;
-        if ($event['created_by'] == $this->user['id']) return true;
+        if ($this->getEventOwnerUserId($event) === (int) $this->user['id']) return true;
         
         return false;
+    }
+
+    private function getEventOwnerUserId(array $event): int
+    {
+        return (int) ($event['organized_by'] ?? $event['created_by'] ?? 0);
+    }
+
+    private function eventMatchesScope(array $event, array $scope): bool
+    {
+        $ownerUserId = $this->getEventOwnerUserId($event);
+        if ($ownerUserId <= 0) {
+            return false;
+        }
+
+        $scopeColumn = $this->getEventScopeColumn((string) ($scope['level_scope'] ?? ''));
+        $scopeValue = $scopeColumn !== null ? ($scope[$scopeColumn] ?? null) : null;
+
+        if ($scopeColumn === null || $scopeValue === null) {
+            return false;
+        }
+
+        $assignment = \App\Utils\Database::getInstance()->fetch(
+            "SELECT global_id, godina_id, gamta_id, gurmu_id FROM user_assignments WHERE user_id = ? AND status = 'active' LIMIT 1",
+            [$ownerUserId]
+        );
+
+        return !empty($assignment) && (int) ($assignment[$scopeColumn] ?? 0) === (int) $scopeValue;
     }
     
     private function canRegisterForEvent($event, $existingRegistration)

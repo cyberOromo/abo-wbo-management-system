@@ -1,0 +1,325 @@
+<?php
+
+declare(strict_types=1);
+
+const DEFAULT_BASE_URL = 'https://staging.j-abo-wbo.org';
+const DEFAULT_PASSWORD = 'Stage123!';
+
+if (!function_exists('curl_init')) {
+    fwrite(STDERR, "cURL is required to run this validator.\n");
+    exit(2);
+}
+
+$baseUrl = rtrim(getenv('ABO_STAGE_BASE_URL') ?: DEFAULT_BASE_URL, '/');
+$password = getenv('ABO_STAGE_PASSWORD') ?: DEFAULT_PASSWORD;
+
+$accounts = [
+    'global' => [
+        'email' => getenv('ABO_STAGE_GLOBAL_EMAIL') ?: 'galana.b@j-abo-wbo.org',
+    ],
+    'gurmu' => [
+        'email' => getenv('ABO_STAGE_GURMU_EMAIL') ?: 'tigist.d@j-abo-wbo.org',
+    ],
+];
+
+$failures = [];
+
+foreach ($accounts as $label => $account) {
+    $cookieFile = tempnam(sys_get_temp_dir(), 'abo-project-proof-');
+    if ($cookieFile === false) {
+        fwrite(STDERR, "Failed to create temporary cookie file.\n");
+        exit(2);
+    }
+
+    try {
+        login($baseUrl, $cookieFile, $account['email'], $password);
+        $createPage = httpRequest('GET', $baseUrl . '/projects/create', $cookieFile);
+        $ownerOptions = extractSelectOptions($createPage['body'], 'owner_user_id', true);
+        $teamOptions = extractSelectOptions($createPage['body'], 'team_user_ids[]', true);
+
+        $ownerPass = count($ownerOptions) > 0;
+        $teamPass = count($teamOptions) > 0;
+
+        echo sprintf(
+            "%s owner options: %d %s",
+            strtoupper($label),
+            count($ownerOptions),
+            $ownerPass ? 'PASS' : 'FAIL'
+        ) . PHP_EOL;
+        echo sprintf(
+            "%s team options: %d %s",
+            strtoupper($label),
+            count($teamOptions),
+            $teamPass ? 'PASS' : 'FAIL'
+        ) . PHP_EOL;
+
+        if (!$ownerPass) {
+            $failures[] = sprintf('%s project create form did not expose any owner options.', $label);
+        }
+
+        if (!$teamPass) {
+            $failures[] = sprintf('%s project create form did not expose any team options.', $label);
+        }
+    } catch (Throwable $throwable) {
+        $failures[] = sprintf('%s project create-form validation failed: %s', $label, $throwable->getMessage());
+        echo strtoupper($label) . ' create-form FAIL: ' . $throwable->getMessage() . PHP_EOL;
+    } finally {
+        if (is_file($cookieFile)) {
+            @unlink($cookieFile);
+        }
+    }
+}
+
+$creatorCookie = tempnam(sys_get_temp_dir(), 'abo-project-creator-');
+$assigneeCookie = tempnam(sys_get_temp_dir(), 'abo-project-assignee-');
+
+if ($creatorCookie === false || $assigneeCookie === false) {
+    fwrite(STDERR, "Failed to create temporary cookie files.\n");
+    exit(2);
+}
+
+try {
+    $creatorEmail = $accounts['gurmu']['email'];
+    login($baseUrl, $creatorCookie, $creatorEmail, $password);
+
+    $createPage = httpRequest('GET', $baseUrl . '/projects/create', $creatorCookie);
+    $csrfToken = extractCsrfToken($createPage['body']);
+    if ($csrfToken === null) {
+        throw new RuntimeException('Could not extract CSRF token from project create page.');
+    }
+
+    $ownerOptions = extractSelectOptions($createPage['body'], 'owner_user_id', true);
+    $teamOptions = extractSelectOptions($createPage['body'], 'team_user_ids[]', true);
+
+    if (count($ownerOptions) === 0) {
+        throw new RuntimeException('No project owner options were available on the project create page.');
+    }
+
+    if (count($teamOptions) === 0) {
+        throw new RuntimeException('No project team options were available on the project create page.');
+    }
+
+    $ownerOption = count($ownerOptions) > 1 ? $ownerOptions[1] : $ownerOptions[0];
+    $teamUserIds = [];
+    foreach ($teamOptions as $option) {
+        if ($option['value'] === '') {
+            continue;
+        }
+
+        if ($option['value'] === $ownerOption['value']) {
+            continue;
+        }
+
+        $teamUserIds[] = $option['value'];
+        if (count($teamUserIds) >= 2) {
+            break;
+        }
+    }
+
+    $projectTitle = 'STG Project Proof ' . gmdate('YmdHis');
+    $createResponse = httpRequest('POST', $baseUrl . '/projects', $creatorCookie, [
+        '_token' => $csrfToken,
+        'title' => $projectTitle,
+        'summary' => 'Automated staging proof-chain validation for project assignment visibility.',
+        'description' => 'Automated staging proof-chain validation for project assignment visibility and detail routing.',
+        'project_code' => '',
+        'status' => 'active',
+        'priority' => 'medium',
+        'project_type' => 'initiative',
+        'start_date' => gmdate('Y-m-d'),
+        'target_date' => gmdate('Y-m-d', strtotime('+14 days')),
+        'completion_percentage' => '0',
+        'budget_amount' => '',
+        'owner_user_id' => $ownerOption['value'],
+        'team_user_ids' => $teamUserIds,
+        'success_metrics' => 'Validator proves project assignment visibility on staging.',
+        'status_notes' => 'Automated validator run.',
+        'delivery_notes' => 'Generated by validate-staging-project-proof-chain.php',
+    ]);
+
+    if (!preg_match('#/projects/(\d+)#', $createResponse['effective_url'], $matches)) {
+        throw new RuntimeException('Could not resolve created project id from redirect URL: ' . $createResponse['effective_url']);
+    }
+
+    $projectId = (int) $matches[1];
+    $detailPage = httpRequest('GET', $baseUrl . '/projects/' . $projectId, $creatorCookie);
+
+    if (!str_contains($detailPage['body'], $projectTitle)) {
+        throw new RuntimeException('Created project title was not visible on the project detail page.');
+    }
+
+    $emails = extractEmails($detailPage['body']);
+    $assignedEmail = null;
+    foreach ($emails as $email) {
+        if (strcasecmp($email, $creatorEmail) !== 0) {
+            $assignedEmail = $email;
+            break;
+        }
+    }
+
+    if ($assignedEmail === null) {
+        throw new RuntimeException('Could not extract a non-creator assigned user email from the project detail page.');
+    }
+
+    login($baseUrl, $assigneeCookie, $assignedEmail, $password);
+
+    $assigneeProjects = httpRequest('GET', $baseUrl . '/projects', $assigneeCookie);
+    $listVisible = str_contains($assigneeProjects['body'], $projectTitle);
+    echo 'ASSIGNEE list visibility: ' . ($listVisible ? 'PASS' : 'FAIL') . PHP_EOL;
+    if (!$listVisible) {
+        $failures[] = 'Assigned project was not visible on the assignee project list.';
+    }
+
+    $assigneeDetail = httpRequest('GET', $baseUrl . '/projects/' . $projectId, $assigneeCookie);
+    $detailVisible = str_contains($assigneeDetail['body'], $projectTitle);
+    echo 'ASSIGNEE detail visibility: ' . ($detailVisible ? 'PASS' : 'FAIL') . PHP_EOL;
+    if (!$detailVisible) {
+        $failures[] = 'Assigned project detail route was not visible to the assignee.';
+    }
+
+    echo 'CREATED PROJECT: ' . $projectTitle . ' (#' . $projectId . ')' . PHP_EOL;
+    echo 'ASSIGNEE EMAIL: ' . $assignedEmail . PHP_EOL;
+} catch (Throwable $throwable) {
+    $failures[] = 'Project assignment proof-chain failed: ' . $throwable->getMessage();
+    echo 'PROJECT PROOF FAIL: ' . $throwable->getMessage() . PHP_EOL;
+} finally {
+    if (is_file($creatorCookie)) {
+        @unlink($creatorCookie);
+    }
+
+    if (is_file($assigneeCookie)) {
+        @unlink($assigneeCookie);
+    }
+}
+
+if (!empty($failures)) {
+    echo PHP_EOL . 'Project proof-chain validation failed.' . PHP_EOL;
+    foreach ($failures as $failure) {
+        echo ' - ' . $failure . PHP_EOL;
+    }
+    exit(1);
+}
+
+echo PHP_EOL . 'Project proof-chain validation passed.' . PHP_EOL;
+exit(0);
+
+function login(string $baseUrl, string $cookieFile, string $email, string $password): void
+{
+    $loginPage = httpRequest('GET', $baseUrl . '/auth/login', $cookieFile);
+    $csrfToken = extractCsrfToken($loginPage['body']);
+    if ($csrfToken === null) {
+        throw new RuntimeException('Could not extract CSRF token from login page.');
+    }
+
+    $loginResponse = httpRequest('POST', $baseUrl . '/auth/login', $cookieFile, [
+        '_token' => $csrfToken,
+        'internal_email' => $email,
+        'password' => $password,
+    ]);
+
+    if (str_contains($loginResponse['effective_url'], '/auth/login')) {
+        throw new RuntimeException('Login did not complete successfully for ' . $email . '.');
+    }
+}
+
+function httpRequest(string $method, string $url, string $cookieFile, array $postFields = []): array
+{
+    $handle = curl_init($url);
+    if ($handle === false) {
+        throw new RuntimeException('Failed to initialize cURL.');
+    }
+
+    curl_setopt_array($handle, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_MAXREDIRS => 5,
+        CURLOPT_COOKIEJAR => $cookieFile,
+        CURLOPT_COOKIEFILE => $cookieFile,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+        CURLOPT_USERAGENT => 'ABO-WBO Project Proof Validator/1.0',
+        CURLOPT_TIMEOUT => 30,
+    ]);
+
+    if ($method === 'POST') {
+        curl_setopt($handle, CURLOPT_POST, true);
+        curl_setopt($handle, CURLOPT_POSTFIELDS, http_build_query($postFields));
+    }
+
+    $body = curl_exec($handle);
+    if ($body === false) {
+        $error = curl_error($handle);
+        curl_close($handle);
+        throw new RuntimeException('HTTP request failed: ' . $error);
+    }
+
+    $statusCode = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+    $effectiveUrl = (string) curl_getinfo($handle, CURLINFO_EFFECTIVE_URL);
+    curl_close($handle);
+
+    if ($statusCode >= 400) {
+        throw new RuntimeException('HTTP ' . $statusCode . ' for ' . $url);
+    }
+
+    return [
+        'status' => $statusCode,
+        'effective_url' => $effectiveUrl,
+        'body' => $body,
+    ];
+}
+
+function extractCsrfToken(string $html): ?string
+{
+    if (preg_match('/name="_token"\s+value="([^"]+)"/', $html, $matches) === 1) {
+        return html_entity_decode($matches[1], ENT_QUOTES);
+    }
+
+    return null;
+}
+
+function extractSelectOptions(string $html, string $name, bool $withValues = false): array
+{
+    $document = new DOMDocument();
+    @$document->loadHTML($html);
+
+    $selects = $document->getElementsByTagName('select');
+    foreach ($selects as $select) {
+        if ($select->getAttribute('name') !== $name) {
+            continue;
+        }
+
+        $options = [];
+        foreach ($select->getElementsByTagName('option') as $option) {
+            $label = trim(html_entity_decode($option->textContent, ENT_QUOTES));
+            if ($label === '') {
+                continue;
+            }
+
+            if ($withValues) {
+                $options[] = [
+                    'value' => $option->getAttribute('value'),
+                    'label' => $label,
+                ];
+                continue;
+            }
+
+            $options[] = strtolower(trim((string) $option->getAttribute('value')));
+        }
+
+        return $options;
+    }
+
+    throw new RuntimeException('Select field not found: ' . $name);
+}
+
+function extractEmails(string $html): array
+{
+    preg_match_all('/[A-Z0-9._%+-]+@j-abo-wbo\.org/i', $html, $matches);
+
+    $emails = array_map(
+        static fn (string $email): string => strtolower($email),
+        $matches[0] ?? []
+    );
+
+    return array_values(array_unique($emails));
+}

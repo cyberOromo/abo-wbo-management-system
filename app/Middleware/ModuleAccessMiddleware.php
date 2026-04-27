@@ -42,6 +42,7 @@ class ModuleAccessMiddleware
             '/hierarchy' => 'hierarchy',
             '/positions' => 'positions',
             '/responsibilities' => 'responsibilities',
+            '/projects' => 'projects',
             '/reports' => 'reports',
             '/notifications' => 'notifications',
             '/settings' => 'settings',

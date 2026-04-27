@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Notification;
@@ -406,6 +407,15 @@ class TaskService
         } catch (\Exception $e) {
             error_log("Get completion trends error: " . $e->getMessage());
             return [];
+        }
+    }
+
+    private function updateProjectProgress(int $projectId): void
+    {
+        try {
+            (new Project())->recalculateProjectProgress($projectId);
+        } catch (\Throwable $e) {
+            error_log('Update project progress error: ' . $e->getMessage());
         }
     }
 

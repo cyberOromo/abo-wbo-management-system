@@ -460,10 +460,34 @@ if (!function_exists('auth_user')) {
         
         // Map user_type to role for backward compatibility
         if ($user && isset($user['user_type'])) {
-            $user['role'] = $user['user_type'] === 'system_admin' ? 'admin' : $user['user_type'];
+            $user['role'] = match ($user['user_type']) {
+                'system_admin' => 'admin',
+                'leader', 'executive' => 'executive',
+                default => $user['user_type'],
+            };
         }
         
         return $user;
+    }
+}
+
+if (!function_exists('normalized_user_role')) {
+    /**
+     * Normalize legacy role/user_type values into the shared access labels.
+     */
+    function normalized_user_role(?array $user): ?string {
+        if (!$user) {
+            return null;
+        }
+
+        $sourceRole = $user['user_type'] ?? $user['role'] ?? null;
+
+        return match ($sourceRole) {
+            'system_admin', 'admin' => 'admin',
+            'leader', 'executive' => 'executive',
+            'user', 'member' => 'member',
+            default => $sourceRole,
+        };
     }
 }
 
@@ -477,7 +501,7 @@ if (!function_exists('is_member')) {
      */
     function is_member() {
         $user = auth_user();
-        return $user && ($user['user_type'] ?? 'member') === 'member';
+        return normalized_user_role($user) === 'member';
     }
 }
 
@@ -487,7 +511,7 @@ if (!function_exists('is_executive')) {
      */
     function is_executive() {
         $user = auth_user();
-        return $user && ($user['user_type'] ?? 'member') === 'executive';
+        return normalized_user_role($user) === 'executive';
     }
 }
 
@@ -497,7 +521,7 @@ if (!function_exists('is_system_admin')) {
      */
     function is_system_admin() {
         $user = auth_user();
-        return $user && ($user['user_type'] ?? 'member') === 'system_admin';
+        return normalized_user_role($user) === 'admin';
     }
 }
 
@@ -536,16 +560,19 @@ if (!function_exists('module_access_map')) {
                 'meetings',
                 'events',
                 'donations',
+                'projects',
                 'profile',
             ],
             'executive' => [
                 'dashboard',
                 'users',
                 'hierarchy',
+                'positions',
                 'tasks',
                 'meetings',
                 'events',
                 'donations',
+                'projects',
                 'reports',
                 'responsibilities',
                 'profile',
@@ -559,6 +586,7 @@ if (!function_exists('module_access_map')) {
                 'meetings',
                 'events',
                 'donations',
+                'projects',
                 'reports',
                 'responsibilities',
                 'settings',
@@ -578,6 +606,10 @@ if (!function_exists('can_access_module')) {
     function can_access_module(string $module): bool {
         if (!auth_check()) {
             return false;
+        }
+
+        if (in_array($module, ['positions', 'responsibilities'], true) && has_position()) {
+            return true;
         }
 
         $role = current_user_role();

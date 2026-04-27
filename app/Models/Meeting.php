@@ -414,6 +414,57 @@ class Meeting extends Model
     }
 
     /**
+     * Get one meeting record for detail views.
+     */
+    public function getMeetingById(int $meetingId): ?array
+    {
+        try {
+            $ownerColumn = $this->db->columnExists($this->table, 'organized_by')
+                ? 'organized_by'
+                : ($this->db->columnExists($this->table, 'created_by') ? 'created_by' : null);
+
+            $sql = 'SELECT m.*';
+            if ($ownerColumn !== null) {
+                $sql .= ", u.first_name as creator_first_name,
+                            u.last_name as creator_last_name,
+                            CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as created_by_name";
+            }
+
+            $sql .= " FROM {$this->table} m";
+            if ($ownerColumn !== null) {
+                $sql .= " LEFT JOIN users u ON m.{$ownerColumn} = u.id";
+            }
+
+            $sql .= ' WHERE m.id = :meeting_id LIMIT 1';
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute(['meeting_id' => $meetingId]);
+            $meeting = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+            if ($meeting === null) {
+                return null;
+            }
+
+            foreach (['agenda', 'recurring_pattern', 'meeting_minutes', 'attachments', 'moderators', 'tags'] as $field) {
+                $meeting[$field] = json_decode($meeting[$field] ?? '[]', true);
+            }
+
+            return $meeting;
+        } catch (\Exception $e) {
+            error_log('Get meeting by id error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get meeting activities for detail views.
+     */
+    public function getMeetingActivities(int $meetingId): array
+    {
+        return $this->getMeetingHistory($meetingId);
+    }
+
+    /**
      * Save meeting minutes
      */
     public function saveMeetingMinutes(int $meetingId, array $minutes, int $userId): array

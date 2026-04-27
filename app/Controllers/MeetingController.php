@@ -34,18 +34,18 @@ class MeetingController extends BaseController
             // Get meetings from database directly
             $db = \App\Utils\Database::getInstance();
             $hasCreatedBy = $db->columnExists('meetings', 'created_by');
-            $hasGodinaId = $db->columnExists('meetings', 'godina_id');
-            $hasScopeId = $db->columnExists('meetings', 'scope_id');
-            $hasLevelScope = $db->columnExists('meetings', 'level_scope');
+            $hasOrganizedBy = $db->columnExists('meetings', 'organized_by');
+            $ownerColumn = $hasOrganizedBy ? 'organized_by' : ($hasCreatedBy ? 'created_by' : null);
             
             // Simple query for meetings with hierarchy filtering  
             $sql = "SELECT m.*";
 
-            if ($hasCreatedBy) {
+            if ($ownerColumn !== null) {
                 $sql .= ", u.first_name, u.last_name,
                            CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as created_by_name
                         FROM meetings m
-                        LEFT JOIN users u ON m.created_by = u.id";
+                        LEFT JOIN users u ON m.{$ownerColumn} = u.id
+                        LEFT JOIN user_assignments meeting_scope_ua ON meeting_scope_ua.user_id = m.{$ownerColumn} AND meeting_scope_ua.status = 'active'";
             } else {
                 $sql .= ", NULL as first_name, NULL as last_name, '' as created_by_name
                         FROM meetings m";
@@ -57,18 +57,10 @@ class MeetingController extends BaseController
             $params = [];
             
             // Apply hierarchy filtering based on user role and scope
-            $scope = $this->getUserHierarchicalScope($user);
+            $scope = $this->getResolvedMeetingUserScope((int) $user['id']);
             
-            if ($scope !== 'all') {
-                if (isset($scope['godina']) && $scope['godina']) {
-                    if ($hasGodinaId) {
-                        $sql .= " AND m.godina_id = ?";
-                        $params[] = $scope['godina'];
-                    } elseif ($hasLevelScope && $hasScopeId) {
-                        $sql .= " AND m.level_scope = 'godina' AND m.scope_id = ?";
-                        $params[] = $scope['godina'];
-                    }
-                }
+            if (($user['role'] ?? null) !== 'admin') {
+                $sql = $this->applyMeetingScopeFilter($sql, $params, $scope);
             }
             
             $sql .= " ORDER BY m.created_at DESC LIMIT 100";
@@ -78,25 +70,24 @@ class MeetingController extends BaseController
             // Get meeting statistics
             $statsSql = "SELECT 
                             COUNT(*) as total,
-                            COUNT(CASE WHEN status = 'scheduled' THEN 1 END) as scheduled,
-                            COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress,
-                            COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-                            COUNT(CASE WHEN created_at > DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as recent
-                        FROM meetings m
+                            COUNT(CASE WHEN m.status = 'scheduled' THEN 1 END) as scheduled,
+                            COUNT(CASE WHEN m.status = 'in_progress' THEN 1 END) as in_progress,
+                            COUNT(CASE WHEN m.status = 'completed' THEN 1 END) as completed,
+                            COUNT(CASE WHEN m.created_at > DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as recent
+                        FROM meetings m";
+
+            if ($ownerColumn !== null) {
+                $statsSql .= "
+                        LEFT JOIN user_assignments meeting_scope_ua ON meeting_scope_ua.user_id = m.{$ownerColumn} AND meeting_scope_ua.status = 'active'";
+            }
+
+            $statsSql .= "
                         WHERE 1=1";
-            
-            if ($scope !== 'all' && isset($scope['godina']) && $scope['godina']) {
-                if ($hasGodinaId) {
-                    $statsSql .= " AND m.godina_id = ?";
-                    $statsParams = [$scope['godina']];
-                } elseif ($hasLevelScope && $hasScopeId) {
-                    $statsSql .= " AND m.level_scope = 'godina' AND m.scope_id = ?";
-                    $statsParams = [$scope['godina']];
-                } else {
-                    $statsParams = [];
-                }
-            } else {
-                $statsParams = [];
+
+            $statsParams = [];
+
+            if (($user['role'] ?? null) !== 'admin') {
+                $statsSql = $this->applyMeetingScopeFilter($statsSql, $statsParams, $scope);
             }
             
             $stats = $db->fetch($statsSql, $statsParams) ?: [];
@@ -123,6 +114,56 @@ class MeetingController extends BaseController
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to load meetings: ' . $e->getMessage());
         }
+    }
+
+    private function getResolvedMeetingUserScope(int $userId): array
+    {
+        $db = \App\Utils\Database::getInstance();
+        $scope = $db->fetch(
+            "SELECT ua.*, go.name as global_name, gd.name as godina_name, ga.name as gamta_name, gu.name as gurmu_name
+             FROM user_assignments ua
+             LEFT JOIN globals go ON ua.global_id = go.id
+             LEFT JOIN godinas gd ON ua.godina_id = gd.id
+             LEFT JOIN gamtas ga ON ua.gamta_id = ga.id
+             LEFT JOIN gurmus gu ON ua.gurmu_id = gu.id
+             WHERE ua.user_id = ? AND ua.status = 'active'
+             LIMIT 1",
+            [$userId]
+        ) ?: [];
+
+        if (!empty($scope)) {
+            $scope['scope_name'] = $scope['gurmu_name']
+                ?? $scope['gamta_name']
+                ?? $scope['godina_name']
+                ?? $scope['global_name']
+                ?? 'Current executive scope';
+        }
+
+        return $scope;
+    }
+
+    private function applyMeetingScopeFilter(string $sql, array &$params, array $scope): string
+    {
+        $scopeColumn = $this->getMeetingScopeColumn((string) ($scope['level_scope'] ?? ''));
+        $scopeValue = $scopeColumn !== null ? ($scope[$scopeColumn] ?? null) : null;
+
+        if ($scopeColumn !== null && $scopeValue !== null) {
+            $sql .= " AND meeting_scope_ua.{$scopeColumn} = ?";
+            $params[] = (int) $scopeValue;
+        }
+
+        return $sql;
+    }
+
+    private function getMeetingScopeColumn(string $levelScope): ?string
+    {
+        return match ($levelScope) {
+            'global' => 'global_id',
+            'godina' => 'godina_id',
+            'gamta' => 'gamta_id',
+            'gurmu' => 'gurmu_id',
+            default => null,
+        };
     }
 
     /**
@@ -576,17 +617,16 @@ class MeetingController extends BaseController
     private function canViewMeeting($meeting)
     {
         if ($this->user['role'] === 'admin') return true;
-        if ($meeting['created_by'] == $this->user['id']) return true;
-        if ($meeting['is_public']) return true;
+        if ($this->getMeetingOwnerUserId($meeting) === (int) $this->user['id']) return true;
+        if (!empty($meeting['is_public'])) return true;
         
-        // Check if user is in the same scope or parent scope
-        return $this->isInScopeHierarchy($meeting['level_scope'], $meeting['scope_id']);
+        return $this->meetingMatchesScope($meeting, $this->getResolvedMeetingUserScope((int) $this->user['id']));
     }
     
     private function canEditMeeting($meeting)
     {
         if ($this->user['role'] === 'admin') return true;
-        if ($meeting['created_by'] == $this->user['id']) return true;
+        if ($this->getMeetingOwnerUserId($meeting) === (int) $this->user['id']) return true;
         
         return false;
     }
@@ -594,7 +634,7 @@ class MeetingController extends BaseController
     private function canDeleteMeeting($meeting)
     {
         if ($this->user['role'] === 'admin') return true;
-        if ($meeting['created_by'] == $this->user['id']) return true;
+        if ($this->getMeetingOwnerUserId($meeting) === (int) $this->user['id']) return true;
         
         return false;
     }
@@ -602,10 +642,37 @@ class MeetingController extends BaseController
     private function canManageMeetingParticipants($meeting)
     {
         if ($this->user['role'] === 'admin') return true;
-        if ($meeting['created_by'] == $this->user['id']) return true;
+        if ($this->getMeetingOwnerUserId($meeting) === (int) $this->user['id']) return true;
         
         // Check if user is moderator
         $moderators = json_decode($meeting['moderators'] ?? '[]', true);
         return in_array($this->user['id'], $moderators);
+    }
+
+    private function getMeetingOwnerUserId(array $meeting): int
+    {
+        return (int) ($meeting['organized_by'] ?? $meeting['created_by'] ?? 0);
+    }
+
+    private function meetingMatchesScope(array $meeting, array $scope): bool
+    {
+        $ownerUserId = $this->getMeetingOwnerUserId($meeting);
+        if ($ownerUserId <= 0) {
+            return false;
+        }
+
+        $scopeColumn = $this->getMeetingScopeColumn((string) ($scope['level_scope'] ?? ''));
+        $scopeValue = $scopeColumn !== null ? ($scope[$scopeColumn] ?? null) : null;
+
+        if ($scopeColumn === null || $scopeValue === null) {
+            return false;
+        }
+
+        $assignment = \App\Utils\Database::getInstance()->fetch(
+            "SELECT global_id, godina_id, gamta_id, gurmu_id FROM user_assignments WHERE user_id = ? AND status = 'active' LIMIT 1",
+            [$ownerUserId]
+        );
+
+        return !empty($assignment) && (int) ($assignment[$scopeColumn] ?? 0) === (int) $scopeValue;
     }
 }

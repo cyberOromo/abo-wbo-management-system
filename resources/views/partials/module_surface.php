@@ -33,6 +33,12 @@
         --module-accent-strong: rgba(16, 185, 129, 0.24);
     }
 
+    .module-surface.theme-projects {
+        --module-accent: #8b1538;
+        --module-accent-soft: rgba(139, 21, 56, 0.12);
+        --module-accent-strong: rgba(139, 21, 56, 0.24);
+    }
+
     .module-surface.theme-reports {
         --module-accent: #7c3aed;
         --module-accent-soft: rgba(124, 58, 237, 0.12);
@@ -67,6 +73,24 @@
         --module-accent: #0f766e;
         --module-accent-soft: rgba(15, 118, 110, 0.12);
         --module-accent-strong: rgba(15, 118, 110, 0.24);
+    }
+
+    .module-surface.theme-member {
+        --module-accent: #2563eb;
+        --module-accent-soft: rgba(37, 99, 235, 0.12);
+        --module-accent-strong: rgba(37, 99, 235, 0.24);
+    }
+
+    .module-surface.theme-admin {
+        --module-accent: #b45309;
+        --module-accent-soft: rgba(180, 83, 9, 0.12);
+        --module-accent-strong: rgba(180, 83, 9, 0.24);
+    }
+
+    .module-surface.theme-system-admin {
+        --module-accent: #991b1b;
+        --module-accent-soft: rgba(153, 27, 27, 0.12);
+        --module-accent-strong: rgba(153, 27, 27, 0.24);
     }
 
     .module-hero {

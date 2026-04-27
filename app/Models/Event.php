@@ -421,11 +421,55 @@ class Event extends Model
     }
 
     /**
-     * Get event statistics by scope
+     * Get one event record for detail views.
      */
-    public function getEventStatistics(string $scope, int $scopeId = null): array
+    public function getEventById(int $eventId): ?array
     {
         try {
+            $ownerColumn = $this->db->columnExists($this->table, 'organized_by')
+                ? 'organized_by'
+                : ($this->db->columnExists($this->table, 'created_by') ? 'created_by' : null);
+
+            $sql = 'SELECT e.*';
+            if ($ownerColumn !== null) {
+                $sql .= ", u.first_name,
+                            u.last_name,
+                            CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as created_by_name";
+            }
+
+            $sql .= " FROM {$this->table} e";
+            if ($ownerColumn !== null) {
+                $sql .= " LEFT JOIN users u ON e.{$ownerColumn} = u.id";
+            }
+
+            $sql .= ' WHERE e.id = :event_id LIMIT 1';
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute(['event_id' => $eventId]);
+            $event = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+            if ($event === null) {
+                return null;
+            }
+
+            $this->decodeEventJsonFields($event);
+            return $event;
+        } catch (\Exception $e) {
+            error_log('Get event by id error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get event statistics by scope
+     */
+    public function getEventStatistics($scope, int $scopeId = null): array
+    {
+        try {
+            if (is_numeric($scope) && $scopeId === null) {
+                return $this->getSingleEventStatistics((int) $scope);
+            }
+
             $query = "SELECT 
                         COUNT(*) as total_events,
                         SUM(CASE WHEN status = 'planning' THEN 1 ELSE 0 END) as planning_events,
@@ -482,6 +526,54 @@ class Event extends Model
         } catch (\Exception $e) {
             error_log("Get event statistics error: " . $e->getMessage());
             return [];
+        }
+    }
+
+    /**
+     * Get event activities for detail views.
+     */
+    public function getEventActivities(int $eventId): array
+    {
+        try {
+            if (!$this->db->tableExists('event_activities')) {
+                return [];
+            }
+
+            return $this->db->fetchAll(
+                "SELECT ea.*, u.first_name, u.last_name,
+                        CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as actor_name
+                 FROM event_activities ea
+                 LEFT JOIN users u ON ea.user_id = u.id
+                 WHERE ea.event_id = ?
+                 ORDER BY ea.created_at DESC",
+                [$eventId]
+            );
+        } catch (\Exception $e) {
+            error_log('Get event activities error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get one user's registration for a single event.
+     */
+    public function getUserRegistration(int $eventId, int $userId): ?array
+    {
+        try {
+            $registration = $this->db->fetch(
+                'SELECT * FROM event_participants WHERE event_id = ? AND user_id = ? LIMIT 1',
+                [$eventId, $userId]
+            );
+
+            if (!$registration) {
+                return null;
+            }
+
+            $registration['registration_data'] = json_decode($registration['registration_data'] ?? '{}', true);
+            return $registration;
+        } catch (\Exception $e) {
+            error_log('Get user registration error: ' . $e->getMessage());
+            return null;
         }
     }
 
@@ -628,6 +720,47 @@ class Event extends Model
             error_log("Get confirmed participants count error: " . $e->getMessage());
             return 0;
         }
+    }
+
+    private function getSingleEventStatistics(int $eventId): array
+    {
+        $eventRow = $this->db->fetch(
+            'SELECT max_participants, is_virtual, status FROM events WHERE id = ? LIMIT 1',
+            [$eventId]
+        );
+
+        if (!$eventRow) {
+            return [];
+        }
+
+        $participantStats = $this->db->fetch(
+            "SELECT
+                COUNT(*) as total_registrations,
+                COUNT(DISTINCT user_id) as unique_participants,
+                SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) as confirmed_registrations,
+                SUM(CASE WHEN status = 'attended' THEN 1 ELSE 0 END) as attended_count,
+                SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_registrations
+             FROM event_participants
+             WHERE event_id = ?",
+            [$eventId]
+        ) ?: [];
+
+        $stats = array_merge([
+            'total_events' => 1,
+            'planning_events' => $eventRow['status'] === self::STATUS_PLANNING ? 1 : 0,
+            'open_registration_events' => $eventRow['status'] === self::STATUS_OPEN_REGISTRATION ? 1 : 0,
+            'completed_events' => $eventRow['status'] === self::STATUS_COMPLETED ? 1 : 0,
+            'cancelled_events' => $eventRow['status'] === self::STATUS_CANCELLED ? 1 : 0,
+            'virtual_events' => !empty($eventRow['is_virtual']) ? 1 : 0,
+            'upcoming_events' => 0,
+            'avg_capacity' => $eventRow['max_participants'] ?? null,
+        ], $participantStats);
+
+        $stats['attendance_rate'] = !empty($stats['confirmed_registrations'])
+            ? round((((int) ($stats['attended_count'] ?? 0)) / (int) $stats['confirmed_registrations']) * 100, 2)
+            : 0;
+
+        return $stats;
     }
 
     /**

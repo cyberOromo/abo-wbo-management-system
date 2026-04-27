@@ -117,7 +117,7 @@
                                 </ul>
                             </li>
                         <?php endif; ?>
-                        <?php $showActivities = can_access_module('tasks') || can_access_module('meetings') || can_access_module('events'); ?>
+                        <?php $showActivities = can_access_module('tasks') || can_access_module('meetings') || can_access_module('events') || can_access_module('projects'); ?>
                         <?php if ($showActivities): ?>
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
@@ -132,6 +132,9 @@
                                     <?php endif; ?>
                                     <?php if (can_access_module('events')): ?>
                                         <li><a class="dropdown-item" href="/events">Events</a></li>
+                                    <?php endif; ?>
+                                    <?php if (can_access_module('projects')): ?>
+                                        <li><a class="dropdown-item" href="/projects">Projects</a></li>
                                     <?php endif; ?>
                                 </ul>
                             </li>
