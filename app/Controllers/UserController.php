@@ -36,10 +36,15 @@ class UserController extends Controller
         $search = $_GET['search'] ?? '';
         $status = $_GET['status'] ?? '';
         $role = $_GET['role'] ?? '';
+        $deletedAtColumnExists = $this->db->columnExists('users', 'deleted_at');
         
         // Build query conditions
         $conditions = [];
         $params = [];
+
+        if ($deletedAtColumnExists) {
+            $conditions[] = 'u.deleted_at IS NULL';
+        }
         
         if (!empty($search)) {
             $conditions[] = "(u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR u.internal_email LIKE ?)";
@@ -400,12 +405,14 @@ class UserController extends Controller
         }
         
         try {
+            $this->ensureUserSoftDeleteColumns();
+
             $deleteData = [
-                'status' => 'deleted'
+                'deleted_at' => date('Y-m-d H:i:s')
             ];
 
-            if ($this->db->columnExists('users', 'deleted_at')) {
-                $deleteData['deleted_at'] = date('Y-m-d H:i:s');
+            if ($this->userStatusSupportsDeletedValue()) {
+                $deleteData['status'] = 'deleted';
             }
 
             $deletedBy = auth_user()['id'] ?? null;
@@ -414,7 +421,7 @@ class UserController extends Controller
             }
 
             $affectedRows = $this->db->update('users', $deleteData, ['id' => (int) $id]);
-            $success = $affectedRows > 0;
+            $success = $affectedRows > 0 || $this->isUserSoftDeleted((int) $id);
             
             if ($success) {
                 try {
@@ -446,6 +453,68 @@ class UserController extends Controller
     private function wantsJsonResponse(): bool
     {
         return $this->isAjax() || (($_GET['format'] ?? '') === 'json') || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+    }
+
+    private function ensureUserSoftDeleteColumns(): void
+    {
+        if (!$this->db->columnExists('users', 'deleted_at')) {
+            $this->db->exec('ALTER TABLE users ADD COLUMN deleted_at DATETIME NULL AFTER updated_at');
+        }
+
+        if (!$this->db->columnExists('users', 'deleted_by')) {
+            $this->db->exec('ALTER TABLE users ADD COLUMN deleted_by INT NULL AFTER deleted_at');
+        }
+    }
+
+    private function userStatusSupportsDeletedValue(): bool
+    {
+        if (!$this->db->columnExists('users', 'status')) {
+            return false;
+        }
+
+        $columnType = strtolower((string) $this->db->fetchColumn(
+            'SELECT COLUMN_TYPE
+             FROM information_schema.columns
+             WHERE table_schema = DATABASE()
+               AND table_name = ?
+               AND column_name = ?',
+            ['users', 'status']
+        ));
+
+        if ($columnType === '') {
+            return false;
+        }
+
+        if (str_starts_with($columnType, 'enum(')) {
+            return str_contains($columnType, "'deleted'");
+        }
+
+        return true;
+    }
+
+    private function isUserSoftDeleted(int $userId): bool
+    {
+        $conditions = [];
+        $params = [];
+
+        if ($this->db->columnExists('users', 'deleted_at')) {
+            $conditions[] = 'deleted_at IS NOT NULL';
+        }
+
+        if ($this->userStatusSupportsDeletedValue()) {
+            $conditions[] = "status = 'deleted'";
+        }
+
+        if (empty($conditions)) {
+            return false;
+        }
+
+        $params[] = $userId;
+
+        return $this->db->fetch(
+            'SELECT id FROM users WHERE id = ? AND (' . implode(' OR ', $conditions) . ') LIMIT 1',
+            $params
+        ) !== null;
     }
 
     private function getManagedUserPayload(int $userId): ?array
