@@ -273,7 +273,7 @@ class MeetingController extends BaseController
             
             echo $this->render('meetings/show', $data);
             
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             $this->setError('Failed to load meeting: ' . $e->getMessage());
             $this->redirect('/meetings');
         }
@@ -307,7 +307,7 @@ class MeetingController extends BaseController
             
             echo $this->render('meetings/edit', $data);
             
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             $this->setError('Failed to load edit form: ' . $e->getMessage());
             $this->redirect('/meetings');
         }

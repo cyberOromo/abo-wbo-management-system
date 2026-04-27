@@ -270,7 +270,7 @@ class EventController extends BaseController
             
             echo $this->render('events/show', $data);
             
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             $this->setError('Failed to load event: ' . $e->getMessage());
             $this->redirect('/events');
         }
@@ -304,7 +304,7 @@ class EventController extends BaseController
             
             echo $this->render('events/edit', $data);
             
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             $this->setError('Failed to load edit form: ' . $e->getMessage());
             $this->redirect('/events');
         }
