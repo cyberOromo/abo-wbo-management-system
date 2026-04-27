@@ -45,6 +45,11 @@ class SystemAdminController extends Controller
             'maintenance_tasks' => $maintenanceTasks
         ]);
     }
+
+    public function userRegistration()
+    {
+        return $this->redirect('/admin/user-leader-registration');
+    }
     
     /**
      * GLOBAL ORGANIZATION MANAGEMENT

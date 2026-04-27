@@ -259,12 +259,11 @@ class TaskController extends BaseController
             // Get available users for assignment
             $availableUsers = $this->getAvailableUsersForScope($userScope);
             
-            // Get parent tasks
-            $parentTasks = $this->taskModel->getTasksByScope(
-                $userScope['scope'], 
-                $userScope['scope_id'],
-                ['status' => ['pending', 'in_progress']]
-            );
+            // Reuse the create-form parent-task loader to avoid stale filter assumptions.
+            $parentTasks = array_values(array_filter(
+                $this->getVisibleParentTasks($userScope),
+                static fn (array $parentTask): bool => (int) ($parentTask['id'] ?? 0) !== $id
+            ));
 
             $this->render('tasks.edit', [
                 'title' => 'Edit Task',

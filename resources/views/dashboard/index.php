@@ -241,7 +241,7 @@
             </div>
             <div class="card-body">
                 <div class="list-group list-group-flush">
-                    <a href="/users/create" class="list-group-item list-group-item-action border-0 px-0">
+                    <a href="/admin/user-leader-registration" class="list-group-item list-group-item-action border-0 px-0">
                         <div class="row align-items-center">
                             <div class="col-auto">
                                 <div class="icon icon-sm bg-primary text-white rounded-circle">

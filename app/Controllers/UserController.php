@@ -100,13 +100,8 @@ class UserController extends Controller
     {
         $this->requireAuth();
         $this->requirePermission('user.create');
-        
-        echo $this->render('users.create', [
-            'title' => 'Create User',
-            'positions' => $this->getAvailablePositions(),
-            'hierarchy_data' => $this->getHierarchyData(),
-            'gamtas' => $this->getAvailableGamtas()
-        ]);
+
+        return $this->redirect('/admin/user-leader-registration');
     }
     
     /**

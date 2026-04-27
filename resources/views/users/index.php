@@ -13,7 +13,7 @@ $breadcrumbs = [
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
-            <a href="/users/create" class="btn btn-primary">
+            <a href="/admin/user-leader-registration" class="btn btn-primary">
                 <i class="bi bi-person-plus me-1"></i>
                 Add User
             </a>
@@ -135,7 +135,7 @@ $breadcrumbs = [
                 <i class="bi bi-people text-muted" style="font-size: 4rem;"></i>
                 <h4 class="text-muted mt-3">No Users Found</h4>
                 <p class="text-muted">No users match your current filters.</p>
-                <a href="/users/create" class="btn btn-primary">
+                <a href="/admin/user-leader-registration" class="btn btn-primary">
                     <i class="bi bi-person-plus me-1"></i>
                     Add First User
                 </a>

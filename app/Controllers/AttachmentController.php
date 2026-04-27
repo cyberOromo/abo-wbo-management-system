@@ -75,7 +75,7 @@ class AttachmentController extends BaseController
     private function resolveMeetingAttachment(int $meetingId, int $index): array
     {
         $meeting = $this->db->fetch(
-            'SELECT id, title, created_by, organized_by, is_public, level_scope, scope_id, attachments FROM meetings WHERE id = ?',
+            'SELECT id, title, organized_by, is_public, level_scope, scope_id, attachments FROM meetings WHERE id = ?',
             [$meetingId]
         );
 
@@ -268,7 +268,7 @@ class AttachmentController extends BaseController
         }
 
         $userId = (int) ($user['id'] ?? 0);
-        $ownerUserId = (int) ($meeting['organized_by'] ?? $meeting['created_by'] ?? 0);
+        $ownerUserId = (int) ($meeting['organized_by'] ?? 0);
 
         if ($userId > 0 && $ownerUserId === $userId) {
             return;
