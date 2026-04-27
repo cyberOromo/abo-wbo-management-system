@@ -514,6 +514,46 @@ class TaskController extends BaseController
         }
     }
 
+    public function destroy(int $id): void
+    {
+        try {
+            $this->requirePost();
+            $this->validateCsrfToken();
+
+            $user = $this->getAuthUser();
+            $userScope = $this->getUserScope($user);
+            $task = $this->loadTaskRecord($id);
+
+            if (!$task || !$this->canEditTask($task, $user, $userScope)) {
+                $this->redirect('/tasks?error=delete_access_denied');
+                return;
+            }
+
+            $taskIds = $this->collectTaskDescendantIds($id);
+            rsort($taskIds);
+
+            $this->db->beginTransaction();
+
+            try {
+                $this->deleteTaskRelatedRows($taskIds);
+
+                foreach ($taskIds as $taskId) {
+                    $this->db->delete('tasks', ['id' => $taskId]);
+                }
+
+                $this->db->commit();
+            } catch (\Exception $exception) {
+                $this->db->rollback();
+                throw $exception;
+            }
+
+            $this->redirect('/tasks?success=task_deleted');
+        } catch (\Exception $e) {
+            error_log('Task delete error: ' . $e->getMessage());
+            $this->redirect('/tasks/' . $id . '?error=task_delete_failed');
+        }
+    }
+
     /**
      * Get tasks API endpoint
      */
@@ -1291,6 +1331,82 @@ class TaskController extends BaseController
         }
 
         return $payload;
+    }
+
+    private function collectTaskDescendantIds(int $rootTaskId): array
+    {
+        $ids = [];
+        $queue = [$rootTaskId];
+
+        while (!empty($queue)) {
+            $taskId = (int) array_shift($queue);
+            if ($taskId <= 0 || in_array($taskId, $ids, true)) {
+                continue;
+            }
+
+            $ids[] = $taskId;
+            $children = $this->db->fetchAll('SELECT id FROM tasks WHERE parent_task_id = ?', [$taskId]);
+            foreach ($children as $child) {
+                $queue[] = (int) ($child['id'] ?? 0);
+            }
+        }
+
+        return $ids;
+    }
+
+    private function deleteTaskRelatedRows(array $taskIds): void
+    {
+        foreach ($taskIds as $taskId) {
+            $task = $this->loadTaskRecord((int) $taskId);
+            if ($task) {
+                $taskAttachments = json_decode((string) ($task['attachments'] ?? '[]'), true);
+                if (is_array($taskAttachments)) {
+                    $this->deleteStoredAttachments($taskAttachments);
+                }
+            }
+
+            if ($this->db->tableExists('task_comments')) {
+                $comments = $this->db->fetchAll('SELECT id, attachments FROM task_comments WHERE task_id = ?', [(int) $taskId]);
+                foreach ($comments as $comment) {
+                    $commentAttachments = json_decode((string) ($comment['attachments'] ?? '[]'), true);
+                    if (is_array($commentAttachments)) {
+                        $this->deleteStoredAttachments($commentAttachments);
+                    }
+                }
+
+                $this->db->query('DELETE FROM task_comments WHERE task_id = ?', [(int) $taskId]);
+            }
+
+            if ($this->db->tableExists('task_activities')) {
+                $this->db->query('DELETE FROM task_activities WHERE task_id = ?', [(int) $taskId]);
+            }
+        }
+    }
+
+    private function deleteStoredAttachments(array $attachments): void
+    {
+        $storageRoot = rtrim((string) (function_exists('storage_path') ? storage_path('') : APP_ROOT . '/storage/'), '/\\');
+        $normalizedRoot = str_replace('\\', '/', realpath($storageRoot) ?: $storageRoot);
+
+        foreach ($attachments as $attachment) {
+            $relativePath = ltrim((string) ($attachment['relative_path'] ?? ''), '/\\');
+            if ($relativePath === '') {
+                continue;
+            }
+
+            $candidatePath = $storageRoot . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
+            $resolvedPath = realpath($candidatePath);
+            if ($resolvedPath === false || !is_file($resolvedPath)) {
+                continue;
+            }
+
+            $normalizedPath = str_replace('\\', '/', $resolvedPath);
+            if (strpos($normalizedPath, $normalizedRoot . '/') !== 0 && $normalizedPath !== $normalizedRoot) {
+                continue;
+            }
+
+            @unlink($resolvedPath);
+        }
     }
 
     private function recordTaskActivity(int $taskId, int $userId, string $action, string $description): void

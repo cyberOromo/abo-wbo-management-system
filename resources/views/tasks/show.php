@@ -51,6 +51,10 @@ $formatDate = static function (?string $value, string $fallback = 'Not set'): st
                     <p class="module-subtitle"><?= htmlspecialchars((string) ($task['description'] ?? 'No description provided.')) ?></p>
                 </div>
                 <div class="module-actions">
+                    <form method="POST" action="/tasks/<?= (int) ($task['id'] ?? 0) ?>/delete" onsubmit="return confirm('Delete this task and its subtasks? This cannot be undone.');" class="d-inline">
+                        <input type="hidden" name="_token" value="<?= csrf_token() ?>">
+                        <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete Task</button>
+                    </form>
                     <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>/edit" class="btn btn-outline-primary"><i class="bi bi-pencil-square me-1"></i>Edit Task</a>
                     <a href="/tasks" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Tasks</a>
                 </div>

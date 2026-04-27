@@ -197,6 +197,7 @@ $router->group(['prefix' => 'tasks', 'middleware' => 'auth'], function() use ($r
     $router->get('/{id}/edit', 'TaskController@edit')->name('tasks.edit');
     $router->post('/{id}/progress', 'TaskController@updateProgress')->name('tasks.progress.post');
     $router->post('/{id}/update', 'TaskController@update')->name('tasks.update.post');
+    $router->post('/{id}/delete', 'TaskController@destroy')->name('tasks.destroy.post');
     $router->put('/{id}', 'TaskController@update')->name('tasks.update');
     $router->delete('/{id}', 'TaskController@destroy')->name('tasks.destroy');
     
