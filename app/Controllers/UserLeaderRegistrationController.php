@@ -28,8 +28,8 @@ class UserLeaderRegistrationController extends BaseController
     private Position $positionModel;
     private UserAssignment $assignmentModel;
     private InternalEmailGenerator $emailGenerator;
-    private EmailSender $emailService;
-    private Logger $logger;
+    private ?EmailSender $emailService = null;
+    private ?Logger $logger = null;
 
     public function __construct()
     {
@@ -39,11 +39,27 @@ class UserLeaderRegistrationController extends BaseController
         $this->positionModel = new Position();
         $this->assignmentModel = new UserAssignment();
         $this->emailGenerator = new InternalEmailGenerator();
-        $this->emailService = new EmailSender();
-        $this->logger = new Logger();
         
         // CRITICAL: Verify System Admin access
         $this->enforceSystemAdminAccess();
+    }
+
+    private function getLogger(): Logger
+    {
+        if ($this->logger === null) {
+            $this->logger = new Logger();
+        }
+
+        return $this->logger;
+    }
+
+    private function getEmailService(): EmailSender
+    {
+        if ($this->emailService === null) {
+            $this->emailService = new EmailSender();
+        }
+
+        return $this->emailService;
     }
 
     /**
@@ -72,7 +88,7 @@ class UserLeaderRegistrationController extends BaseController
             ]);
             
         } catch (Exception $e) {
-            $this->logger->error('Error loading user/leader registration page', [
+            $this->getLogger()->error('Error loading user/leader registration page', [
                 'error' => $e->getMessage(),
                 'user_id' => $_SESSION['user']['id'] ?? null
             ]);
@@ -145,7 +161,7 @@ class UserLeaderRegistrationController extends BaseController
             }
 
         } catch (Exception $e) {
-            $this->logger->error('Error registering user/leader', [
+            $this->getLogger()->error('Error registering user/leader', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'admin_user_id' => $_SESSION['user']['id'] ?? null,
@@ -739,7 +755,7 @@ class UserLeaderRegistrationController extends BaseController
                 'login_url' => $_SERVER['HTTP_HOST'] . '/auth/login'
             ];
 
-            $this->emailService->sendWelcomeEmail(
+            $this->getEmailService()->sendWelcomeEmail(
                 $emailData['email'],
                 $emailData['name'],
                 [
@@ -869,7 +885,7 @@ class UserLeaderRegistrationController extends BaseController
      */
     private function logUserRegistration(int $userId, array $assignments)
     {
-        $this->logger->info('User/Leader registered by System Admin', [
+        $this->getLogger()->info('User/Leader registered by System Admin', [
             'registered_user_id' => $userId,
             'admin_user_id' => $_SESSION['user']['id'],
             'assignments_count' => count($assignments),
