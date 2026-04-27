@@ -142,7 +142,7 @@ class Task extends Model
             }
         }
 
-        if (!$this->db->columnExists($this->table, 'completion_percentage') && isset($data['completion_percentage'])) {
+        if (!$this->db->columnExists($this->table, 'completion_percentage') && array_key_exists('completion_percentage', $data)) {
             if ($this->db->columnExists($this->table, 'progress_percentage')) {
                 $data['progress_percentage'] = $data['completion_percentage'];
             }
@@ -150,7 +150,7 @@ class Task extends Model
             unset($data['completion_percentage']);
         }
 
-        if (!$this->db->columnExists($this->table, 'completed_date') && isset($data['completed_date'])) {
+        if (!$this->db->columnExists($this->table, 'completed_date') && array_key_exists('completed_date', $data)) {
             if ($this->db->columnExists($this->table, 'completed_at')) {
                 $data['completed_at'] = $data['completed_date'];
             }
@@ -165,6 +165,25 @@ class Task extends Model
         }
 
         return $data;
+    }
+
+    public function update($id, array $data): bool
+    {
+        if (isset($data['tags']) && is_array($data['tags'])) {
+            $data['tags'] = json_encode($data['tags']);
+        }
+
+        if (isset($data['attachments']) && is_array($data['attachments'])) {
+            $data['attachments'] = json_encode($data['attachments']);
+        }
+
+        if (isset($data['assigned_to']) && is_array($data['assigned_to'])) {
+            $data['assigned_to'] = json_encode($data['assigned_to']);
+        }
+
+        $data = $this->prepareTaskAttributesForSchema($data);
+
+        return parent::update($id, $data);
     }
 
     /**
