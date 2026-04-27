@@ -392,20 +392,18 @@ class Meeting extends Model
     public function getMeetingParticipants(int $meetingId): array
     {
         try {
-            $query = "SELECT mp.*, 
-                             u.first_name, 
-                             u.last_name, 
-                             u.email,
-                             u.profile_image
-                      FROM meeting_participants mp
-                      JOIN users u ON mp.user_id = u.id
-                      WHERE mp.meeting_id = :meeting_id
-                      ORDER BY mp.status ASC, u.first_name ASC";
-
-            $stmt = $this->db->prepare($query);
-            $stmt->execute(['meeting_id' => $meetingId]);
-            
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return $this->db->fetchAll(
+                "SELECT mp.*, 
+                        u.first_name, 
+                        u.last_name, 
+                        u.email,
+                        u.profile_image
+                 FROM meeting_participants mp
+                 JOIN users u ON mp.user_id = u.id
+                 WHERE mp.meeting_id = ?
+                 ORDER BY mp.status ASC, u.first_name ASC",
+                [$meetingId]
+            );
             
         } catch (\Exception $e) {
             error_log("Get meeting participants error: " . $e->getMessage());
@@ -435,11 +433,9 @@ class Meeting extends Model
                 $sql .= " LEFT JOIN users u ON m.{$ownerColumn} = u.id";
             }
 
-            $sql .= ' WHERE m.id = :meeting_id LIMIT 1';
+            $sql .= ' WHERE m.id = ? LIMIT 1';
 
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute(['meeting_id' => $meetingId]);
-            $meeting = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            $meeting = $this->db->fetch($sql, [$meetingId]) ?: null;
 
             if ($meeting === null) {
                 return null;
@@ -583,18 +579,16 @@ class Meeting extends Model
     public function getMeetingHistory(int $meetingId): array
     {
         try {
-            $query = "SELECT ma.*, 
-                             u.first_name, 
-                             u.last_name
-                      FROM meeting_activities ma
-                      LEFT JOIN users u ON ma.user_id = u.id
-                      WHERE ma.meeting_id = :meeting_id
-                      ORDER BY ma.created_at DESC";
-
-            $stmt = $this->db->prepare($query);
-            $stmt->execute(['meeting_id' => $meetingId]);
-            
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return $this->db->fetchAll(
+                "SELECT ma.*, 
+                        u.first_name, 
+                        u.last_name
+                 FROM meeting_activities ma
+                 LEFT JOIN users u ON ma.user_id = u.id
+                 WHERE ma.meeting_id = ?
+                 ORDER BY ma.created_at DESC",
+                [$meetingId]
+            );
             
         } catch (\Exception $e) {
             error_log("Get meeting history error: " . $e->getMessage());

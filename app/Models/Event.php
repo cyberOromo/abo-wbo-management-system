@@ -391,21 +391,18 @@ class Event extends Model
                              u.profile_image
                       FROM event_participants ep
                       JOIN users u ON ep.user_id = u.id
-                      WHERE ep.event_id = :event_id";
+                      WHERE ep.event_id = ?";
             
-            $params = ['event_id' => $eventId];
+            $params = [$eventId];
             
             if ($status) {
-                $query .= " AND ep.status = :status";
-                $params['status'] = $status;
+                $query .= " AND ep.status = ?";
+                $params[] = $status;
             }
             
             $query .= " ORDER BY ep.registered_at ASC";
 
-            $stmt = $this->db->prepare($query);
-            $stmt->execute($params);
-            
-            $participants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $participants = $this->db->fetchAll($query, $params);
             
             // Decode registration data
             foreach ($participants as &$participant) {
@@ -442,11 +439,9 @@ class Event extends Model
                 $sql .= " LEFT JOIN users u ON e.{$ownerColumn} = u.id";
             }
 
-            $sql .= ' WHERE e.id = :event_id LIMIT 1';
+            $sql .= ' WHERE e.id = ? LIMIT 1';
 
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute(['event_id' => $eventId]);
-            $event = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            $event = $this->db->fetch($sql, [$eventId]) ?: null;
 
             if ($event === null) {
                 return null;
