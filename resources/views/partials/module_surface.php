@@ -274,7 +274,7 @@
     }
 
     .module-panel {
-        height: 100%;
+        /* height: 100%; */
         border-radius: 24px;
         overflow: hidden;
         background: rgba(255, 255, 255, 0.98);
