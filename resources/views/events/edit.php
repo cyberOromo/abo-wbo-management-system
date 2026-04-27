@@ -4,7 +4,7 @@ $event = $event ?? [];
 
 $eventTypeOptions = ['social' => 'Social', 'educational' => 'Educational', 'cultural' => 'Cultural', 'fundraising' => 'Fundraising', 'community' => 'Community', 'political' => 'Political', 'memorial' => 'Memorial', 'celebration' => 'Celebration', 'conference' => 'Conference'];
 $registrationTypeOptions = ['open' => 'Open', 'approval_required' => 'Approval Required', 'invitation_only' => 'Invitation Only', 'closed' => 'Closed'];
-$statusOptions = ['planning' => 'Planning', 'open_registration' => 'Open Registration', 'registration_closed' => 'Registration Closed', 'in_progress' => 'In Progress', 'completed' => 'Completed', 'cancelled' => 'Cancelled', 'postponed' => 'Postponed', 'published' => 'Published'];
+$statusOptions = ['planning' => 'Planning', 'open_registration' => 'Open Registration', 'registration_closed' => 'Registration Closed', 'in_progress' => 'In Progress', 'completed' => 'Completed', 'cancelled' => 'Cancelled', 'postponed' => 'Postponed'];
 $currentEventType = (string) ($event['event_type'] ?? 'social');
 $currentRegistrationType = (string) ($event['registration_type'] ?? 'open');
 $currentStatus = (string) ($event['status'] ?? 'planning');
@@ -16,7 +16,7 @@ if (!isset($registrationTypeOptions[$currentRegistrationType])) {
     $registrationTypeOptions[$currentRegistrationType] = ucfirst(str_replace('_', ' ', $currentRegistrationType));
 }
 if (!isset($statusOptions[$currentStatus])) {
-    $statusOptions[$currentStatus] = ucfirst(str_replace('_', ' ', $currentStatus));
+    $currentStatus = 'planning';
 }
 
 $formatDateTimeLocal = static function ($value): string {

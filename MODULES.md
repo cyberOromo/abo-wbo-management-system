@@ -73,10 +73,22 @@
 
 ## Recommended Module Continuation Order
 
-1. Authentication and session consistency
-2. Reports repair
-3. User management and registration flows
+### Execution Principle
+
+Work one dependency chain at a time. Do not mix unrelated module completion work in the same staging cycle unless the later change is required to unblock the active lane.
+
+### Recommended Order
+
+1. Shared runtime blockers affecting active staging paths
+2. Reports repair and admin contract stabilization
+3. User management plus registration flows tied to hierarchy assignment
 4. Position and responsibility workflows
-5. Tasks, meetings, and events
-6. Donations, courses, and notifications
+5. Tasks, meetings, events, and donations UX completion on the active render tree
+6. Courses, notifications, and secondary modules
 7. System admin, settings, audit/log surfaces
+
+### Current Practical Order
+
+1. Finish the current tasks, meetings, events, and donations stabilization slice already in progress.
+2. Move immediately to member registration and user-leader registration with hierarchy-linked assignment validation.
+3. After registration is proven on staging, return to public debug-script lockdown and the remaining Phase 1 hardening tasks.

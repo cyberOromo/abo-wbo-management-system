@@ -420,7 +420,12 @@ abstract class Model
             }
             
             $affected = $this->db->update($this->table, $data, [$this->primaryKey => $id]);
-            return $affected > 0;
+
+            if ($affected > 0) {
+                return true;
+            }
+
+            return $this->findRecord($id) !== null;
         } catch (\Exception $e) {
             log_error("Model update failed: " . $e->getMessage());
             return false;

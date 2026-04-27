@@ -8,6 +8,32 @@
 - Treat `resources/views` as the active render tree until a migration plan says otherwise.
 - Use `database/schema.sql` as the canonical schema source.
 
+## Execution Policy
+
+### Best-Practice Adjustment
+
+Do not continue broad parallel feature work across multiple modules at the same time.
+
+Use one active delivery lane at a time:
+
+1. stabilize one shared runtime contract or one module slice
+2. validate it on staging end to end
+3. document the outcome and remaining gaps
+4. only then move to the next lane
+
+### Why This Is The Better Approach Here
+
+- the codebase already has route/view/schema/runtime drift
+- staging debugging is slower than local because SSH access is limited
+- regressions are easier to isolate when only one module chain is changing
+- hierarchy, auth, and registration are dependency-heavy and should not be mixed with unrelated UI modernization in the same sprint
+
+### Current Delivery Rule
+
+- allow shared-contract fixes when they directly unblock the active lane
+- otherwise avoid concurrent module work
+- treat staging validation as the exit gate for each lane
+
 ## Phase 1: Stabilize Current Staging System
 
 ### Goal
@@ -124,9 +150,10 @@ Move from resumed development to reliable release discipline.
 
 1. Lock down public exposure and stabilize reports.
 2. Fix auth/session/admin contract issues.
-3. Complete the active `resources/views` path for key modules before touching `app/Views`.
-4. Reconcile database access and CSRF architecture.
-5. Only after stabilization, choose whether to modernize or retire the parallel UI surfaces.
+3. Finish the active `resources/views` path for the currently open tasks, meetings, events, and donations slice.
+4. Move next into registration and hierarchy-integrated onboarding flows.
+5. Only after those flows are stable, return to broader database/CSRF/auth consolidation.
+6. Only after stabilization, choose whether to modernize or retire the parallel UI surfaces.
 
 ## Complexity Summary
 
@@ -134,10 +161,30 @@ Move from resumed development to reliable release discipline.
 - Medium: route/view reconciliation, admin auth fixes, test-tool restoration
 - High: report repair across modules, auth/session unification, render-tree consolidation, DB contract normalization
 
-## Immediate Next Sprint Recommendation
+## Current Sequenced Work Plan
+
+### Lane 0: Current In-Flight Stabilization
+
+1. Normalize no-op meeting and event saves.
+2. Clean legacy event status handling and visible staging data.
+3. Repair donations cards UX on the active runtime path.
+
+### Lane 1: Registration and Hierarchy Integrity
+
+1. Tighten member registration so Gurmu-scoped member creation follows hierarchy rules exactly.
+2. Tighten user and leader registration so new users can be assigned to Godina, Gamta, or Gurmu with the correct position in one flow.
+3. Validate that new registrations land in the correct scope and see the correct dashboard on staging.
+
+### Lane 2: Platform Hardening
 
 1. Remove or block public debug scripts.
 2. Fix `AdminMiddleware` and validate admin access.
 3. Fix report queries against canonical schema.
 4. Inventory and repair active missing assets.
 5. Confirm one CSRF path for the existing active forms.
+
+## Immediate Next Sprint Recommendation
+
+1. Finish the current stabilization lane and close it with staging proof.
+2. Move directly into registration and hierarchy-integrated onboarding.
+3. Defer broader cleanup and security hardening until the registration lane is complete unless a shared runtime defect blocks it.
