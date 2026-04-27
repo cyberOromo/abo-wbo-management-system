@@ -450,6 +450,67 @@ class UserLeaderRegistrationController extends BaseController
         }
     }
 
+    public function backfillResponsibilities()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            return $this->jsonResponse(['success' => false, 'message' => 'Invalid request method']);
+        }
+
+        try {
+            $this->validateCsrfToken();
+
+            if (!$this->db->tableExists('user_assignments')) {
+                return $this->jsonResponse(['success' => false, 'message' => 'User assignments table is unavailable']);
+            }
+
+            $assignments = $this->db->fetchAll(
+                "SELECT id, user_id, position_id, level_scope, organizational_unit_id, global_id, godina_id, gamta_id, gurmu_id,
+                        start_date, end_date, notes
+                 FROM user_assignments
+                 WHERE status = 'active'
+                 ORDER BY user_id ASC, id ASC"
+            );
+
+            $processed = 0;
+            $skipped = 0;
+
+            foreach ($assignments as $assignment) {
+                $payload = [
+                    'position_id' => (int) ($assignment['position_id'] ?? 0),
+                    'hierarchy_level' => (string) ($assignment['level_scope'] ?? 'global'),
+                    'hierarchy_id' => $this->resolveAssignmentHierarchyId($assignment),
+                    'start_date' => $assignment['start_date'] ?? null,
+                    'end_date' => $assignment['end_date'] ?? null,
+                    'notes' => $assignment['notes'] ?? 'Legacy assignment responsibility backfill',
+                ];
+
+                if (!$this->validateAssignmentData($payload) || (int) ($assignment['user_id'] ?? 0) <= 0) {
+                    $skipped++;
+                    continue;
+                }
+
+                $this->syncResponsibilitiesForAssignment((int) $assignment['user_id'], $payload);
+                $processed++;
+            }
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Responsibility backfill completed successfully',
+                'data' => [
+                    'processed_assignments' => $processed,
+                    'skipped_assignments' => $skipped,
+                ]
+            ]);
+        } catch (Exception $e) {
+            $this->getLogger()->error('Error backfilling legacy responsibilities', [
+                'error' => $e->getMessage(),
+                'admin_user_id' => $_SESSION['user']['id'] ?? null,
+            ]);
+
+            return $this->jsonResponse(['success' => false, 'message' => 'Responsibility backfill failed: ' . $e->getMessage()]);
+        }
+    }
+
     // Private helper methods
 
     /**
@@ -1000,12 +1061,12 @@ class UserLeaderRegistrationController extends BaseController
                 continue;
             }
 
-            $existingAssignmentId = (int) ($this->db->fetchColumn(
-                'SELECT id FROM responsibility_assignments WHERE user_id = ? AND responsibility_id = ? AND position_id = ? AND organizational_unit_id = ? LIMIT 1',
+            $existingAssignment = $this->db->fetch(
+                'SELECT id, status FROM responsibility_assignments WHERE user_id = ? AND responsibility_id = ? AND position_id = ? AND organizational_unit_id = ? LIMIT 1',
                 [$userId, $responsibilityId, (int) $assignment['position_id'], $organizationalUnitId]
-            ) ?? 0);
+            );
 
-            if ($existingAssignmentId > 0) {
+            if ($existingAssignment && !in_array((string) ($existingAssignment['status'] ?? ''), ['cancelled', 'inactive'], true)) {
                 continue;
             }
 
@@ -1030,10 +1091,28 @@ class UserLeaderRegistrationController extends BaseController
                 'assigned_by' => $_SESSION['user']['id'] ?? null,
             ]);
 
+            if ($existingAssignment && !empty($assignmentPayload)) {
+                $this->db->update('responsibility_assignments', $assignmentPayload, ['id' => (int) $existingAssignment['id']]);
+                continue;
+            }
+
             if (!empty($assignmentPayload)) {
                 $this->db->insert('responsibility_assignments', $assignmentPayload);
             }
         }
+    }
+
+    private function resolveAssignmentHierarchyId(array $assignment): ?int
+    {
+        $levelScope = (string) ($assignment['level_scope'] ?? 'global');
+
+        return match ($levelScope) {
+            'global' => 1,
+            'godina' => !empty($assignment['godina_id']) ? (int) $assignment['godina_id'] : null,
+            'gamta' => !empty($assignment['gamta_id']) ? (int) $assignment['gamta_id'] : null,
+            'gurmu' => !empty($assignment['gurmu_id']) ? (int) $assignment['gurmu_id'] : null,
+            default => !empty($assignment['organizational_unit_id']) ? (int) $assignment['organizational_unit_id'] : null,
+        };
     }
 
     private function ensureResponsibilityRecord(array $definition, string $levelScope, string $positionKey): int

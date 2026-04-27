@@ -392,6 +392,7 @@ $router->group(['prefix' => 'admin/user-leader-registration', 'middleware' => ['
     // User management
     $router->get('/users', 'UserLeaderRegistrationController@listUsers')->name('admin.user_leader.registration.users');
     $router->post('/update-assignments', 'UserLeaderRegistrationController@updateUserAssignments')->name('admin.user_leader.registration.update_assignments');
+    $router->post('/backfill-responsibilities', 'UserLeaderRegistrationController@backfillResponsibilities')->name('admin.user_leader.registration.backfill_responsibilities');
 });
 
 // System Admin routes (Only for System Admins)
