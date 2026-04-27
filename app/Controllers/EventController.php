@@ -20,6 +20,11 @@ class EventController extends BaseController
         $this->notificationService = new NotificationService();
         $this->user = $this->getAuthUser() ?? [];
     }
+    
+    private function syncCurrentUser(): void
+    {
+        $this->user = $this->getAuthUser() ?? [];
+    }
 
     /**
      * Display event list
@@ -192,6 +197,7 @@ class EventController extends BaseController
     {
         try {
             $this->requireAuth();
+            $this->syncCurrentUser();
             $this->requirePost();
             $this->validateCsrfToken();
             
@@ -231,11 +237,13 @@ class EventController extends BaseController
     {
         try {
             $this->requireAuth();
+            $this->syncCurrentUser();
             
             $event = $this->eventModel->getEventById($id);
             
             if (!$event) {
-                return $this->notFoundResponse('Event not found.');
+                $this->notFoundResponse('Event not found.');
+                return;
             }
             
             // Check access permissions
@@ -275,11 +283,13 @@ class EventController extends BaseController
     {
         try {
             $this->requireAuth();
+            $this->syncCurrentUser();
             
             $event = $this->eventModel->getEventById($id);
             
             if (!$event) {
-                return $this->notFoundResponse('Event not found.');
+                $this->notFoundResponse('Event not found.');
+                return;
             }
             
             if (!$this->canEditEvent($event)) {

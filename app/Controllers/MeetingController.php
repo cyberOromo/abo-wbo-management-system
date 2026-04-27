@@ -20,6 +20,11 @@ class MeetingController extends BaseController
         $this->notificationService = new NotificationService();
         $this->user = $this->getAuthUser() ?? [];
     }
+    
+    private function syncCurrentUser(): void
+    {
+        $this->user = $this->getAuthUser() ?? [];
+    }
 
     /**
      * Display meeting list
@@ -240,11 +245,13 @@ class MeetingController extends BaseController
     {
         try {
             $this->requireAuth();
+            $this->syncCurrentUser();
             
             $meeting = $this->meetingModel->getMeetingById($id);
             
             if (!$meeting) {
-                return $this->notFoundResponse('Meeting not found.');
+                $this->notFoundResponse('Meeting not found.');
+                return;
             }
             
             // Check access permissions
@@ -279,11 +286,13 @@ class MeetingController extends BaseController
     {
         try {
             $this->requireAuth();
+            $this->syncCurrentUser();
             
             $meeting = $this->meetingModel->getMeetingById($id);
             
             if (!$meeting) {
-                return $this->notFoundResponse('Meeting not found.');
+                $this->notFoundResponse('Meeting not found.');
+                return;
             }
             
             if (!$this->canEditMeeting($meeting)) {
@@ -311,6 +320,7 @@ class MeetingController extends BaseController
     {
         try {
             $this->requireAuth();
+            $this->syncCurrentUser();
             $this->requirePost();
             $this->validateCsrfToken();
             

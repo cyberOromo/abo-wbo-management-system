@@ -66,6 +66,32 @@ class BaseController extends Controller
     {
         $this->json($data, $statusCode);
     }
+    
+    /**
+     * Flash an error message for the next response.
+     */
+    protected function setError(string $message): void
+    {
+        if (function_exists('session_flash')) {
+            session_flash('error', $message);
+            return;
+        }
+        
+        $_SESSION['flash']['error'] = $message;
+    }
+    
+    /**
+     * Flash a success message for the next response.
+     */
+    protected function setSuccess(string $message): void
+    {
+        if (function_exists('session_flash')) {
+            session_flash('success', $message);
+            return;
+        }
+        
+        $_SESSION['flash']['success'] = $message;
+    }
 
     /**
      * Return error response
