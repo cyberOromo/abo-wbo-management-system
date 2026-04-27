@@ -416,8 +416,32 @@ class UserLeaderRegistrationController extends BaseController
             $this->db->beginTransaction();
 
             try {
-                $this->deactivateUserAssignments($userId);
+                $activeAssignments = $this->getActiveUserAssignments($userId);
+                $hasSingleActiveConstraint = $this->hasSingleActiveAssignmentConstraint();
+
+                if ($hasSingleActiveConstraint && count($validAssignments) > 1) {
+                    throw new Exception('Current assignment schema supports only one active assignment per user.');
+                }
+
                 $this->deactivateResponsibilityAssignments($userId);
+
+                if ($hasSingleActiveConstraint && count($validAssignments) === 1 && count($activeAssignments) === 1) {
+                    $assignmentId = $this->updateActiveUserAssignmentInPlace(
+                        (int) $activeAssignments[0]['id'],
+                        $userId,
+                        $validAssignments[0]
+                    );
+
+                    $this->db->commit();
+
+                    return $this->jsonResponse([
+                        'success' => true,
+                        'message' => 'User assignments updated successfully',
+                        'data' => ['assignment_ids' => [$assignmentId]]
+                    ]);
+                }
+
+                $this->deactivateUserAssignments($userId);
 
                 // Create new assignments
                 $newAssignments = [];
@@ -735,6 +759,26 @@ class UserLeaderRegistrationController extends BaseController
      */
     private function createUserAssignment(int $userId, array $assignment): int
     {
+        $assignmentData = $this->buildUserAssignmentPayload($userId, $assignment, true);
+
+        $assignmentId = $this->db->insert('user_assignments', $assignmentData);
+        $this->syncResponsibilitiesForAssignment($userId, $assignment);
+
+        return $assignmentId;
+    }
+
+    private function updateActiveUserAssignmentInPlace(int $assignmentId, int $userId, array $assignment): int
+    {
+        $assignmentData = $this->buildUserAssignmentPayload($userId, $assignment, false);
+
+        $this->db->update('user_assignments', $assignmentData, ['id' => $assignmentId]);
+        $this->syncResponsibilitiesForAssignment($userId, $assignment);
+
+        return $assignmentId;
+    }
+
+    private function buildUserAssignmentPayload(int $userId, array $assignment, bool $includeCreatedAt): array
+    {
         $scopeColumns = [
             'global_id' => null,
             'godina_id' => null,
@@ -749,7 +793,7 @@ class UserLeaderRegistrationController extends BaseController
             }
         }
 
-        $assignmentData = $this->filterTableData('user_assignments', [
+        $payload = [
             'user_id' => $userId,
             'position_id' => $assignment['position_id'],
             'organizational_unit_id' => $assignment['hierarchy_id'] ?: null,
@@ -764,13 +808,44 @@ class UserLeaderRegistrationController extends BaseController
             'assignment_reason' => $assignment['notes'] ?: 'Assigned during admin registration',
             'notes' => $assignment['notes'] ?: null,
             'metadata' => json_encode(['notes' => $assignment['notes'] ?: null]),
-            'created_at' => date('Y-m-d H:i:s')
-        ]) + $this->filterTableData('user_assignments', $scopeColumns);
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
 
-        $assignmentId = $this->db->insert('user_assignments', $assignmentData);
-        $this->syncResponsibilitiesForAssignment($userId, $assignment);
+        if ($includeCreatedAt) {
+            $payload['created_at'] = date('Y-m-d H:i:s');
+        }
 
-        return $assignmentId;
+        return $this->filterTableData('user_assignments', $payload)
+            + $this->filterTableData('user_assignments', $scopeColumns);
+    }
+
+    private function getActiveUserAssignments(int $userId): array
+    {
+        if (!$this->db->tableExists('user_assignments')) {
+            return [];
+        }
+
+        return $this->db->fetchAll(
+            "SELECT id
+             FROM user_assignments
+             WHERE user_id = ? AND status = 'active'
+             ORDER BY id ASC",
+            [$userId]
+        );
+    }
+
+    private function hasSingleActiveAssignmentConstraint(): bool
+    {
+        if (!$this->db->tableExists('user_assignments')) {
+            return false;
+        }
+
+        try {
+            $indexes = $this->db->fetchAll("SHOW INDEX FROM user_assignments WHERE Key_name = 'unique_active_user_assignment'");
+            return !empty($indexes);
+        } catch (Exception $e) {
+            return false;
+        }
     }
 
     private function deactivateUserAssignments(int $userId): void
