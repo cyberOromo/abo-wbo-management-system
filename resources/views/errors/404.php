@@ -1,3 +1,5 @@
+<?php $errorMessage = $errorMessage ?? 'The page you are looking for could not be found.'; ?>
+
 <div class="text-center">
     <div class="error-page">
         <div class="error-code">
@@ -6,7 +8,7 @@
         <div class="error-content">
             <h2 class="mb-4">Page Not Found</h2>
             <p class="lead mb-4">
-                The page you are looking for could not be found.
+                <?= htmlspecialchars($errorMessage) ?>
             </p>
             <div class="error-actions">
                 <a href="/" class="btn btn-primary me-2">

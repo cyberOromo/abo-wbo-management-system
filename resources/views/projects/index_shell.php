@@ -5,6 +5,7 @@ $title = $title ?? 'Projects & Initiatives';
 $projects = $projects ?? [];
 $stats = $stats ?? [];
 $scope = $scope ?? [];
+$viewMode = (($_GET['view'] ?? 'table') === 'cards') ? 'cards' : 'table';
 
 $statusClass = static function (?string $value): string {
     return match ((string) $value) {
@@ -17,7 +18,7 @@ $statusClass = static function (?string $value): string {
 };
 ?>
 
-<div class="module-surface theme-reports">
+<div class="module-surface theme-projects">
     <section class="module-hero">
         <div class="module-hero-content">
             <span class="module-kicker"><i class="bi bi-kanban"></i> Responsibility Type Workspace</span>
@@ -55,47 +56,86 @@ $statusClass = static function (?string $value): string {
             <div class="module-panel">
                 <div class="module-panel-header">
                     <h2 class="module-panel-title"><i class="bi bi-clipboard-data me-2"></i>Project Register</h2>
-                    <span class="module-soft-badge"><i class="bi bi-eye"></i><?= number_format(count($projects)) ?> loaded</span>
+                    <div class="module-toolbar">
+                        <span class="module-soft-badge"><i class="bi bi-eye"></i><?= number_format(count($projects)) ?> loaded</span>
+                        <div class="module-view-toggle" role="group" aria-label="Project list view">
+                            <a href="/projects?view=table" class="btn btn-sm <?= $viewMode === 'table' ? 'active' : '' ?>"><i class="bi bi-table me-1"></i>Table</a>
+                            <a href="/projects?view=cards" class="btn btn-sm <?= $viewMode === 'cards' ? 'active' : '' ?>"><i class="bi bi-grid-3x2-gap me-1"></i>Cards</a>
+                        </div>
+                    </div>
                 </div>
                 <div class="module-panel-body p-0">
                     <?php if (!empty($projects)): ?>
-                        <div class="table-responsive">
-                            <table class="module-table">
-                                <thead>
-                                    <tr>
-                                        <th>Project</th>
-                                        <th>Status</th>
-                                        <th>Priority</th>
-                                        <th>Progress</th>
-                                        <th>Team</th>
-                                        <th>Owner</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                        <?php if ($viewMode === 'cards'): ?>
+                            <div class="module-panel-body">
+                                <div class="module-resource-grid">
                                     <?php foreach ($projects as $project): ?>
-                                        <tr>
-                                            <td>
-                                                <div class="module-row-title"><a href="/projects/<?= (int) $project['id'] ?>"><?= htmlspecialchars($project['title'] ?? 'Untitled project') ?></a></div>
-                                                <div class="module-row-meta"><?= htmlspecialchars($project['summary'] ?? 'No summary provided.') ?></div>
-                                                <div class="module-row-meta"><?= htmlspecialchars($project['project_code'] ?? '') ?></div>
-                                            </td>
-                                            <td><span class="module-status <?= $statusClass((string) ($project['status'] ?? 'proposed')) ?>"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', (string) ($project['status'] ?? 'proposed')))) ?></span></td>
-                                            <td><div class="module-row-title"><?= htmlspecialchars(ucfirst((string) ($project['priority'] ?? 'medium'))) ?></div><div class="module-row-meta"><?= htmlspecialchars(ucfirst((string) ($project['project_type'] ?? 'initiative'))) ?></div></td>
-                                            <td>
-                                                <div class="progress" style="height: 8px;">
-                                                    <div class="progress-bar" role="progressbar" style="width: <?= (int) ($project['completion_percentage'] ?? 0) ?>%"></div>
-                                                </div>
-                                                <div class="module-row-meta mt-2"><?= (int) ($project['completion_percentage'] ?? 0) ?>% complete</div>
-                                            </td>
-                                            <td><div class="module-row-title"><?= (int) ($project['team_members'] ?? 0) ?> people</div><div class="module-row-meta"><?= (int) ($project['milestones_completed'] ?? 0) ?>/<?= (int) ($project['milestones_total'] ?? 0) ?> milestones</div></td>
-                                            <td><div class="module-row-title"><?= htmlspecialchars(trim((string) ($project['owner_name'] ?? ''))) ?: 'Unassigned' ?></div><div class="module-row-meta"><?= htmlspecialchars((string) ($project['target_date'] ?? 'No target date')) ?></div></td>
-                                            <td class="text-end"><a href="/projects/<?= (int) $project['id'] ?>/edit" class="btn btn-sm btn-outline-secondary">Edit</a></td>
-                                        </tr>
+                                        <?php $progress = (int) ($project['completion_percentage'] ?? 0); ?>
+                                        <article class="module-resource-card d-flex flex-column">
+                                            <div class="module-card-eyebrow">
+                                                <span class="module-status <?= $statusClass((string) ($project['status'] ?? 'proposed')) ?>"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', (string) ($project['status'] ?? 'proposed')))) ?></span>
+                                                <span class="module-status status-neutral"><?= htmlspecialchars(ucfirst((string) ($project['priority'] ?? 'medium'))) ?></span>
+                                            </div>
+                                            <a href="/projects/<?= (int) $project['id'] ?>" class="module-row-title fs-5"><?= htmlspecialchars($project['title'] ?? 'Untitled project') ?></a>
+                                            <p class="module-card-summary"><?= htmlspecialchars($project['summary'] ?? 'No summary provided.') ?></p>
+                                            <div class="module-row-meta mb-3"><?= htmlspecialchars($project['project_code'] ?? 'No project code') ?></div>
+                                            <div class="module-card-metric-grid">
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Owner</div><div class="module-card-metric-value"><?= htmlspecialchars(trim((string) ($project['owner_name'] ?? ''))) ?: 'Unassigned' ?></div></div>
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Team</div><div class="module-card-metric-value"><?= (int) ($project['team_members'] ?? 0) ?> people</div></div>
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Type</div><div class="module-card-metric-value"><?= htmlspecialchars(ucfirst((string) ($project['project_type'] ?? 'initiative'))) ?></div></div>
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Target</div><div class="module-card-metric-value"><?= htmlspecialchars((string) ($project['target_date'] ?? 'No target date')) ?></div></div>
+                                            </div>
+                                            <div class="module-card-metric mb-3">
+                                                <div class="d-flex justify-content-between small fw-semibold"><span>Progress</span><span><?= $progress ?>%</span></div>
+                                                <div class="module-progress-track"><div class="module-progress-fill" style="width: <?= $progress ?>%;"></div></div>
+                                            </div>
+                                            <div class="module-card-actions">
+                                                <a href="/projects/<?= (int) $project['id'] ?>" class="btn btn-sm btn-outline-primary">View</a>
+                                                <a href="/projects/<?= (int) $project['id'] ?>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                            </div>
+                                        </article>
                                     <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="module-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Project</th>
+                                            <th>Status</th>
+                                            <th>Priority</th>
+                                            <th>Progress</th>
+                                            <th>Team</th>
+                                            <th>Owner</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($projects as $project): ?>
+                                            <tr>
+                                                <td>
+                                                    <div class="module-row-title"><a href="/projects/<?= (int) $project['id'] ?>"><?= htmlspecialchars($project['title'] ?? 'Untitled project') ?></a></div>
+                                                    <div class="module-row-meta"><?= htmlspecialchars($project['summary'] ?? 'No summary provided.') ?></div>
+                                                    <div class="module-row-meta"><?= htmlspecialchars($project['project_code'] ?? '') ?></div>
+                                                </td>
+                                                <td><span class="module-status <?= $statusClass((string) ($project['status'] ?? 'proposed')) ?>"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', (string) ($project['status'] ?? 'proposed')))) ?></span></td>
+                                                <td><div class="module-row-title"><?= htmlspecialchars(ucfirst((string) ($project['priority'] ?? 'medium'))) ?></div><div class="module-row-meta"><?= htmlspecialchars(ucfirst((string) ($project['project_type'] ?? 'initiative'))) ?></div></td>
+                                                <td>
+                                                    <div class="progress" style="height: 8px;">
+                                                        <div class="progress-bar" role="progressbar" style="width: <?= (int) ($project['completion_percentage'] ?? 0) ?>%"></div>
+                                                    </div>
+                                                    <div class="module-row-meta mt-2"><?= (int) ($project['completion_percentage'] ?? 0) ?>% complete</div>
+                                                </td>
+                                                <td><div class="module-row-title"><?= (int) ($project['team_members'] ?? 0) ?> people</div><div class="module-row-meta"><?= (int) ($project['milestones_completed'] ?? 0) ?>/<?= (int) ($project['milestones_total'] ?? 0) ?> milestones</div></td>
+                                                <td><div class="module-row-title"><?= htmlspecialchars(trim((string) ($project['owner_name'] ?? ''))) ?: 'Unassigned' ?></div><div class="module-row-meta"><?= htmlspecialchars((string) ($project['target_date'] ?? 'No target date')) ?></div></td>
+                                                <td class="text-end"><a href="/projects/<?= (int) $project['id'] ?>/edit" class="btn btn-sm btn-outline-secondary">Edit</a></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="module-empty">
                             <i class="bi bi-kanban"></i>

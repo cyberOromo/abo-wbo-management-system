@@ -5,6 +5,7 @@ $title = $title ?? 'Events Management';
 $events = $events ?? [];
 $stats = $stats ?? [];
 $scope = $scope ?? [];
+$viewMode = (($_GET['view'] ?? 'table') === 'cards') ? 'cards' : 'table';
 
 $formatStatusClass = static function (?string $value): string {
     return match ((string) $value) {
@@ -43,7 +44,7 @@ $featuredEvents = array_slice($events, 0, 4);
     </section>
 
     <div class="module-callout warning">
-        <strong>Current staging behavior:</strong> this page shows real event records and reporting access. Create, calendar, export, and event-detail actions remain hidden until their backing handlers are complete.
+        <strong>Current staging behavior:</strong> this page shows real event records, detail routes, and reporting access. Create, calendar, and export actions remain hidden until their backing handlers are complete.
     </div>
 
     <div class="row g-4 mb-4">
@@ -78,22 +79,19 @@ $featuredEvents = array_slice($events, 0, 4);
             <div class="module-panel">
                 <div class="module-panel-header">
                     <h2 class="module-panel-title"><i class="bi bi-calendar-range me-2"></i>Scoped Event Register</h2>
-                    <span class="module-soft-badge"><i class="bi bi-eye"></i><?= number_format(count($events)) ?> loaded</span>
+                    <div class="module-toolbar">
+                        <span class="module-soft-badge"><i class="bi bi-eye"></i><?= number_format(count($events)) ?> loaded</span>
+                        <div class="module-view-toggle" role="group" aria-label="Event list view">
+                            <a href="/events?view=table" class="btn btn-sm <?= $viewMode === 'table' ? 'active' : '' ?>"><i class="bi bi-table me-1"></i>Table</a>
+                            <a href="/events?view=cards" class="btn btn-sm <?= $viewMode === 'cards' ? 'active' : '' ?>"><i class="bi bi-grid-3x2-gap me-1"></i>Cards</a>
+                        </div>
+                    </div>
                 </div>
                 <div class="module-panel-body p-0">
                     <?php if (!empty($events)): ?>
-                        <div class="table-responsive">
-                            <table class="module-table">
-                                <thead>
-                                    <tr>
-                                        <th>Event</th>
-                                        <th>Status</th>
-                                        <th>Schedule</th>
-                                        <th>Location</th>
-                                        <th>Created By</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                        <?php if ($viewMode === 'cards'): ?>
+                            <div class="module-panel-body">
+                                <div class="module-resource-grid">
                                     <?php foreach ($events as $event): ?>
                                         <?php
                                         $dateLabel = 'No schedule';
@@ -107,29 +105,79 @@ $featuredEvents = array_slice($events, 0, 4);
                                             $creator = $event['created_by_name'] ?? 'Unknown';
                                         }
                                         ?>
-                                        <tr>
-                                            <td>
-                                                <div class="module-row-title"><?= htmlspecialchars($event['title'] ?? 'Untitled event') ?></div>
-                                                <div class="module-row-meta"><?= htmlspecialchars($event['description'] ?? 'No description provided.') ?></div>
-                                            </td>
-                                            <td><span class="module-status <?= $formatStatusClass((string) ($event['status'] ?? 'upcoming')) ?>"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', (string) ($event['status'] ?? 'upcoming')))) ?></span></td>
-                                            <td>
-                                                <div class="module-row-title"><?= htmlspecialchars($dateLabel) ?></div>
-                                                <div class="module-row-meta">Primary visible schedule</div>
-                                            </td>
-                                            <td>
-                                                <div class="module-row-title"><?= htmlspecialchars($event['location'] ?? 'TBD') ?></div>
-                                                <div class="module-row-meta">Resolved venue or fallback</div>
-                                            </td>
-                                            <td>
-                                                <div class="module-row-title"><?= htmlspecialchars((string) $creator) ?></div>
-                                                <div class="module-row-meta">Visible creator attribution</div>
-                                            </td>
-                                        </tr>
+                                        <article class="module-resource-card d-flex flex-column">
+                                            <div class="module-card-eyebrow">
+                                                <span class="module-status <?= $formatStatusClass((string) ($event['status'] ?? 'upcoming')) ?>"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', (string) ($event['status'] ?? 'upcoming')))) ?></span>
+                                                <span class="module-status status-neutral">Record #<?= (int) ($event['id'] ?? 0) ?></span>
+                                            </div>
+                                            <a href="/events/<?= (int) ($event['id'] ?? 0) ?>" class="module-row-title fs-5"><?= htmlspecialchars($event['title'] ?? 'Untitled event') ?></a>
+                                            <p class="module-card-summary"><?= htmlspecialchars($event['description'] ?? 'No description provided.') ?></p>
+                                            <div class="module-card-metric-grid">
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Schedule</div><div class="module-card-metric-value"><?= htmlspecialchars($dateLabel) ?></div></div>
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Location</div><div class="module-card-metric-value"><?= htmlspecialchars($event['location'] ?? 'TBD') ?></div></div>
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Created by</div><div class="module-card-metric-value"><?= htmlspecialchars((string) $creator) ?></div></div>
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Type</div><div class="module-card-metric-value"><?= htmlspecialchars(ucfirst((string) ($event['event_type'] ?? 'general'))) ?></div></div>
+                                            </div>
+                                            <div class="module-card-actions">
+                                                <a href="/events/<?= (int) ($event['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">View</a>
+                                            </div>
+                                        </article>
                                     <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="module-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Event</th>
+                                            <th>Status</th>
+                                            <th>Schedule</th>
+                                            <th>Location</th>
+                                            <th>Created By</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($events as $event): ?>
+                                            <?php
+                                            $dateLabel = 'No schedule';
+                                            if (!empty($event['start_datetime'])) {
+                                                $dateLabel = date('M j, Y g:i A', strtotime((string) $event['start_datetime']));
+                                            } elseif (!empty($event['created_at'])) {
+                                                $dateLabel = date('M j, Y', strtotime((string) $event['created_at']));
+                                            }
+                                            $creator = trim((string) (($event['first_name'] ?? '') . ' ' . ($event['last_name'] ?? '')));
+                                            if ($creator === '') {
+                                                $creator = $event['created_by_name'] ?? 'Unknown';
+                                            }
+                                            ?>
+                                            <tr>
+                                                <td>
+                                                    <div class="module-row-title"><a href="/events/<?= (int) ($event['id'] ?? 0) ?>"><?= htmlspecialchars($event['title'] ?? 'Untitled event') ?></a></div>
+                                                    <div class="module-row-meta">Record #<?= (int) ($event['id'] ?? 0) ?></div>
+                                                    <div class="module-row-meta"><?= htmlspecialchars($event['description'] ?? 'No description provided.') ?></div>
+                                                </td>
+                                                <td><span class="module-status <?= $formatStatusClass((string) ($event['status'] ?? 'upcoming')) ?>"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', (string) ($event['status'] ?? 'upcoming')))) ?></span></td>
+                                                <td>
+                                                    <div class="module-row-title"><?= htmlspecialchars($dateLabel) ?></div>
+                                                    <div class="module-row-meta">Primary visible schedule</div>
+                                                </td>
+                                                <td>
+                                                    <div class="module-row-title"><?= htmlspecialchars($event['location'] ?? 'TBD') ?></div>
+                                                    <div class="module-row-meta">Resolved venue or fallback</div>
+                                                </td>
+                                                <td>
+                                                    <div class="module-row-title"><?= htmlspecialchars((string) $creator) ?></div>
+                                                    <div class="module-row-meta">Visible creator attribution</div>
+                                                </td>
+                                                <td><a href="/events/<?= (int) ($event['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">View</a></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="module-empty">
                             <i class="bi bi-calendar-x"></i>
@@ -153,7 +201,7 @@ $featuredEvents = array_slice($events, 0, 4);
                                 <?php $when = !empty($event['start_datetime']) ? date('M j', strtotime((string) $event['start_datetime'])) : 'TBD'; ?>
                                 <div class="module-stack-item">
                                     <div>
-                                        <div class="module-row-title"><?= htmlspecialchars($event['title'] ?? 'Untitled event') ?></div>
+                                        <div class="module-row-title"><a href="/events/<?= (int) ($event['id'] ?? 0) ?>"><?= htmlspecialchars($event['title'] ?? 'Untitled event') ?></a></div>
                                         <div class="module-row-meta"><?= htmlspecialchars($event['location'] ?? 'TBD') ?></div>
                                     </div>
                                     <div class="module-stack-value"><?= htmlspecialchars($when) ?></div>
@@ -194,7 +242,7 @@ $featuredEvents = array_slice($events, 0, 4);
                         <div class="module-stack-item">
                             <div>
                                 <div class="module-row-title">Supported actions only</div>
-                                <div class="module-row-meta">Non-functional create, calendar, export, and detail affordances remain hidden until implemented.</div>
+                                <div class="module-row-meta">Detail navigation is active. Non-functional create, calendar, and export affordances remain hidden until implemented.</div>
                             </div>
                         </div>
                     </div>

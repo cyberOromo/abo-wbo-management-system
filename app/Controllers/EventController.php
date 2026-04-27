@@ -11,10 +11,14 @@ class EventController extends BaseController
 {
     private $eventModel;
     private $notificationService;
+    private array $user = [];
 
     public function __construct()
     {
         parent::__construct();
+        $this->eventModel = new Event();
+        $this->notificationService = new NotificationService();
+        $this->user = $this->getAuthUser() ?? [];
     }
 
     /**
@@ -199,9 +203,10 @@ class EventController extends BaseController
             $data = $this->validateEventData($_POST);
             $data['created_by'] = $this->user['id'];
             
-            $eventId = $this->eventModel->createEvent($data);
-            
-            if ($eventId) {
+            $result = $this->eventModel->createEvent($data);
+
+            if (($result['success'] ?? false) && !empty($result['event_id'])) {
+                $eventId = (int) $result['event_id'];
                 // Send notification if event is published
                 if ($data['status'] === 'open_registration') {
                     $this->notificationService->sendEventAnnouncementNotification($eventId);
@@ -210,7 +215,7 @@ class EventController extends BaseController
                 $this->setSuccess('Event created successfully');
                 $this->redirect('/events/' . $eventId);
             } else {
-                throw new Exception('Failed to create event');
+                throw new Exception((string) ($result['message'] ?? 'Failed to create event'));
             }
             
         } catch (Exception $e) {
@@ -230,8 +235,7 @@ class EventController extends BaseController
             $event = $this->eventModel->getEventById($id);
             
             if (!$event) {
-                $this->setError('Event not found');
-                return $this->redirect('/events');
+                return $this->notFoundResponse('Event not found.');
             }
             
             // Check access permissions
@@ -243,7 +247,7 @@ class EventController extends BaseController
             $participants = $this->eventModel->getEventParticipants($id);
             $statistics = $this->eventModel->getEventStatistics($id);
             $activities = $this->eventModel->getEventActivities($id);
-            $userRegistration = $this->eventModel->getUserRegistration($id, $this->user['id']);
+            $userRegistration = $this->eventModel->getUserRegistration($id, (int) ($this->user['id'] ?? 0));
             
             $data = [
                 'event' => $event,
@@ -275,8 +279,7 @@ class EventController extends BaseController
             $event = $this->eventModel->getEventById($id);
             
             if (!$event) {
-                $this->setError('Event not found');
-                return $this->redirect('/events');
+                return $this->notFoundResponse('Event not found.');
             }
             
             if (!$this->canEditEvent($event)) {

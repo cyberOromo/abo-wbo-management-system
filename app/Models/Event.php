@@ -780,9 +780,23 @@ class Event extends Model
     /**
      * Log event activity
      */
-    private function logEventActivity(int $eventId, string $action, string $description, int $userId): void
+    public function logEventActivity(int $eventId, $arg2, $arg3, $arg4 = null): void
     {
         try {
+            if (is_int($arg2)) {
+                $userId = $arg2;
+                $action = (string) $arg3;
+                $description = (string) ($arg4 ?? $arg3);
+            } else {
+                $action = (string) $arg2;
+                $description = (string) $arg3;
+                $userId = (int) $arg4;
+            }
+
+            if ($userId <= 0) {
+                return;
+            }
+
             $query = "INSERT INTO event_activities (event_id, user_id, action, description, created_at) 
                      VALUES (:event_id, :user_id, :action, :description, :created_at)";
             

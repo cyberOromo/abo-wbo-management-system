@@ -320,6 +320,38 @@
         font-weight: 700;
     }
 
+    .module-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .module-view-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.25rem;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.12);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+
+    .module-view-toggle .btn {
+        border: none;
+        border-radius: 999px;
+        padding: 0.45rem 0.85rem;
+        color: var(--module-text-soft);
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .module-view-toggle .btn.active {
+        background: #fff;
+        color: var(--module-accent);
+        box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.65);
+    }
+
     .module-table {
         width: 100%;
         margin: 0;
@@ -351,6 +383,15 @@
 
     .module-table tbody tr:hover {
         background: rgba(248, 250, 252, 0.74);
+    }
+
+    .module-table a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .module-table a:hover {
+        color: var(--module-accent);
     }
 
     .module-row-title {
@@ -532,6 +573,71 @@
     .module-form-grid .form-select,
     .module-form-grid .form-control {
         border-radius: 14px;
+    }
+
+    .module-resource-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+
+    .module-resource-card {
+        height: 100%;
+        padding: 1.15rem;
+        border-radius: 22px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.96));
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        box-shadow: 0 20px 42px -34px rgba(15, 23, 42, 0.48);
+    }
+
+    .module-card-eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .module-card-summary {
+        margin: 0.7rem 0 1rem;
+        color: var(--module-text-soft);
+        font-size: 0.94rem;
+    }
+
+    .module-card-metric-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .module-card-metric {
+        padding: 0.8rem 0.9rem;
+        border-radius: 16px;
+        background: rgba(248, 250, 252, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .module-card-metric-label {
+        color: var(--module-text-soft);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .module-card-metric-value {
+        margin-top: 0.35rem;
+        color: var(--abo-gray-900, #0f172a);
+        font-weight: 700;
+        word-break: break-word;
+    }
+
+    .module-card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-top: auto;
     }
 
     .module-card-grid {

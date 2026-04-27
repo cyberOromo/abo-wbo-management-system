@@ -83,6 +83,19 @@ class BaseController extends Controller
     }
 
     /**
+     * Render a 404 page for missing resources.
+     */
+    protected function notFoundResponse(string $message = 'The requested record could not be found.'): void
+    {
+        http_response_code(404);
+        $this->render('errors/404', [
+            'title' => 'Page Not Found',
+            'errorMessage' => $message,
+        ]);
+        exit;
+    }
+
+    /**
      * Check if request is AJAX
      */
     protected function isAjaxRequest()

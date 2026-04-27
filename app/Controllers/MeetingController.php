@@ -11,13 +11,14 @@ class MeetingController extends BaseController
 {
     private $meetingModel;
     private $notificationService;
+    private array $user = [];
 
     public function __construct()
     {
         parent::__construct();
-        // Initialize services as needed
-        // $this->meetingModel = new Meeting();
-        // $this->notificationService = new NotificationService();
+        $this->meetingModel = new Meeting();
+        $this->notificationService = new NotificationService();
+        $this->user = $this->getAuthUser() ?? [];
     }
 
     /**
@@ -211,9 +212,10 @@ class MeetingController extends BaseController
             $data = $this->validateMeetingData($_POST);
             $data['created_by'] = $this->user['id'];
             
-            $meetingId = $this->meetingModel->createMeeting($data);
-            
-            if ($meetingId) {
+            $result = $this->meetingModel->createMeeting($data);
+
+            if (($result['success'] ?? false) && !empty($result['meeting_id'])) {
+                $meetingId = (int) $result['meeting_id'];
                 // Send notifications to participants
                 if (!empty($data['participants'])) {
                     $this->notificationService->sendMeetingInvitationNotification($meetingId, $data['participants']);
@@ -222,7 +224,7 @@ class MeetingController extends BaseController
                 $this->setSuccess('Meeting created successfully');
                 $this->redirect('/meetings/' . $meetingId);
             } else {
-                throw new Exception('Failed to create meeting');
+                throw new Exception((string) ($result['message'] ?? 'Failed to create meeting'));
             }
             
         } catch (Exception $e) {
@@ -242,8 +244,7 @@ class MeetingController extends BaseController
             $meeting = $this->meetingModel->getMeetingById($id);
             
             if (!$meeting) {
-                $this->setError('Meeting not found');
-                return $this->redirect('/meetings');
+                return $this->notFoundResponse('Meeting not found.');
             }
             
             // Check access permissions
@@ -282,8 +283,7 @@ class MeetingController extends BaseController
             $meeting = $this->meetingModel->getMeetingById($id);
             
             if (!$meeting) {
-                $this->setError('Meeting not found');
-                return $this->redirect('/meetings');
+                return $this->notFoundResponse('Meeting not found.');
             }
             
             if (!$this->canEditMeeting($meeting)) {

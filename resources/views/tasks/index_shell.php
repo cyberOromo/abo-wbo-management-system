@@ -29,6 +29,7 @@ $totalTasks = (int) ($taskStats['total'] ?? 0);
 $completedTasks = (int) ($taskStats['completed'] ?? 0);
 $activeTasks = (int) (($taskStats['pending'] ?? 0) + ($taskStats['in_progress'] ?? 0));
 $completionRate = $totalTasks > 0 ? (int) round(($completedTasks / $totalTasks) * 100) : 0;
+$viewMode = (($_GET['view'] ?? 'table') === 'cards') ? 'cards' : 'table';
 ?>
 
 <div class="module-surface theme-tasks">
@@ -115,23 +116,19 @@ $completionRate = $totalTasks > 0 ? (int) round(($completedTasks / $totalTasks) 
             <div class="module-panel">
                 <div class="module-panel-header">
                     <h2 class="module-panel-title"><i class="bi bi-table me-2"></i>Scoped Task Queue</h2>
-                    <span class="module-soft-badge"><i class="bi bi-eye"></i><?= number_format(count($tasks)) ?> loaded</span>
+                    <div class="module-toolbar">
+                        <span class="module-soft-badge"><i class="bi bi-eye"></i><?= number_format(count($tasks)) ?> loaded</span>
+                        <div class="module-view-toggle" role="group" aria-label="Task list view">
+                            <a href="/tasks?view=table" class="btn btn-sm <?= $viewMode === 'table' ? 'active' : '' ?>"><i class="bi bi-table me-1"></i>Table</a>
+                            <a href="/tasks?view=cards" class="btn btn-sm <?= $viewMode === 'cards' ? 'active' : '' ?>"><i class="bi bi-grid-3x2-gap me-1"></i>Cards</a>
+                        </div>
+                    </div>
                 </div>
                 <div class="module-panel-body p-0">
                     <?php if (!empty($tasks)): ?>
-                        <div class="table-responsive">
-                            <table class="module-table">
-                                <thead>
-                                    <tr>
-                                        <th>Task</th>
-                                        <th>Status</th>
-                                        <th>Priority</th>
-                                        <th>Assigned To</th>
-                                        <th>Due Date</th>
-                                        <th>Progress</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                        <?php if ($viewMode === 'cards'): ?>
+                            <div class="module-panel-body">
+                                <div class="module-resource-grid">
                                     <?php foreach ($tasks as $task): ?>
                                         <?php
                                         $status = ucfirst(str_replace('_', ' ', (string) ($task['status'] ?? 'pending')));
@@ -140,39 +137,85 @@ $completionRate = $totalTasks > 0 ? (int) round(($completedTasks / $totalTasks) 
                                         $progress = max(0, min(100, (int) ($task['progress'] ?? 0)));
                                         $assigneeLabel = !empty($task['assignee_names']) ? implode(', ', (array) $task['assignee_names']) : 'Unassigned';
                                         ?>
-                                        <tr>
-                                            <td>
-                                                <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>" class="module-row-title text-decoration-none d-inline-block"><?= htmlspecialchars($task['title'] ?? 'Untitled task') ?></a>
-                                                <div class="module-row-meta"><?= htmlspecialchars($task['description'] ?? 'No description provided.') ?></div>
-                                                <div class="mt-2 d-flex gap-2 flex-wrap">
-                                                    <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">View</a>
-                                                    <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
-                                                </div>
-                                            </td>
-                                            <td><span class="module-status <?= $formatStatusClass((string) ($task['status'] ?? 'pending')) ?>"><?= htmlspecialchars($status) ?></span></td>
-                                            <td><span class="module-status <?= $formatPriorityClass((string) ($task['priority'] ?? 'medium')) ?>"><?= htmlspecialchars($priority) ?></span></td>
-                                            <td>
-                                                <div class="module-row-title"><?= htmlspecialchars($assigneeLabel) ?></div>
-                                                <div class="module-row-meta">Hierarchy-visible assignee set</div>
-                                            </td>
-                                            <td>
-                                                <div class="module-row-title"><?= htmlspecialchars($dueDate) ?></div>
-                                                <div class="module-row-meta">Current target date</div>
-                                            </td>
-                                            <td style="min-width: 180px;">
-                                                <div class="d-flex justify-content-between small fw-semibold">
-                                                    <span><?= number_format($progress) ?>%</span>
-                                                    <span class="text-muted">completion</span>
-                                                </div>
-                                                <div class="module-progress-track">
-                                                    <div class="module-progress-fill" style="width: <?= $progress ?>%;"></div>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                        <article class="module-resource-card d-flex flex-column">
+                                            <div class="module-card-eyebrow">
+                                                <span class="module-status <?= $formatStatusClass((string) ($task['status'] ?? 'pending')) ?>"><?= htmlspecialchars($status) ?></span>
+                                                <span class="module-status <?= $formatPriorityClass((string) ($task['priority'] ?? 'medium')) ?>"><?= htmlspecialchars($priority) ?></span>
+                                            </div>
+                                            <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>" class="module-row-title fs-5"><?= htmlspecialchars($task['title'] ?? 'Untitled task') ?></a>
+                                            <p class="module-card-summary"><?= htmlspecialchars($task['description'] ?? 'No description provided.') ?></p>
+                                            <div class="module-card-metric-grid">
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Assigned</div><div class="module-card-metric-value"><?= htmlspecialchars($assigneeLabel) ?></div></div>
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Due date</div><div class="module-card-metric-value"><?= htmlspecialchars($dueDate) ?></div></div>
+                                            </div>
+                                            <div class="module-card-metric">
+                                                <div class="d-flex justify-content-between small fw-semibold"><span>Progress</span><span><?= number_format($progress) ?>%</span></div>
+                                                <div class="module-progress-track"><div class="module-progress-fill" style="width: <?= $progress ?>%;"></div></div>
+                                            </div>
+                                            <div class="module-card-actions">
+                                                <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">View</a>
+                                                <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                            </div>
+                                        </article>
                                     <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="module-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Task</th>
+                                            <th>Status</th>
+                                            <th>Priority</th>
+                                            <th>Assigned To</th>
+                                            <th>Due Date</th>
+                                            <th>Progress</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($tasks as $task): ?>
+                                            <?php
+                                            $status = ucfirst(str_replace('_', ' ', (string) ($task['status'] ?? 'pending')));
+                                            $priority = ucfirst((string) ($task['priority'] ?? 'medium'));
+                                            $dueDate = !empty($task['due_date']) ? date('M j, Y', strtotime((string) $task['due_date'])) : 'No due date';
+                                            $progress = max(0, min(100, (int) ($task['progress'] ?? 0)));
+                                            $assigneeLabel = !empty($task['assignee_names']) ? implode(', ', (array) $task['assignee_names']) : 'Unassigned';
+                                            ?>
+                                            <tr>
+                                                <td>
+                                                    <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>" class="module-row-title d-inline-block"><?= htmlspecialchars($task['title'] ?? 'Untitled task') ?></a>
+                                                    <div class="module-row-meta"><?= htmlspecialchars($task['description'] ?? 'No description provided.') ?></div>
+                                                    <div class="mt-2 d-flex gap-2 flex-wrap">
+                                                        <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">View</a>
+                                                        <a href="/tasks/<?= (int) ($task['id'] ?? 0) ?>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                                    </div>
+                                                </td>
+                                                <td><span class="module-status <?= $formatStatusClass((string) ($task['status'] ?? 'pending')) ?>"><?= htmlspecialchars($status) ?></span></td>
+                                                <td><span class="module-status <?= $formatPriorityClass((string) ($task['priority'] ?? 'medium')) ?>"><?= htmlspecialchars($priority) ?></span></td>
+                                                <td>
+                                                    <div class="module-row-title"><?= htmlspecialchars($assigneeLabel) ?></div>
+                                                    <div class="module-row-meta">Hierarchy-visible assignee set</div>
+                                                </td>
+                                                <td>
+                                                    <div class="module-row-title"><?= htmlspecialchars($dueDate) ?></div>
+                                                    <div class="module-row-meta">Current target date</div>
+                                                </td>
+                                                <td style="min-width: 180px;">
+                                                    <div class="d-flex justify-content-between small fw-semibold">
+                                                        <span><?= number_format($progress) ?>%</span>
+                                                        <span class="text-muted">completion</span>
+                                                    </div>
+                                                    <div class="module-progress-track">
+                                                        <div class="module-progress-fill" style="width: <?= $progress ?>%;"></div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="module-empty">
                             <i class="bi bi-inbox"></i>

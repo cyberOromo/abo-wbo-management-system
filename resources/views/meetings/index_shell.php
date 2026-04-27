@@ -6,6 +6,7 @@ $meetings = $meetings ?? [];
 $stats = $stats ?? [];
 $scope = $scope ?? [];
 $canCreateMeeting = $can_create_meeting ?? false;
+$viewMode = (($_GET['view'] ?? 'table') === 'cards') ? 'cards' : 'table';
 
 $formatStatusClass = static function (?string $value): string {
     return match ((string) $value) {
@@ -45,7 +46,7 @@ $agendaItems = array_slice($meetings, 0, 5);
 
     <?php if (!$canCreateMeeting): ?>
         <div class="module-callout warning">
-            <strong>Current staging behavior:</strong> scheduling and editing remain disabled for this executive scope. This surface focuses on reliable meeting visibility and direct access to analytics.
+            <strong>Current staging behavior:</strong> scheduling remains disabled for this executive scope. Meeting detail viewing and reporting are available from the current surface, while edit-only actions stay hidden unless ownership permits them.
         </div>
     <?php endif; ?>
 
@@ -81,22 +82,19 @@ $agendaItems = array_slice($meetings, 0, 5);
             <div class="module-panel">
                 <div class="module-panel-header">
                     <h2 class="module-panel-title"><i class="bi bi-people me-2"></i>Scoped Meeting Register</h2>
-                    <span class="module-soft-badge"><i class="bi bi-eye"></i><?= number_format(count($meetings)) ?> loaded</span>
+                    <div class="module-toolbar">
+                        <span class="module-soft-badge"><i class="bi bi-eye"></i><?= number_format(count($meetings)) ?> loaded</span>
+                        <div class="module-view-toggle" role="group" aria-label="Meeting list view">
+                            <a href="/meetings?view=table" class="btn btn-sm <?= $viewMode === 'table' ? 'active' : '' ?>"><i class="bi bi-table me-1"></i>Table</a>
+                            <a href="/meetings?view=cards" class="btn btn-sm <?= $viewMode === 'cards' ? 'active' : '' ?>"><i class="bi bi-grid-3x2-gap me-1"></i>Cards</a>
+                        </div>
+                    </div>
                 </div>
                 <div class="module-panel-body p-0">
                     <?php if (!empty($meetings)): ?>
-                        <div class="table-responsive">
-                            <table class="module-table">
-                                <thead>
-                                    <tr>
-                                        <th>Meeting</th>
-                                        <th>Status</th>
-                                        <th>Schedule</th>
-                                        <th>Location</th>
-                                        <th>Visible Owner</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                        <?php if ($viewMode === 'cards'): ?>
+                            <div class="module-panel-body">
+                                <div class="module-resource-grid">
                                     <?php foreach ($meetings as $meeting): ?>
                                         <?php
                                         $status = (string) ($meeting['status'] ?? 'scheduled');
@@ -109,29 +107,78 @@ $agendaItems = array_slice($meetings, 0, 5);
                                             $owner = ucfirst(str_replace('_', ' ', $platform));
                                         }
                                         ?>
-                                        <tr>
-                                            <td>
-                                                <div class="module-row-title"><?= htmlspecialchars($meeting['title'] ?? 'Untitled meeting') ?></div>
-                                                <div class="module-row-meta"><?= htmlspecialchars($meeting['agenda'] ?? 'Agenda details are not populated for this record.') ?></div>
-                                            </td>
-                                            <td><span class="module-status <?= $formatStatusClass($status) ?>"><?= htmlspecialchars(ucwords(str_replace('_', ' ', $status))) ?></span></td>
-                                            <td>
-                                                <div class="module-row-title"><?= $startAt ? htmlspecialchars(date('M j, Y', $startAt)) : 'TBD' ?></div>
-                                                <div class="module-row-meta"><?= $startAt ? htmlspecialchars(date('g:i A', $startAt)) : 'Pending time' ?></div>
-                                            </td>
-                                            <td>
-                                                <div class="module-row-title"><?= htmlspecialchars($locationLabel) ?></div>
-                                                <div class="module-row-meta"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $platform))) ?> meeting context</div>
-                                            </td>
-                                            <td>
-                                                <div class="module-row-title"><?= htmlspecialchars($owner) ?></div>
-                                                <div class="module-row-meta">Resolved from available schema columns</div>
-                                            </td>
-                                        </tr>
+                                        <article class="module-resource-card d-flex flex-column">
+                                            <div class="module-card-eyebrow">
+                                                <span class="module-status <?= $formatStatusClass($status) ?>"><?= htmlspecialchars(ucwords(str_replace('_', ' ', $status))) ?></span>
+                                                <span class="module-status status-neutral">Record #<?= (int) ($meeting['id'] ?? 0) ?></span>
+                                            </div>
+                                            <a href="/meetings/<?= (int) ($meeting['id'] ?? 0) ?>" class="module-row-title fs-5"><?= htmlspecialchars($meeting['title'] ?? 'Untitled meeting') ?></a>
+                                            <p class="module-card-summary"><?= htmlspecialchars($meeting['agenda'] ?? 'Agenda details are not populated for this record.') ?></p>
+                                            <div class="module-card-metric-grid">
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Schedule</div><div class="module-card-metric-value"><?= $startAt ? htmlspecialchars(date('M j, Y g:i A', $startAt)) : 'TBD' ?></div></div>
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Location</div><div class="module-card-metric-value"><?= htmlspecialchars($locationLabel) ?></div></div>
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Owner</div><div class="module-card-metric-value"><?= htmlspecialchars($owner) ?></div></div>
+                                                <div class="module-card-metric"><div class="module-card-metric-label">Platform</div><div class="module-card-metric-value"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $platform))) ?></div></div>
+                                            </div>
+                                            <div class="module-card-actions">
+                                                <a href="/meetings/<?= (int) ($meeting['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">View</a>
+                                            </div>
+                                        </article>
                                     <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="module-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Meeting</th>
+                                            <th>Status</th>
+                                            <th>Schedule</th>
+                                            <th>Location</th>
+                                            <th>Visible Owner</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($meetings as $meeting): ?>
+                                            <?php
+                                            $status = (string) ($meeting['status'] ?? 'scheduled');
+                                            $platform = (string) ($meeting['platform'] ?? 'in_person');
+                                            $startAt = !empty($meeting['start_datetime']) ? strtotime((string) $meeting['start_datetime']) : false;
+                                            $location = trim((string) ($meeting['location'] ?? ''));
+                                            $locationLabel = $location !== '' ? $location : ucfirst(str_replace('_', ' ', $platform));
+                                            $owner = trim((string) ($meeting['created_by_name'] ?? ''));
+                                            if ($owner === '') {
+                                                $owner = ucfirst(str_replace('_', ' ', $platform));
+                                            }
+                                            ?>
+                                            <tr>
+                                                <td>
+                                                    <div class="module-row-title"><a href="/meetings/<?= (int) ($meeting['id'] ?? 0) ?>"><?= htmlspecialchars($meeting['title'] ?? 'Untitled meeting') ?></a></div>
+                                                    <div class="module-row-meta">Record #<?= (int) ($meeting['id'] ?? 0) ?></div>
+                                                    <div class="module-row-meta"><?= htmlspecialchars($meeting['agenda'] ?? 'Agenda details are not populated for this record.') ?></div>
+                                                </td>
+                                                <td><span class="module-status <?= $formatStatusClass($status) ?>"><?= htmlspecialchars(ucwords(str_replace('_', ' ', $status))) ?></span></td>
+                                                <td>
+                                                    <div class="module-row-title"><?= $startAt ? htmlspecialchars(date('M j, Y', $startAt)) : 'TBD' ?></div>
+                                                    <div class="module-row-meta"><?= $startAt ? htmlspecialchars(date('g:i A', $startAt)) : 'Pending time' ?></div>
+                                                </td>
+                                                <td>
+                                                    <div class="module-row-title"><?= htmlspecialchars($locationLabel) ?></div>
+                                                    <div class="module-row-meta"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $platform))) ?> meeting context</div>
+                                                </td>
+                                                <td>
+                                                    <div class="module-row-title"><?= htmlspecialchars($owner) ?></div>
+                                                    <div class="module-row-meta">Resolved from available schema columns</div>
+                                                </td>
+                                                <td><a href="/meetings/<?= (int) ($meeting['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">View</a></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="module-empty">
                             <i class="bi bi-calendar-x"></i>
@@ -155,7 +202,7 @@ $agendaItems = array_slice($meetings, 0, 5);
                                 <?php $startAt = !empty($meeting['start_datetime']) ? strtotime((string) $meeting['start_datetime']) : false; ?>
                                 <div class="module-stack-item">
                                     <div>
-                                        <div class="module-row-title"><?= htmlspecialchars($meeting['title'] ?? 'Untitled meeting') ?></div>
+                                        <div class="module-row-title"><a href="/meetings/<?= (int) ($meeting['id'] ?? 0) ?>"><?= htmlspecialchars($meeting['title'] ?? 'Untitled meeting') ?></a></div>
                                         <div class="module-row-meta"><?= htmlspecialchars(trim((string) ($meeting['location'] ?? '')) ?: ucfirst(str_replace('_', ' ', (string) ($meeting['platform'] ?? 'in_person')))) ?></div>
                                     </div>
                                     <div class="module-stack-value"><?= $startAt ? htmlspecialchars(date('M j', $startAt)) : 'TBD' ?></div>
@@ -196,7 +243,7 @@ $agendaItems = array_slice($meetings, 0, 5);
                         <div class="module-stack-item">
                             <div>
                                 <div class="module-row-title">Supported actions only</div>
-                                <div class="module-row-meta">Scheduling, editing, and template flows remain intentionally hidden until their full UI paths are implemented.</div>
+                                <div class="module-row-meta">Detail navigation is active. Scheduling and template flows remain intentionally hidden until their full UI paths are implemented.</div>
                             </div>
                         </div>
                     </div>

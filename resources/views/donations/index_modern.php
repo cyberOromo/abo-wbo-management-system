@@ -4,6 +4,7 @@ $donations = $donations ?? [];
 $stats = $stats ?? [];
 $user_scope = $user_scope ?? [];
 $can_create = $can_create ?? false;
+$viewMode = (($_GET['view'] ?? 'table') === 'cards') ? 'cards' : 'table';
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -15,6 +16,16 @@ $can_create = $can_create ?? false;
         <p class="text-muted mb-0">Scoped donation visibility and reporting for the current hierarchy level.</p>
     </div>
     <div class="btn-toolbar gap-2">
+        <div class="btn-group" role="group" aria-label="Donation list view">
+            <a href="/donations?view=table" class="btn btn-outline-secondary <?= $viewMode === 'table' ? 'active' : '' ?>">
+                <i class="bi bi-table me-1"></i>
+                Table
+            </a>
+            <a href="/donations?view=cards" class="btn btn-outline-secondary <?= $viewMode === 'cards' ? 'active' : '' ?>">
+                <i class="bi bi-grid-3x2-gap me-1"></i>
+                Cards
+            </a>
+        </div>
         <a href="/donations/reports/summary" class="btn btn-outline-success">
             <i class="bi bi-file-earmark-bar-graph me-1"></i>
             Summary Report
@@ -109,65 +120,121 @@ $can_create = $can_create ?? false;
             </div>
             <div class="card-body">
                 <?php if (!empty($donations)): ?>
-                    <div class="table-responsive">
-                        <table class="table align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Donor</th>
-                                    <th>Amount</th>
-                                    <th>Type</th>
-                                    <th>Date</th>
-                                    <th>Scope</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($donations as $donation): ?>
-                                    <?php
-                                    $donorName = trim(($donation['first_name'] ?? '') . ' ' . ($donation['last_name'] ?? ''));
-                                    if ($donorName === '') {
-                                        $donorName = $donation['donor_name']
-                                            ?? $donation['group_name']
-                                            ?? $donation['organization_name']
-                                            ?? (isset($donation['member_id']) ? 'Member #' . $donation['member_id'] : 'Unknown donor');
-                                    }
+                    <?php if ($viewMode === 'cards'): ?>
+                        <div class="row g-3">
+                            <?php foreach ($donations as $donation): ?>
+                                <?php
+                                $donorName = trim(($donation['first_name'] ?? '') . ' ' . ($donation['last_name'] ?? ''));
+                                if ($donorName === '') {
+                                    $donorName = $donation['donor_name']
+                                        ?? $donation['group_name']
+                                        ?? $donation['organization_name']
+                                        ?? (isset($donation['member_id']) ? 'Member #' . $donation['member_id'] : 'Unknown donor');
+                                }
 
-                                    $scopeLabel = $donation['gurmu_name'] ?? $donation['gamta_name'] ?? $donation['godina_name'] ?? 'Current scope';
-                                    if ($scopeLabel === 'Current scope' && !empty($donation['level_scope'])) {
-                                        $scopeLabel = ucfirst($donation['level_scope']);
-                                    }
+                                $scopeLabel = $donation['gurmu_name'] ?? $donation['gamta_name'] ?? $donation['godina_name'] ?? 'Current scope';
+                                if ($scopeLabel === 'Current scope' && !empty($donation['level_scope'])) {
+                                    $scopeLabel = ucfirst($donation['level_scope']);
+                                }
 
-                                    $referenceLabel = $donation['reference_number']
-                                        ?? $donation['donation_number']
-                                        ?? $donation['receipt_number']
-                                        ?? $donation['uuid']
-                                        ?? 'No reference';
+                                $referenceLabel = $donation['reference_number']
+                                    ?? $donation['donation_number']
+                                    ?? $donation['receipt_number']
+                                    ?? $donation['uuid']
+                                    ?? 'No reference';
 
-                                    $typeLabel = $donation['type']
-                                        ?? $donation['donation_type']
-                                        ?? $donation['donor_type']
-                                        ?? 'General';
+                                $typeLabel = $donation['type']
+                                    ?? $donation['donation_type']
+                                    ?? $donation['donor_type']
+                                    ?? 'General';
 
-                                    $dateValue = $donation['donation_date']
-                                        ?? $donation['payment_date']
-                                        ?? $donation['created_at']
-                                        ?? 'now';
-                                    ?>
+                                $dateValue = $donation['donation_date']
+                                    ?? $donation['payment_date']
+                                    ?? $donation['created_at']
+                                    ?? 'now';
+                                ?>
+                                <div class="col-xl-6">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-body d-flex flex-column gap-3">
+                                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                                <div>
+                                                    <div class="fw-semibold fs-5"><?= htmlspecialchars($donorName !== '' ? $donorName : ($donation['email'] ?? 'Unknown donor')) ?></div>
+                                                    <div class="text-muted small"><?= htmlspecialchars($referenceLabel) ?></div>
+                                                </div>
+                                                <span class="badge text-bg-light"><?= htmlspecialchars(ucfirst((string) $typeLabel)) ?></span>
+                                            </div>
+                                            <div class="row g-3">
+                                                <div class="col-sm-6"><div class="small text-muted text-uppercase fw-semibold">Amount</div><div class="fw-semibold text-success">$<?= number_format((float) ($donation['amount'] ?? 0), 2) ?></div></div>
+                                                <div class="col-sm-6"><div class="small text-muted text-uppercase fw-semibold">Date</div><div class="fw-semibold"><?= htmlspecialchars(date('M j, Y', strtotime((string) $dateValue))) ?></div></div>
+                                                <div class="col-sm-6"><div class="small text-muted text-uppercase fw-semibold">Scope</div><div class="fw-semibold"><?= htmlspecialchars($scopeLabel) ?></div></div>
+                                                <div class="col-sm-6"><div class="small text-muted text-uppercase fw-semibold">Mode</div><div class="text-muted small">Read-only in current build</div></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table align-middle">
+                                <thead>
                                     <tr>
-                                        <td>
-                                            <div class="fw-semibold"><?= htmlspecialchars($donorName !== '' ? $donorName : ($donation['email'] ?? 'Unknown donor')) ?></div>
-                                            <small class="text-muted"><?= htmlspecialchars($referenceLabel) ?></small>
-                                        </td>
-                                        <td class="fw-semibold text-success">$<?= number_format((float) ($donation['amount'] ?? 0), 2) ?></td>
-                                        <td><?= htmlspecialchars(ucfirst((string) $typeLabel)) ?></td>
-                                        <td><?= htmlspecialchars(date('M j, Y', strtotime((string) $dateValue))) ?></td>
-                                        <td><?= htmlspecialchars($scopeLabel) ?></td>
-                                        <td><span class="text-muted small">Read-only in current build</span></td>
+                                        <th>Donor</th>
+                                        <th>Amount</th>
+                                        <th>Type</th>
+                                        <th>Date</th>
+                                        <th>Scope</th>
+                                        <th>Actions</th>
                                     </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($donations as $donation): ?>
+                                        <?php
+                                        $donorName = trim(($donation['first_name'] ?? '') . ' ' . ($donation['last_name'] ?? ''));
+                                        if ($donorName === '') {
+                                            $donorName = $donation['donor_name']
+                                                ?? $donation['group_name']
+                                                ?? $donation['organization_name']
+                                                ?? (isset($donation['member_id']) ? 'Member #' . $donation['member_id'] : 'Unknown donor');
+                                        }
+
+                                        $scopeLabel = $donation['gurmu_name'] ?? $donation['gamta_name'] ?? $donation['godina_name'] ?? 'Current scope';
+                                        if ($scopeLabel === 'Current scope' && !empty($donation['level_scope'])) {
+                                            $scopeLabel = ucfirst($donation['level_scope']);
+                                        }
+
+                                        $referenceLabel = $donation['reference_number']
+                                            ?? $donation['donation_number']
+                                            ?? $donation['receipt_number']
+                                            ?? $donation['uuid']
+                                            ?? 'No reference';
+
+                                        $typeLabel = $donation['type']
+                                            ?? $donation['donation_type']
+                                            ?? $donation['donor_type']
+                                            ?? 'General';
+
+                                        $dateValue = $donation['donation_date']
+                                            ?? $donation['payment_date']
+                                            ?? $donation['created_at']
+                                            ?? 'now';
+                                        ?>
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold"><?= htmlspecialchars($donorName !== '' ? $donorName : ($donation['email'] ?? 'Unknown donor')) ?></div>
+                                                <small class="text-muted"><?= htmlspecialchars($referenceLabel) ?></small>
+                                            </td>
+                                            <td class="fw-semibold text-success">$<?= number_format((float) ($donation['amount'] ?? 0), 2) ?></td>
+                                            <td><?= htmlspecialchars(ucfirst((string) $typeLabel)) ?></td>
+                                            <td><?= htmlspecialchars(date('M j, Y', strtotime((string) $dateValue))) ?></td>
+                                            <td><?= htmlspecialchars($scopeLabel) ?></td>
+                                            <td><span class="text-muted small">Read-only in current build</span></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
                 <?php else: ?>
                     <div class="text-center py-5">
                         <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
