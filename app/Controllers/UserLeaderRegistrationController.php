@@ -30,6 +30,7 @@ class UserLeaderRegistrationController extends BaseController
     private InternalEmailGenerator $emailGenerator;
     private ?EmailSender $emailService = null;
     private ?Logger $logger = null;
+    private ?array $positionColumns = null;
 
     public function __construct()
     {
@@ -242,12 +243,16 @@ class UserLeaderRegistrationController extends BaseController
                 return $this->jsonResponse(['success' => false, 'message' => 'Level required']);
             }
 
+            $nameColumn = $this->getPositionNameColumn();
+            $hierarchyColumn = $this->getPositionHierarchyColumn();
+            $executiveExpression = $this->hasPositionColumn('is_executive') ? 'is_executive' : '0';
+
             // Get positions for the specified level
             $positions = $this->db->fetchAll(
-                "SELECT id, name, is_executive, hierarchy_type 
+                "SELECT id, {$nameColumn} AS name, {$executiveExpression} AS is_executive, {$hierarchyColumn} AS hierarchy_type 
                  FROM positions 
-                 WHERE hierarchy_type = ? 
-                 ORDER BY is_executive DESC, name",
+                 WHERE {$hierarchyColumn} = ? 
+                 ORDER BY name",
                 [$level]
             );
 
@@ -812,11 +817,58 @@ class UserLeaderRegistrationController extends BaseController
      */
     private function getPositions(): array
     {
+        $nameColumn = $this->getPositionNameColumn();
+        $hierarchyColumn = $this->getPositionHierarchyColumn();
+        $executiveExpression = $this->hasPositionColumn('is_executive') ? 'is_executive' : '0';
+
         return $this->db->fetchAll("
-            SELECT id, name, hierarchy_type, is_executive 
+            SELECT id, {$nameColumn} AS name, {$hierarchyColumn} AS hierarchy_type, {$executiveExpression} AS is_executive 
             FROM positions 
-            ORDER BY hierarchy_type, is_executive DESC, name
+            ORDER BY hierarchy_type, name
         ");
+    }
+
+    private function getPositionColumns(): array
+    {
+        if ($this->positionColumns !== null) {
+            return $this->positionColumns;
+        }
+
+        $columns = $this->db->fetchAll('SHOW COLUMNS FROM positions');
+        $this->positionColumns = array_column($columns, 'Field');
+
+        return $this->positionColumns;
+    }
+
+    private function hasPositionColumn(string $column): bool
+    {
+        return in_array($column, $this->getPositionColumns(), true);
+    }
+
+    private function getPositionNameColumn(): string
+    {
+        if ($this->hasPositionColumn('name')) {
+            return 'name';
+        }
+
+        if ($this->hasPositionColumn('name_en')) {
+            return 'name_en';
+        }
+
+        return 'key_name';
+    }
+
+    private function getPositionHierarchyColumn(): string
+    {
+        if ($this->hasPositionColumn('hierarchy_type')) {
+            return 'hierarchy_type';
+        }
+
+        if ($this->hasPositionColumn('level_scope')) {
+            return 'level_scope';
+        }
+
+        return 'level';
     }
 
     /**
