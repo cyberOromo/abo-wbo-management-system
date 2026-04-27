@@ -6,19 +6,23 @@ $breadcrumbs = [
 ];
 ?>
 
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">
-        <i class="bi bi-people me-2"></i>
-        User Management
-    </h1>
+<div class="users-hero mb-4">
+    <div>
+        <div class="users-eyebrow">Organization Directory</div>
+        <h1 class="users-title">
+            <i class="bi bi-people me-2"></i>
+            User Management
+        </h1>
+        <p class="users-subtitle mb-0">Manage internal users, verify role state, and switch between compact table scanning and a cleaner modern card layout.</p>
+    </div>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
-            <a href="/admin/user-leader-registration" class="btn btn-primary">
+            <a href="/admin/user-leader-registration" class="btn btn-primary users-primary-action">
                 <i class="bi bi-person-plus me-1"></i>
                 Add User
             </a>
         </div>
-        <div class="btn-group me-2" role="group" aria-label="Users display mode">
+        <div class="btn-group me-2 users-view-switch" role="group" aria-label="Users display mode">
             <button type="button" class="btn btn-outline-secondary active" data-user-view-mode="table">
                 <i class="bi bi-table me-1"></i>
                 Table
@@ -45,7 +49,7 @@ $breadcrumbs = [
 <!-- Filters and Search -->
 <div class="row mb-4">
     <div class="col-12">
-        <div class="card">
+        <div class="card surface-card filter-surface border-0 shadow-sm">
             <div class="card-body">
                 <form method="GET" action="/users" class="row g-3">
                     <div class="col-md-4">
@@ -92,48 +96,48 @@ $breadcrumbs = [
 </div>
 
 <!-- Statistics Cards -->
-<div class="row mb-4">
+<div class="row mb-4 g-3">
     <div class="col-md-3">
-        <div class="card text-center">
+        <div class="card metric-card metric-card-primary border-0 shadow-sm">
             <div class="card-body">
-                <i class="bi bi-people text-primary mb-2" style="font-size: 2rem;"></i>
-                <h4 class="card-title"><?= number_format($totalUsers ?? 0) ?></h4>
-                <p class="card-text text-muted">Total Users</p>
+                <div class="metric-icon"><i class="bi bi-people"></i></div>
+                <div class="metric-value"><?= number_format($totalUsers ?? 0) ?></div>
+                <p class="metric-label mb-0">Total Users</p>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-center">
+        <div class="card metric-card metric-card-success border-0 shadow-sm">
             <div class="card-body">
-                <i class="bi bi-person-check text-success mb-2" style="font-size: 2rem;"></i>
-                <h4 class="card-title"><?= number_format(count(array_filter($users ?? [], fn($u) => $u['status'] === 'active'))) ?></h4>
-                <p class="card-text text-muted">Active Users</p>
+                <div class="metric-icon"><i class="bi bi-person-check"></i></div>
+                <div class="metric-value"><?= number_format(count(array_filter($users ?? [], fn($u) => $u['status'] === 'active'))) ?></div>
+                <p class="metric-label mb-0">Active Users</p>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-center">
+        <div class="card metric-card metric-card-warning border-0 shadow-sm">
             <div class="card-body">
-                <i class="bi bi-person-exclamation text-warning mb-2" style="font-size: 2rem;"></i>
-                <h4 class="card-title"><?= number_format(count(array_filter($users ?? [], fn($u) => $u['status'] === 'pending'))) ?></h4>
-                <p class="card-text text-muted">Pending</p>
+                <div class="metric-icon"><i class="bi bi-person-exclamation"></i></div>
+                <div class="metric-value"><?= number_format(count(array_filter($users ?? [], fn($u) => $u['status'] === 'pending'))) ?></div>
+                <p class="metric-label mb-0">Pending</p>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-center">
+        <div class="card metric-card metric-card-info border-0 shadow-sm">
             <div class="card-body">
-                <i class="bi bi-shield-shaded text-info mb-2" style="font-size: 2rem;"></i>
-                <h4 class="card-title"><?= number_format(count(array_filter($users ?? [], fn($u) => in_array($u['role_key'] ?? '', ['admin', 'system_admin'], true)))) ?></h4>
-                <p class="card-text text-muted">Administrators</p>
+                <div class="metric-icon"><i class="bi bi-shield-shaded"></i></div>
+                <div class="metric-value"><?= number_format(count(array_filter($users ?? [], fn($u) => in_array($u['role_key'] ?? '', ['admin', 'system_admin'], true)))) ?></div>
+                <p class="metric-label mb-0">Administrators</p>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Users Table -->
-<div class="card">
-    <div class="card-header">
+<div class="card surface-card users-list-shell border-0 shadow-sm">
+    <div class="card-header users-list-header border-0 bg-transparent">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <h5 class="card-title mb-0">
                 <i class="bi bi-table me-2"></i>
@@ -172,13 +176,12 @@ $breadcrumbs = [
                             <tr>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <div class="avatar-circle me-3">
+                                        <div class="user-avatar user-avatar-sm me-3">
                                             <?php if (!empty($user['profile_image'])): ?>
                                                 <img src="/uploads/profiles/<?= htmlspecialchars($user['profile_image']) ?>" 
-                                                     alt="Profile" class="rounded-circle" width="40" height="40">
+                                                     alt="Profile" class="user-avatar-image">
                                             <?php else: ?>
-                                                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" 
-                                                     style="width: 40px; height: 40px;">
+                                                <div class="user-avatar-fallback">
                                                     <?= strtoupper(substr($user['first_name'], 0, 1) . substr($user['last_name'], 0, 1)) ?>
                                                 </div>
                                             <?php endif; ?>
@@ -290,16 +293,16 @@ $breadcrumbs = [
                     $statusColor = $statusColors[$user['status']] ?? 'secondary';
                     ?>
                     <div class="col-xl-4 col-md-6">
-                        <div class="card h-100 border user-card-surface">
+                        <div class="card h-100 border-0 user-card-surface user-card-modern shadow-sm">
                             <div class="card-body d-flex flex-column gap-3">
                                 <div class="d-flex align-items-start justify-content-between gap-3">
                                     <div class="d-flex align-items-center gap-3">
-                                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-semibold user-card-avatar">
+                                        <div class="user-avatar user-card-avatar">
                                             <?= strtoupper(substr($user['first_name'], 0, 1) . substr($user['last_name'], 0, 1)) ?>
                                         </div>
                                         <div>
-                                            <div class="fw-semibold fs-5"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></div>
-                                            <div class="text-muted small">ID: <?= (int) $user['id'] ?></div>
+                                            <div class="user-card-name"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></div>
+                                            <div class="text-muted user-card-meta">ID: <?= (int) $user['id'] ?></div>
                                         </div>
                                     </div>
                                     <div class="d-flex flex-column align-items-end gap-2">
@@ -309,30 +312,30 @@ $breadcrumbs = [
                                 </div>
 
                                 <div>
-                                    <div class="small text-uppercase text-muted fw-semibold mb-1">Contacts</div>
-                                    <div><?= htmlspecialchars($user['internal_email'] ?: $user['email']) ?></div>
+                                    <div class="small text-uppercase text-muted fw-semibold mb-1 user-card-section-title">Contacts</div>
+                                    <div class="user-card-contact"><?= htmlspecialchars($user['internal_email'] ?: $user['email']) ?></div>
                                     <?php if (!empty($user['phone'])): ?>
-                                        <div class="text-muted small mt-1"><?= htmlspecialchars($user['phone']) ?></div>
+                                        <div class="text-muted user-card-meta mt-1"><?= htmlspecialchars($user['phone']) ?></div>
                                     <?php endif; ?>
                                 </div>
 
                                 <div>
-                                    <div class="small text-uppercase text-muted fw-semibold mb-1">Assignments</div>
+                                    <div class="small text-uppercase text-muted fw-semibold mb-1 user-card-section-title">Assignments</div>
                                     <?php if (!empty($user['position_summary'])): ?>
-                                        <div class="d-flex flex-wrap gap-2">
+                                        <div class="d-flex flex-wrap gap-2 user-card-chip-wrap">
                                             <?php foreach (array_slice($user['position_summary'], 0, 3) as $assignmentLabel): ?>
-                                                <span class="badge text-bg-light border"><?= htmlspecialchars($assignmentLabel) ?></span>
+                                                <span class="badge user-assignment-chip"><?= htmlspecialchars($assignmentLabel) ?></span>
                                             <?php endforeach; ?>
                                             <?php if (count($user['position_summary']) > 3): ?>
-                                                <span class="badge text-bg-secondary">+<?= count($user['position_summary']) - 3 ?></span>
+                                                <span class="badge user-chip-counter">+<?= count($user['position_summary']) - 3 ?></span>
                                             <?php endif; ?>
                                         </div>
                                     <?php else: ?>
-                                        <span class="text-muted">No active position assignments</span>
+                                        <span class="text-muted user-card-meta">No active position assignments</span>
                                     <?php endif; ?>
                                 </div>
 
-                                <div class="small text-muted mt-auto">
+                                <div class="user-card-meta mt-auto">
                                     Last login:
                                     <?php if ($user['last_login_at']): ?>
                                         <?= htmlspecialchars(time_ago($user['last_login_at'])) ?>
@@ -341,7 +344,7 @@ $breadcrumbs = [
                                     <?php endif; ?>
                                 </div>
 
-                                <div class="d-flex gap-2 flex-wrap">
+                                <div class="d-flex gap-2 flex-wrap user-card-actions">
                                     <button type="button" class="btn btn-outline-primary btn-sm" onclick="openUserDetails(<?= (int) $user['id'] ?>)">
                                         <i class="bi bi-eye me-1"></i>View
                                     </button>
@@ -1063,9 +1066,152 @@ if (userPageParams.has('edit')) {
 </script>
 
 <style>
+:root {
+    --users-surface: linear-gradient(135deg, #f7f8f4 0%, #eef3ec 100%);
+    --users-panel: rgba(255, 255, 255, 0.88);
+    --users-border: rgba(22, 61, 47, 0.1);
+    --users-ink: #173229;
+    --users-muted: #66756e;
+    --users-accent: #0f7a5c;
+}
+
+.users-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.5rem;
+    padding: 1.5rem 1.6rem;
+    border: 1px solid var(--users-border);
+    border-radius: 1.5rem;
+    background: var(--users-surface);
+    box-shadow: 0 22px 44px rgba(15, 32, 24, 0.08);
+}
+
+.users-eyebrow {
+    margin-bottom: 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--users-accent);
+}
+
+.users-title {
+    margin-bottom: 0.4rem;
+    font-size: clamp(1.7rem, 2vw, 2.2rem);
+    font-weight: 700;
+    color: var(--users-ink);
+}
+
+.users-subtitle {
+    max-width: 50rem;
+    color: var(--users-muted);
+    font-size: 0.96rem;
+}
+
+.users-primary-action,
+.users-view-switch .btn {
+    border-radius: 999px !important;
+}
+
+.surface-card {
+    border: 1px solid var(--users-border);
+    background: var(--users-panel);
+    backdrop-filter: blur(10px);
+}
+
+.filter-surface .form-control,
+.filter-surface .form-select {
+    border-radius: 0.95rem;
+}
+
+.metric-card {
+    overflow: hidden;
+    border: 1px solid var(--users-border);
+    border-radius: 1.35rem;
+    background: linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(246,249,246,0.96) 100%);
+}
+
+.metric-card .card-body {
+    padding: 1.35rem;
+}
+
+.metric-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 0.9rem;
+    border-radius: 1rem;
+    font-size: 1.35rem;
+}
+
+.metric-card-primary .metric-icon { background: rgba(22, 104, 230, 0.12); color: #1668e6; }
+.metric-card-success .metric-icon { background: rgba(28, 153, 84, 0.12); color: #1c9954; }
+.metric-card-warning .metric-icon { background: rgba(218, 146, 13, 0.14); color: #c27a06; }
+.metric-card-info .metric-icon { background: rgba(0, 141, 158, 0.12); color: #008d9e; }
+
+.metric-value {
+    font-size: 2rem;
+    line-height: 1;
+    font-weight: 700;
+    color: var(--users-ink);
+}
+
+.metric-label {
+    margin-top: 0.45rem;
+    color: var(--users-muted);
+    font-size: 0.9rem;
+}
+
+.users-list-shell {
+    overflow: hidden;
+    border-radius: 1.5rem;
+}
+
+.users-list-header {
+    padding: 1.15rem 1.25rem 0;
+}
+
+.user-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 3.1rem;
+    height: 3.1rem;
+    border-radius: 50%;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1d6ef2 0%, #0e63b6 100%);
+    color: #fff;
+    font-weight: 700;
+}
+
+.user-avatar-sm {
+    width: 2.5rem;
+    height: 2.5rem;
+}
+
+.user-avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.user-avatar-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
 .user-card-avatar {
     width: 3rem;
     height: 3rem;
+    font-size: 0.95rem;
 }
 
 .user-card-surface {
@@ -1073,8 +1219,54 @@ if (userPageParams.has('edit')) {
 }
 
 .user-card-surface:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 1rem 2rem rgba(15, 23, 42, 0.08);
+    transform: translateY(-4px);
+    box-shadow: 0 1.35rem 2.6rem rgba(15, 23, 42, 0.1);
+}
+
+.user-card-modern {
+    border-radius: 1.4rem;
+    background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(246,248,247,0.98) 100%);
+}
+
+.user-card-name {
+    font-size: 1.08rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--users-ink);
+}
+
+.user-card-meta {
+    font-size: 0.82rem;
+    color: var(--users-muted);
+}
+
+.user-card-section-title {
+    letter-spacing: 0.08em;
+    font-size: 0.68rem;
+}
+
+.user-card-contact {
+    font-size: 0.92rem;
+    color: #253a32;
+    word-break: break-word;
+}
+
+.user-assignment-chip {
+    border: 1px solid rgba(15, 122, 92, 0.14);
+    background: rgba(15, 122, 92, 0.08);
+    color: #184e3c;
+    font-size: 0.72rem;
+}
+
+.user-chip-counter {
+    background: rgba(18, 32, 26, 0.16);
+    color: #20352d;
+    font-size: 0.72rem;
+}
+
+.user-card-actions .btn {
+    border-radius: 999px;
+    font-size: 0.8rem;
 }
 
 .responsibility-preview {
@@ -1095,5 +1287,11 @@ if (userPageParams.has('edit')) {
 
 .assignment-editor-row {
     scroll-margin-top: 5rem;
+}
+
+@media (max-width: 991.98px) {
+    .users-hero {
+        flex-direction: column;
+    }
 }
 </style>

@@ -18,9 +18,13 @@ $current_user = $current_user ?? [];
     <!-- Header -->
     <div class="row">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h3 mb-0">👤 User & Leader Registration</h1>
-                <div class="btn-group">
+            <div class="registration-hero mb-4">
+                <div>
+                    <div class="registration-eyebrow">System Administrator Workspace</div>
+                    <h1 class="registration-title mb-2">User & Leader Registration</h1>
+                    <p class="registration-subtitle mb-0">Register internal users, assign organizational leadership, and review fresh registrations in either a dense table or a cleaner card layout.</p>
+                </div>
+                <div class="btn-group registration-actions">
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#registerUserModal">
                         <i class="bi bi-person-plus"></i> Register User/Leader
                     </button>
@@ -38,7 +42,7 @@ $current_user = $current_user ?? [];
     <!-- System Admin Notice -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="alert alert-warning">
+            <div class="alert alert-warning registration-alert">
                 <i class="bi bi-shield-exclamation"></i>
                 <strong>System Administrator Module:</strong> This module allows you to register users with leadership positions and assign them to any organizational level. Use with caution as these users will have significant organizational responsibilities.
             </div>
@@ -46,9 +50,9 @@ $current_user = $current_user ?? [];
     </div>
 
     <!-- Statistics Cards -->
-    <div class="row mb-4">
+    <div class="row mb-4 g-3">
         <div class="col-lg-2 col-md-4 col-sm-6">
-            <div class="card bg-primary text-white">
+            <div class="card registration-metric registration-metric-primary border-0 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
@@ -63,7 +67,7 @@ $current_user = $current_user ?? [];
             </div>
         </div>
         <div class="col-lg-2 col-md-4 col-sm-6">
-            <div class="card bg-success text-white">
+            <div class="card registration-metric registration-metric-success border-0 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
@@ -78,7 +82,7 @@ $current_user = $current_user ?? [];
             </div>
         </div>
         <div class="col-lg-2 col-md-4 col-sm-6">
-            <div class="card bg-info text-white">
+            <div class="card registration-metric registration-metric-info border-0 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
@@ -93,7 +97,7 @@ $current_user = $current_user ?? [];
             </div>
         </div>
         <div class="col-lg-2 col-md-4 col-sm-6">
-            <div class="card bg-warning text-white">
+            <div class="card registration-metric registration-metric-warning border-0 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
@@ -108,7 +112,7 @@ $current_user = $current_user ?? [];
             </div>
         </div>
         <div class="col-lg-2 col-md-4 col-sm-6">
-            <div class="card bg-dark text-white">
+            <div class="card registration-metric registration-metric-dark border-0 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
@@ -127,13 +131,20 @@ $current_user = $current_user ?? [];
     <!-- Recent Registrations -->
     <div class="row">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Recent User Registrations</h5>
+            <div class="card registration-surface border-0 shadow-sm">
+                <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h5 class="card-title mb-0">Recent User Registrations</h5>
+                        <small class="text-muted">Switch between scanning rows and a cleaner card layout for newly registered users.</small>
+                    </div>
+                    <div class="btn-group recent-registrations-switch" role="group" aria-label="Recent registrations view">
+                        <button type="button" class="btn btn-outline-secondary active" data-registration-view-mode="table">Table</button>
+                        <button type="button" class="btn btn-outline-secondary" data-registration-view-mode="cards">Cards</button>
+                    </div>
                 </div>
                 <div class="card-body">
                     <?php if (!empty($recent_registrations)): ?>
-                        <div class="table-responsive">
+                        <div class="table-responsive registration-view-surface" data-registration-view-surface="table">
                             <table class="table table-striped">
                                 <thead>
                                     <tr>
@@ -200,6 +211,68 @@ $current_user = $current_user ?? [];
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="row g-3 registration-view-surface d-none" data-registration-view-surface="cards">
+                            <?php foreach ($recent_registrations as $user): ?>
+                                <?php
+                                $roleClass = match($user['role']) {
+                                    'system_admin' => 'danger',
+                                    'admin' => 'warning',
+                                    'executive' => 'info',
+                                    default => 'secondary'
+                                };
+                                $statusClass = match($user['status']) {
+                                    'active' => 'success',
+                                    'inactive' => 'secondary',
+                                    'suspended' => 'danger',
+                                    default => 'warning'
+                                };
+                                $positionLabels = array_values(array_filter(array_map('trim', preg_split('/\s*,\s*/', (string) ($user['positions'] ?? '')))));
+                                ?>
+                                <div class="col-xl-4 col-md-6">
+                                    <div class="card registration-user-card border-0 shadow-sm h-100">
+                                        <div class="card-body d-flex flex-column gap-3">
+                                            <div class="d-flex justify-content-between gap-3 align-items-start">
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <div class="registration-avatar">
+                                                        <?= strtoupper(substr($user['first_name'], 0, 1) . substr($user['last_name'], 0, 1)) ?>
+                                                    </div>
+                                                    <div>
+                                                        <div class="registration-user-name"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></div>
+                                                        <div class="registration-user-meta"><?= htmlspecialchars($user['email']) ?></div>
+                                                    </div>
+                                                </div>
+                                                <div class="d-flex flex-column align-items-end gap-2">
+                                                    <span class="badge bg-<?= $roleClass ?>"><?= ucfirst(str_replace('_', ' ', $user['role'])) ?></span>
+                                                    <span class="badge bg-<?= $statusClass ?>"><?= ucfirst($user['status']) ?></span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div class="registration-section-label">Assignments</div>
+                                                <?php if (!empty($positionLabels)): ?>
+                                                    <div class="registration-chip-wrap">
+                                                        <?php foreach (array_slice($positionLabels, 0, 3) as $positionLabel): ?>
+                                                            <span class="badge registration-position-chip"><?= htmlspecialchars($positionLabel) ?></span>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                    <div class="registration-user-meta mt-2"><?= (int) $user['position_count'] ?> position(s)</div>
+                                                <?php else: ?>
+                                                    <div class="registration-user-meta">No positions assigned</div>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="registration-user-meta mt-auto">Registered <?= date('M j, Y g:i A', strtotime($user['created_at'])) ?></div>
+                                            <div class="d-flex gap-2 flex-wrap">
+                                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="viewUser(<?= $user['id'] ?>)">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="editUserAssignments(<?= $user['id'] ?>)">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     <?php else: ?>
                         <div class="text-center py-5">
@@ -1008,15 +1081,113 @@ function showAlert(message, type) {
         alertDiv.remove();
     }, 5000);
 }
+
+function applyRecentRegistrationsView(mode) {
+    document.querySelectorAll('[data-registration-view-surface]').forEach(element => {
+        element.classList.toggle('d-none', element.getAttribute('data-registration-view-surface') !== mode);
+    });
+
+    document.querySelectorAll('[data-registration-view-mode]').forEach(button => {
+        const active = button.getAttribute('data-registration-view-mode') === mode;
+        button.classList.toggle('active', active);
+        button.classList.toggle('btn-secondary', active);
+        button.classList.toggle('btn-outline-secondary', !active);
+    });
+
+    localStorage.setItem('recentRegistrationViewMode', mode);
+}
+
+document.querySelectorAll('[data-registration-view-mode]').forEach(button => {
+    button.addEventListener('click', function () {
+        applyRecentRegistrationsView(this.getAttribute('data-registration-view-mode'));
+    });
+});
+
+applyRecentRegistrationsView(localStorage.getItem('recentRegistrationViewMode') || 'table');
 </script>
 
 <style>
+:root {
+    --registration-shell: linear-gradient(135deg, #f9f6ef 0%, #edf5f0 100%);
+    --registration-border: rgba(29, 54, 40, 0.1);
+    --registration-ink: #20342b;
+    --registration-muted: #6b776f;
+    --registration-accent: #0f6c5d;
+}
+
+.registration-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.5rem;
+    padding: 1.6rem 1.7rem;
+    border: 1px solid var(--registration-border);
+    border-radius: 1.6rem;
+    background: var(--registration-shell);
+    box-shadow: 0 24px 50px rgba(16, 35, 25, 0.08);
+}
+
+.registration-eyebrow {
+    margin-bottom: 0.45rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--registration-accent);
+}
+
+.registration-title {
+    font-size: clamp(1.8rem, 2.1vw, 2.4rem);
+    font-weight: 700;
+    color: var(--registration-ink);
+}
+
+.registration-subtitle {
+    max-width: 48rem;
+    color: var(--registration-muted);
+}
+
+.registration-actions .btn,
+.recent-registrations-switch .btn {
+    border-radius: 999px !important;
+}
+
+.registration-alert {
+    border: 0;
+    border-radius: 1.1rem;
+    background: linear-gradient(90deg, rgba(255, 220, 121, 0.26) 0%, rgba(255, 255, 255, 0.88) 100%);
+}
+
+.registration-metric {
+    color: #fff;
+    border-radius: 1.35rem;
+    overflow: hidden;
+}
+
+.registration-metric .card-body {
+    padding: 1.15rem 1.2rem;
+}
+
+.registration-metric-primary { background: linear-gradient(135deg, #2168e6 0%, #1c4ea3 100%); }
+.registration-metric-success { background: linear-gradient(135deg, #1b8e5d 0%, #0f6b46 100%); }
+.registration-metric-info { background: linear-gradient(135deg, #1f9ab4 0%, #0f7488 100%); }
+.registration-metric-warning { background: linear-gradient(135deg, #e3a222 0%, #bf7708 100%); }
+.registration-metric-dark { background: linear-gradient(135deg, #2b3a34 0%, #17201b 100%); }
+
+.registration-surface {
+    border-radius: 1.5rem;
+    border: 1px solid var(--registration-border);
+    background: rgba(255, 255, 255, 0.92);
+}
+
 .modal-xl {
     max-width: 1200px;
 }
 
 .assignment-row {
     border-left: 4px solid #007bff;
+    border-radius: 1.05rem;
+    box-shadow: 0 14px 28px rgba(15, 32, 24, 0.06);
 }
 
 .form-text {
@@ -1052,6 +1223,88 @@ function showAlert(message, type) {
     padding: 1rem;
 }
 
+#registerUserModal .modal-content,
+#usersListModal .modal-content {
+    border: 0;
+    border-radius: 1.4rem;
+    overflow: hidden;
+}
+
+#registerUserModal .modal-header,
+#usersListModal .modal-header {
+    background: linear-gradient(135deg, #1e6a56 0%, #17493d 100%);
+    color: #fff;
+    border-bottom: 0;
+}
+
+#registerUserModal .modal-header .btn-close,
+#usersListModal .modal-header .btn-close {
+    filter: invert(1);
+}
+
+#registerUserModal .modal-body {
+    background: linear-gradient(180deg, #fbfcf9 0%, #f2f6f3 100%);
+}
+
+#registerUserModal .form-control,
+#registerUserModal .form-select,
+#usersListModal .form-control,
+#usersListModal .form-select {
+    border-radius: 0.95rem;
+}
+
+.registration-user-card {
+    border-radius: 1.35rem;
+    background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,247,246,0.98) 100%);
+}
+
+.registration-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #226ff1 0%, #0e61b3 100%);
+    color: #fff;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.registration-user-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--registration-ink);
+}
+
+.registration-user-meta {
+    font-size: 0.82rem;
+    color: var(--registration-muted);
+    word-break: break-word;
+}
+
+.registration-section-label {
+    margin-bottom: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--registration-muted);
+}
+
+.registration-chip-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.registration-position-chip {
+    background: rgba(15, 108, 93, 0.09);
+    border: 1px solid rgba(15, 108, 93, 0.14);
+    color: #1b4e40;
+    font-size: 0.72rem;
+}
+
 .hierarchy-level {
     font-weight: 500;
 }
@@ -1081,5 +1334,11 @@ function showAlert(message, type) {
 
 .responsibility-pill small {
     color: #6c757d;
+}
+
+@media (max-width: 991.98px) {
+    .registration-hero {
+        flex-direction: column;
+    }
 }
 </style>
