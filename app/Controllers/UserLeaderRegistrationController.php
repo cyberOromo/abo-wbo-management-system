@@ -672,19 +672,23 @@ class UserLeaderRegistrationController extends BaseController
             }
         }
 
-        $assignmentData = [
+        $assignmentData = $this->filterTableData('user_assignments', [
             'user_id' => $userId,
             'position_id' => $assignment['position_id'],
+            'organizational_unit_id' => $assignment['hierarchy_id'] ?: null,
             'level_scope' => $assignment['hierarchy_level'],
             'start_date' => $assignment['start_date'],
+            'term_start' => $assignment['start_date'],
             'end_date' => $assignment['end_date'],
+            'term_end' => $assignment['end_date'],
             'status' => 'active',
             'appointment_type' => 'appointed',
             'assigned_by' => $_SESSION['user']['id'],
             'assignment_reason' => $assignment['notes'] ?: 'Assigned during admin registration',
+            'notes' => $assignment['notes'] ?: null,
             'metadata' => json_encode(['notes' => $assignment['notes'] ?: null]),
             'created_at' => date('Y-m-d H:i:s')
-        ] + $scopeColumns;
+        ]) + $this->filterTableData('user_assignments', $scopeColumns);
 
         return $this->db->insert('user_assignments', $assignmentData);
     }
