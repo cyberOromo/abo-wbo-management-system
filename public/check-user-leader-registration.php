@@ -48,12 +48,62 @@ try {
     $controller = new \App\Controllers\UserLeaderRegistrationController();
     echo '<p>Controller instantiated successfully.</p>';
 
-    ob_start();
-    $controller->index();
-    $output = ob_get_clean();
+    $reflection = new \ReflectionClass($controller);
+    $checks = [
+        'getGodinas',
+        'getGamtas',
+        'getGurmus',
+        'getPositions',
+        'getRecentRegistrations',
+        'getRegistrationStatistics',
+    ];
 
-    echo '<p>index() completed. Output length: ' . strlen($output) . '</p>';
-    echo '<details><summary>Output preview</summary><pre>' . htmlspecialchars(substr($output, 0, 4000)) . '</pre></details>';
+    foreach ($checks as $methodName) {
+        $method = $reflection->getMethod($methodName);
+        $method->setAccessible(true);
+
+        try {
+            $result = $method->invoke($controller);
+            $count = is_array($result) ? count($result) : 1;
+            echo '<p><strong>' . htmlspecialchars($methodName) . '</strong>: success (' . $count . ')</p>';
+        } catch (\Throwable $methodError) {
+            echo '<p style="color:red;"><strong>' . htmlspecialchars($methodName) . '</strong>: ' . htmlspecialchars($methodError->getMessage()) . '</p>';
+            echo '<p><strong>File:</strong> ' . htmlspecialchars($methodError->getFile()) . ' <strong>Line:</strong> ' . (int) $methodError->getLine() . '</p>';
+        }
+    }
+
+    $render = $reflection->getMethod('render');
+    $render->setAccessible(true);
+
+    try {
+        ob_start();
+        $output = $render->invoke($controller, 'admin/user_leader_registration', [
+            'title' => 'User & Leader Registration',
+            'godinas' => [],
+            'gamtas' => [],
+            'gurmus' => [],
+            'positions' => [],
+            'recent_registrations' => [],
+            'statistics' => [
+                'total_users' => 0,
+                'this_month' => 0,
+                'this_week' => 0,
+                'today' => 0,
+                'active_assignments' => 0,
+            ],
+            'current_user' => $_SESSION['user'],
+        ]);
+        ob_end_clean();
+
+        echo '<p><strong>render(admin/user_leader_registration)</strong>: success, output length ' . strlen((string) $output) . '</p>';
+    } catch (\Throwable $renderError) {
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        echo '<p style="color:red;"><strong>render(admin/user_leader_registration)</strong>: ' . htmlspecialchars($renderError->getMessage()) . '</p>';
+        echo '<p><strong>File:</strong> ' . htmlspecialchars($renderError->getFile()) . ' <strong>Line:</strong> ' . (int) $renderError->getLine() . '</p>';
+    }
 } catch (\Throwable $e) {
     if (ob_get_level() > 0) {
         ob_end_clean();
