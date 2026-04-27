@@ -400,12 +400,7 @@ class UserController extends Controller
         }
         
         try {
-            // Soft delete - update status instead of actually deleting
-            $success = $this->userModel->update($id, [
-                'status' => 'deleted',
-                'deleted_at' => date('Y-m-d H:i:s'),
-                'deleted_by' => auth_user()['id']
-            ]);
+            $success = $this->userModel->softDelete($id, auth_user()['id'] ?? null);
             
             if ($success) {
                 log_activity('user.deleted', "Deleted user: {$user['email']}", ['user_id' => $id]);

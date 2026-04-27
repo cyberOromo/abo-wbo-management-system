@@ -420,11 +420,19 @@ class User extends Model
      */
     public function softDelete($id, $deletedBy = null)
     {
-        return $this->update($id, [
-            'status' => 'deleted',
-            'deleted_at' => date('Y-m-d H:i:s'),
-            'deleted_by' => $deletedBy
-        ]);
+        $data = [
+            'status' => 'deleted'
+        ];
+
+        if ($this->db->columnExists($this->table, 'deleted_at')) {
+            $data['deleted_at'] = date('Y-m-d H:i:s');
+        }
+
+        if ($deletedBy !== null && $this->db->columnExists($this->table, 'deleted_by')) {
+            $data['deleted_by'] = $deletedBy;
+        }
+
+        return $this->update($id, $data);
     }
     
     /**
@@ -432,11 +440,19 @@ class User extends Model
      */
     public function restore($id)
     {
-        return $this->update($id, [
-            'status' => 'active',
-            'deleted_at' => null,
-            'deleted_by' => null
-        ]);
+        $data = [
+            'status' => 'active'
+        ];
+
+        if ($this->db->columnExists($this->table, 'deleted_at')) {
+            $data['deleted_at'] = null;
+        }
+
+        if ($this->db->columnExists($this->table, 'deleted_by')) {
+            $data['deleted_by'] = null;
+        }
+
+        return $this->update($id, $data);
     }
     
     /**
