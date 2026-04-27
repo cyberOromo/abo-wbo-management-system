@@ -185,7 +185,7 @@ class Router
      */
     public function dispatch(): void
     {
-        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        $method = $this->getRequestMethod();
         $path = $this->getCurrentPath();
         
         // DEBUG: Log route debugging info
@@ -213,6 +213,23 @@ class Router
         } catch (\Exception $e) {
             $this->handleException($e);
         }
+    }
+
+    /**
+     * Resolve the effective HTTP method, honoring form method spoofing.
+     */
+    protected function getRequestMethod(): string
+    {
+        $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+
+        if ($method === 'POST') {
+            $override = strtoupper((string) ($_POST['_method'] ?? ''));
+            if (in_array($override, ['PUT', 'PATCH', 'DELETE'], true)) {
+                return $override;
+            }
+        }
+
+        return $method;
     }
     
     /**
