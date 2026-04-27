@@ -274,7 +274,7 @@ class TaskController extends BaseController
                 'userScope' => $userScope,
                 'categories' => $this->getTaskCategoryOptions(),
                 'priorities' => $this->getTaskPriorityOptions(),
-                'scopes' => $this->getAvailableScopes($userScope),
+                'scopes' => $this->getAvailableScopes($userScope, (string) ($task['level_scope'] ?? '')),
                 'formAction' => '/tasks/' . $id . '/update',
                 'submitLabel' => 'Update Task',
             ]);
@@ -1147,17 +1147,20 @@ class TaskController extends BaseController
     /**
      * Get available scopes for task creation
      */
-    private function getAvailableScopes(array $user): array
+    private function getAvailableScopes(array $user, string $preferredScope = ''): array
     {
         $levelScope = (string) ($user['level_scope'] ?? $user['scope'] ?? '');
+        $scopes = [];
 
-        return match ($levelScope) {
-            'global' => ['global', 'godina', 'gamta', 'gurmu'],
-            'godina' => ['godina', 'gamta', 'gurmu'],
-            'gamta' => ['gamta', 'gurmu'],
-            'gurmu' => ['gurmu'],
-            default => [],
-        };
+        if ($preferredScope !== '') {
+            $scopes[] = $preferredScope;
+        }
+
+        if ($levelScope !== '') {
+            $scopes[] = $levelScope;
+        }
+
+        return array_values(array_unique($scopes));
     }
 
     protected function getUserScope(array $user): array
