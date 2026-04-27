@@ -127,7 +127,7 @@ class UserLeaderRegistrationController extends BaseController
 
             try {
                 // Create user account
-                $userId = $this->createUserAccount($userData);
+                $userId = $this->createUserAccount($userData, $positionData[0]);
                 
                 // Assign positions to user
                 $assignmentResults = $this->assignPositionsToUser($userId, $positionData);
@@ -569,11 +569,12 @@ class UserLeaderRegistrationController extends BaseController
     /**
      * Create user account
      */
-    private function createUserAccount(array $userData): int
+    private function createUserAccount(array $userData, array $primaryAssignment): int
     {
         // Generate temporary password
         $temporaryPassword = $this->generateTemporaryPassword();
         $passwordHash = password_hash($temporaryPassword, PASSWORD_DEFAULT);
+        $resolvedScope = $this->resolveUserScopeData($primaryAssignment);
 
         $storageRole = match ($userData['role']) {
             'admin', 'system_admin' => 'admin',
@@ -592,6 +593,9 @@ class UserLeaderRegistrationController extends BaseController
             'password_hash' => $passwordHash,
             'password' => $passwordHash,
             'user_type' => $storageRole,
+            'position_id' => $primaryAssignment['position_id'] ?? null,
+            'level_scope' => $resolvedScope['level_scope'],
+            'gurmu_id' => $resolvedScope['gurmu_id'],
             'status' => 'active',
             'date_of_birth' => $userData['date_of_birth'] ?: null,
             'birth_date' => $userData['date_of_birth'] ?: null,
@@ -893,6 +897,37 @@ class UserLeaderRegistrationController extends BaseController
         }
 
         return $filtered;
+    }
+
+    private function resolveUserScopeData(array $assignment): array
+    {
+        $levelScope = $assignment['hierarchy_level'] ?? 'gurmu';
+        $hierarchyId = isset($assignment['hierarchy_id']) ? (int) $assignment['hierarchy_id'] : 0;
+
+        $gurmuId = match ($levelScope) {
+            'gurmu' => $hierarchyId,
+            'gamta' => (int) ($this->db->fetchColumn(
+                'SELECT id FROM gurmus WHERE gamta_id = ? ORDER BY id LIMIT 1',
+                [$hierarchyId]
+            ) ?? 0),
+            'godina' => (int) ($this->db->fetchColumn(
+                'SELECT gu.id FROM gurmus gu JOIN gamtas ga ON gu.gamta_id = ga.id WHERE ga.godina_id = ? ORDER BY gu.id LIMIT 1',
+                [$hierarchyId]
+            ) ?? 0),
+            'global' => (int) ($this->db->fetchColumn(
+                'SELECT id FROM gurmus ORDER BY id LIMIT 1'
+            ) ?? 0),
+            default => 0,
+        };
+
+        if ($gurmuId <= 0) {
+            throw new Exception('Unable to resolve a Gurmu scope for the selected assignment.');
+        }
+
+        return [
+            'level_scope' => $levelScope,
+            'gurmu_id' => $gurmuId,
+        ];
     }
 
     /**
