@@ -453,8 +453,11 @@ class UserLeaderRegistrationController extends BaseController
      */
     private function enforceSystemAdminAccess()
     {
-        if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['system_admin', 'super_admin'])) {
-            if (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin') {
+        $currentUser = auth_user();
+        $normalizedRole = function_exists('normalized_user_role') ? normalized_user_role($currentUser) : ($currentUser['role'] ?? null);
+
+        if (!$currentUser || !in_array($normalizedRole, ['admin', 'system_admin', 'super_admin'], true)) {
+            if (($currentUser['role'] ?? null) === 'admin') {
                 return;
             }
 
